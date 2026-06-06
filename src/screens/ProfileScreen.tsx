@@ -15,21 +15,23 @@ import * as Location from 'expo-location';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { useProfile } from '../hooks/useProfile';
+import { usePreference } from '../hooks/usePreference';
 
 export default function ProfileScreen() {
   const { session } = useAuth();
 
   const { profile, update } = useProfile();
 
-  const [radius, setRadius] = useState<
-    number | null
-  >(null);
+  const [radius, setRadius] = useState<number | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const [savingLocation, setSavingLocation] =
-    useState(false);
+  const [savingLocation, setSavingLocation] = useState(false);
 
-  const displayRadius =
-    radius ?? profile?.search_radius_km ?? 200;
+  const displayRadius = radius ?? profile?.search_radius_km ?? 200;
+
+  const { value: skipConfirm, setValue: setSkipConfirm } = usePreference<boolean>(
+    'skipUnfollowConfirm',
+    false,
+  );
 
   const handleSyncConcerts = async () => {
     try {
@@ -62,27 +64,17 @@ export default function ProfileScreen() {
   const handleSetHomeLocation = async () => {
     try {
       setSavingLocation(true);
-      const { status } =
-        await Location.requestForegroundPermissionsAsync();
+      const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(
-          'Permiso denegado',
-          'Necesitamos acceso a la ubicación',
-        );
+        Alert.alert('Permiso denegado', 'Necesitamos acceso a la ubicación');
         return;
       }
-      const pos =
-        await Location.getCurrentPositionAsync(
-          {},
-        );
+      const pos = await Location.getCurrentPositionAsync({});
       await update({
         home_lat: pos.coords.latitude,
         home_lng: pos.coords.longitude,
       });
-      Alert.alert(
-        'Listo',
-        'Ubicación de referencia guardada',
-      );
+      Alert.alert('Listo', 'Ubicación de referencia guardada');
     } catch (err: any) {
       Alert.alert('Error', err.message);
     } finally {
@@ -90,19 +82,14 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleRadiusComplete = async (
-    value: number,
-  ) => {
+  const handleRadiusComplete = async (value: number) => {
     const rounded = Math.round(value / 10) * 10;
     try {
       await update({
         search_radius_km: rounded,
       });
     } catch (err: any) {
-      Alert.alert(
-        'Error al guardar radio',
-        err.message,
-      );
+      Alert.alert('Error al guardar radio', err.message);
     }
   };
 
@@ -115,24 +102,16 @@ export default function ProfileScreen() {
     >
       {/* Cabecera */}
       <View style={styles.section}>
-        <Text style={styles.email}>
-          {session?.user.email}
-        </Text>
+        <Text style={styles.email}>{session?.user.email}</Text>
       </View>
 
       {/* Radio de búsqueda (push) */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          Radio para notificaciones
-        </Text>
+        <Text style={styles.sectionTitle}>Radio para notificaciones</Text>
         <Text style={styles.sectionDescription}>
-          Distancia máxima desde tu ubicación de
-          referencia para avisarte de nuevos
-          conciertos.
+          Distancia máxima desde tu ubicación de referencia para avisarte de nuevos conciertos.
         </Text>
-        <Text style={styles.radiusValue}>
-          {displayRadius} km
-        </Text>
+        <Text style={styles.radiusValue}>{displayRadius} km</Text>
         <Slider
           style={{
             width: '100%',
@@ -152,23 +131,16 @@ export default function ProfileScreen() {
 
       {/* Ubicación de referencia */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          Ubicación de referencia
-        </Text>
+        <Text style={styles.sectionTitle}>Ubicación de referencia</Text>
         <Text style={styles.sectionDescription}>
-          Solo para notificaciones. El mapa usa
-          siempre tu ubicación actual.
+          Solo para notificaciones. El mapa usa siempre tu ubicación actual.
         </Text>
-        {profile?.home_lat &&
-        profile?.home_lng ? (
+        {profile?.home_lat && profile?.home_lng ? (
           <Text style={styles.locationText}>
-            {profile.home_lat.toFixed(3)},{' '}
-            {profile.home_lng.toFixed(3)}
+            {profile.home_lat.toFixed(3)}, {profile.home_lng.toFixed(3)}
           </Text>
         ) : (
-          <Text style={styles.locationText}>
-            Sin establecer
-          </Text>
+          <Text style={styles.locationText}>Sin establecer</Text>
         )}
         <TouchableOpacity
           style={styles.secondaryButton}
@@ -178,14 +150,22 @@ export default function ProfileScreen() {
           {savingLocation ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text
-              style={styles.secondaryButtonText}
-            >
-              Usar mi ubicación actual
-            </Text>
+            <Text style={styles.secondaryButtonText}>Usar mi ubicación actual</Text>
           )}
         </TouchableOpacity>
       </View>
+
+      {skipConfirm && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Confirmaciones</Text>
+          <Text style={styles.sectionDescription}>
+            Has desactivado la confirmación al dejar de seguir bandas.
+          </Text>
+          <TouchableOpacity style={styles.secondaryButton} onPress={() => setSkipConfirm(false)}>
+            <Text style={styles.secondaryButtonText}>Volver a preguntar</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Acciones */}
       <View style={styles.section}>
@@ -197,9 +177,7 @@ export default function ProfileScreen() {
           {syncing ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.actionButtonText}>
-              Sincronizar conciertos
-            </Text>
+            <Text style={styles.actionButtonText}>Sincronizar conciertos</Text>
           )}
         </TouchableOpacity>
 
@@ -214,15 +192,10 @@ export default function ProfileScreen() {
         />
 
         <TouchableOpacity
-          style={[
-            styles.actionButton,
-            styles.logoutButton,
-          ]}
+          style={[styles.actionButton, styles.logoutButton]}
           onPress={() => supabase.auth.signOut()}
         >
-          <Text style={styles.actionButtonText}>
-            Cerrar sesión
-          </Text>
+          <Text style={styles.actionButtonText}>Cerrar sesión</Text>
         </TouchableOpacity>
       </View>
 

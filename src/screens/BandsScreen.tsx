@@ -10,8 +10,6 @@ import {
   TouchableOpacity,
   View,
   LayoutAnimation,
-  Platform,
-  UIManager,
 } from 'react-native';
 import BandSearch, { SearchedBand } from '../components/BandSearch';
 import { useFollowedBands } from '../hooks/useFollowedBands';
@@ -19,6 +17,7 @@ import { useRecommendations, RecommendedBand } from '../hooks/useRecomendations'
 import { followBand } from '../lib/bands';
 import { useQueryClient } from '@tanstack/react-query';
 import PulsingBadge from '../components/PulsingBadge';
+import { usePreference } from '../hooks/usePreference';
 
 export default function BandsScreen() {
   const { bands: followedBands, loading: loadingFollowed, unfollow } = useFollowedBands();
@@ -47,6 +46,11 @@ export default function BandsScreen() {
     null,
   );
 
+  const { value: skipConfirm, setValue: setSkipConfirm } = usePreference<boolean>(
+    'skipUnfollowConfirm',
+    false,
+  );
+
   const visibleRecs = useMemo(() => {
     const filtered = recommendations.filter((r) => !followedNames.has(r.name.toLowerCase()));
 
@@ -66,10 +70,6 @@ export default function BandsScreen() {
     result.splice(insertAt, 0, ...newOnes);
     return result;
   }, [recommendations, followedNames, insertSlot]);
-
-  if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-    UIManager.setLayoutAnimationEnabledExperimental(true);
-  }
 
   const handleFollowSearched = async (band: SearchedBand) => {
     await followBand(band);
@@ -101,8 +101,21 @@ export default function BandsScreen() {
   };
 
   const handleUnfollow = (bandId: string, bandName: string) => {
+    if (skipConfirm) {
+      unfollow(bandId);
+      return;
+    }
+
     Alert.alert('Dejar de seguir', `¿Quitar a ${bandName}?`, [
       { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Quitar y no preguntar más',
+        style: 'destructive',
+        onPress: () => {
+          setSkipConfirm(true);
+          unfollow(bandId);
+        },
+      },
       {
         text: 'Quitar',
         style: 'destructive',
