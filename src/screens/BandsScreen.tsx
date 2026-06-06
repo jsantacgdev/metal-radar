@@ -9,18 +9,30 @@ import {
   Text,
   TouchableOpacity,
   View,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
 import BandSearch, { SearchedBand } from '../components/BandSearch';
 import { useFollowedBands } from '../hooks/useFollowedBands';
 import { useRecommendations, RecommendedBand } from '../hooks/useRecomendations';
 import { followBand } from '../lib/bands';
 import { useQueryClient } from '@tanstack/react-query';
+import PulsingBadge from '../components/PulsingBadge';
 
 export default function BandsScreen() {
   const { bands: followedBands, loading: loadingFollowed, unfollow } = useFollowedBands();
 
   const { recommendations, loading: loadingRecs } = useRecommendations();
+
+  const queryClient = useQueryClient();
+
+  const [followingId, setFollowingId] = useState<string | null>(null);
+
+  const followedPositionRef = useRef<number | null>(null);
+
+  const [newBandIds, setNewBandIds] = useState<Set<string>>(new Set());
+  const previousIdsRef = useRef<Set<string> | null>(null);
 
   const followedSpotifyIds = useMemo(() => {
     return new Set<string>();
@@ -31,14 +43,33 @@ export default function BandsScreen() {
     [followedBands],
   );
 
-  const visibleRecs = recommendations.filter((r) => !followedNames.has(r.name.toLowerCase()));
+  const [insertSlot, setInsertSlot] = useState<{ position: number; bandIds: string[] } | null>(
+    null,
+  );
 
-  const queryClient = useQueryClient();
+  const visibleRecs = useMemo(() => {
+    const filtered = recommendations.filter((r) => !followedNames.has(r.name.toLowerCase()));
 
-  const [followingId, setFollowingId] = useState<string | null>(null);
+    if (!insertSlot || insertSlot.bandIds.length === 0) return filtered;
 
-  const [newBandIds, setNewBandIds] = useState<Set<string>>(new Set());
-  const previousIdsRef = useRef<Set<string> | null>(null);
+    const insertSet = new Set(insertSlot.bandIds);
+    const newOnes: RecommendedBand[] = [];
+    const others: RecommendedBand[] = [];
+    for (const rec of filtered) {
+      if (insertSet.has(rec.spotify_id)) newOnes.push(rec);
+      else others.push(rec);
+    }
+
+    // Insertar las nuevas en la posición guardada
+    const result = [...others];
+    const insertAt = Math.min(insertSlot.position, result.length);
+    result.splice(insertAt, 0, ...newOnes);
+    return result;
+  }, [recommendations, followedNames, insertSlot]);
+
+  if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  }
 
   const handleFollowSearched = async (band: SearchedBand) => {
     await followBand(band);
@@ -51,16 +82,17 @@ export default function BandsScreen() {
   };
 
   const handleFollowRec = async (band: RecommendedBand) => {
-    if (followingId) return; // ya hay una operación en curso
+    if (followingId) return;
     try {
       setFollowingId(band.spotify_id);
+
+      // Guardar la posición ANTES de cualquier cambio
+      const position = visibleRecs.findIndex((r) => r.spotify_id === band.spotify_id);
+      followedPositionRef.current = position;
+
       await followBand(band);
-      queryClient.invalidateQueries({
-        queryKey: ['followedBands'],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ['recommendations'],
-      });
+      queryClient.invalidateQueries({ queryKey: ['followedBands'] });
+      queryClient.invalidateQueries({ queryKey: ['recommendations'] });
     } catch (err: any) {
       Alert.alert('Error', err.message);
     } finally {
@@ -85,13 +117,11 @@ export default function BandsScreen() {
 
     const currentIds = new Set(recommendations.map((r) => r.spotify_id));
 
-    // Primera carga: solo guardamos referencia, no marcamos nada
     if (previousIdsRef.current === null) {
       previousIdsRef.current = currentIds;
       return;
     }
 
-    // Detectar las que no estaban antes
     const fresh = new Set<string>();
     for (const id of currentIds) {
       if (!previousIdsRef.current.has(id)) fresh.add(id);
@@ -100,15 +130,26 @@ export default function BandsScreen() {
     previousIdsRef.current = currentIds;
 
     if (fresh.size > 0) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setNewBandIds((prev) => new Set([...prev, ...fresh]));
 
-      // Quitar el badge después de 8 segundos
+      // Recordar dónde estaba la banda que el usuario acaba de seguir
+      if (followedPositionRef.current !== null) {
+        setInsertSlot({
+          position: followedPositionRef.current,
+          bandIds: Array.from(fresh),
+        });
+        followedPositionRef.current = null;
+      }
+
       setTimeout(() => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setNewBandIds((prev) => {
           const next = new Set(prev);
           for (const id of fresh) next.delete(id);
           return next;
         });
+        setInsertSlot(null);
       }, 8000);
     }
   }, [recommendations]);
@@ -185,11 +226,7 @@ export default function BandsScreen() {
                   <Text style={styles.bandName} numberOfLines={1}>
                     {rec.name}
                   </Text>
-                  {newBandIds.has(rec.spotify_id) && (
-                    <View style={styles.newBadge}>
-                      <Text style={styles.newBadgeText}>NUEVO</Text>
-                    </View>
-                  )}
+                  {newBandIds.has(rec.spotify_id) && <PulsingBadge />}
                 </View>
                 {rec.genres.length > 0 && (
                   <Text style={styles.genres} numberOfLines={1}>
@@ -273,18 +310,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-  },
-  newBadge: {
-    backgroundColor: '#1f7a3a',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginRight: 10,
-  },
-  newBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
   },
 });
