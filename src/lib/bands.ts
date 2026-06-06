@@ -38,10 +38,11 @@ export async function followBand(
 
   const { error: followError } = await supabase
     .from('user_bands')
-    .upsert(
-      { user_id: user.id, band_id: bandRow.id },
-      { onConflict: 'user_id,band_id' },
-    );
+    .insert({
+      user_id: user.id,
+      band_id: bandRow.id,
+    });
 
-  if (followError) throw followError;
+  if (followError && followError.code !== '23505')
+    throw followError;
 }
