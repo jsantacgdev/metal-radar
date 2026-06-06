@@ -14,26 +14,22 @@ const NOMINATIM_HEADERS = {
   'User-Agent': 'MetalRadar/1.0 (contacto: tu@email.com)',
 };
 
-type TmEvent = {
-  id: string;
-  name: string;
-  url: string;
-  dates: { start: { dateTime?: string; localDate?: string } };
-  priceRanges?: { min: number; max: number; currency: string }[];
-  _embedded?: {
-    venues?: {
-      id: string;
-      name: string;
-      city?: { name: string };
-      country?: { name: string };
-      location?: { latitude: string; longitude: string };
-    }[];
-  };
-};
+const TRIBUTE_KEYWORDS =
+  /\b(tribute|tributo|homenaje|cover|vs\.?|versus|experience|story of|by candlelight|reimagined|symphonic)\b/i;
 
 function normalizeCountry(name?: string): string | null {
   if (!name) return null;
   return name.toLowerCase().trim();
+}
+
+function normalizeName(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // quita diacríticos
+    .replace(/[^\w\s]/g, '') // quita signos de puntuación
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
@@ -63,6 +59,23 @@ async function forwardGeocode(query: string): Promise<{ lat: number; lng: number
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+type TmEvent = {
+  id: string;
+  name: string;
+  url: string;
+  dates: { start: { dateTime?: string; localDate?: string } };
+  priceRanges?: { min: number; max: number; currency: string }[];
+  _embedded?: {
+    venues?: {
+      id: string;
+      name: string;
+      city?: { name: string };
+      country?: { name: string };
+      location?: { latitude: string; longitude: string };
+    }[];
+  };
+};
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS_HEADERS });
@@ -86,7 +99,7 @@ Deno.serve(async (req) => {
 
     const { data: userBands, error: ubError } = await admin
       .from('user_bands')
-      .select('band_id, bands(id, name, spotify_id)')
+      .select('band_id, bands(id, name, spotify_id, ticketmaster_id)')
       .eq('user_id', user.id);
 
     if (ubError) throw ubError;
@@ -103,17 +116,58 @@ Deno.serve(async (req) => {
       const band = (ub as any).bands;
       if (!band?.name) continue;
 
+      // 1. Conseguir attractionId (cacheado o nuevo)
+      let attractionId: string | null = band.ticketmaster_id;
+
+      if (!attractionId) {
+        const attrUrl =
+          `https://app.ticketmaster.com/discovery/v2/attractions.json?` +
+          `keyword=${encodeURIComponent(band.name)}` +
+          `&classificationName=music` +
+          `&size=5` +
+          `&apikey=${TICKETMASTER_API_KEY}`;
+
+        const attrRes = await fetch(attrUrl);
+        if (!attrRes.ok) {
+          console.warn(`Ticketmaster attractions error for ${band.name}: ${attrRes.status}`);
+          continue;
+        }
+
+        const attrData = await attrRes.json();
+        const attractions = attrData._embedded?.attractions ?? [];
+
+        const target = normalizeName(band.name);
+
+        let matched = attractions.find((a: any) => normalizeName(a.name) === target);
+
+        if (!matched) {
+          matched = attractions.find((a: any) => {
+            const candidate = normalizeName(a.name);
+            return candidate.includes(target) || target.includes(candidate);
+          });
+        }
+
+        if (!matched) {
+          console.warn(`No attraction match for "${band.name}", skipping`);
+          continue;
+        }
+
+        attractionId = matched.id;
+
+        await admin.from('bands').update({ ticketmaster_id: attractionId }).eq('id', band.id);
+      }
+
+      // 2. Eventos por attractionId (oficial, no tributos)
       const tmUrl =
         `https://app.ticketmaster.com/discovery/v2/events.json?` +
-        `keyword=${encodeURIComponent(band.name)}` +
-        `&classificationName=music` +
+        `attractionId=${attractionId}` +
         `&size=20` +
         `&sort=date,asc` +
         `&apikey=${TICKETMASTER_API_KEY}`;
 
       const tmRes = await fetch(tmUrl);
       if (!tmRes.ok) {
-        console.warn(`Ticketmaster error for ${band.name}: ${tmRes.status}`);
+        console.warn(`Ticketmaster events error for ${band.name}: ${tmRes.status}`);
         continue;
       }
 
@@ -121,6 +175,13 @@ Deno.serve(async (req) => {
       const events: TmEvent[] = tmData._embedded?.events ?? [];
 
       for (const ev of events) {
+        // Backup: filtrar tributos por nombre
+        if (TRIBUTE_KEYWORDS.test(ev.name)) {
+          console.warn(`Skipping tribute-like event: ${ev.name}`);
+          discardedConcerts++;
+          continue;
+        }
+
         const venue = ev._embedded?.venues?.[0];
         if (!venue) continue;
 
@@ -131,11 +192,11 @@ Deno.serve(async (req) => {
         let lat: number | null = venue.location ? parseFloat(venue.location.latitude) : null;
         let lng: number | null = venue.location ? parseFloat(venue.location.longitude) : null;
 
-        // 1. Si hay coords y país declarado, validar con reverse geocoding
+        // Validar coordenadas con reverse geocoding
         let needsForwardGeocode = false;
         if (lat != null && lng != null && declaredCountry) {
           const realCountry = await reverseGeocode(lat, lng);
-          await sleep(1100); // rate limit
+          await sleep(1100);
           if (realCountry && realCountry !== declaredCountry) {
             console.warn(
               `Venue ${venue.name}: declared ${declaredCountry} but coords are in ${realCountry}, will re-geocode`,
@@ -146,7 +207,7 @@ Deno.serve(async (req) => {
           needsForwardGeocode = true;
         }
 
-        // 2. Si las coords son sospechosas o faltan, geocodificar la dirección
+        // Si las coords son sospechosas, geocodificar dirección textual
         if (needsForwardGeocode) {
           const query = [venue.name, venue.city?.name, venue.country?.name]
             .filter(Boolean)
@@ -168,7 +229,6 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Upsert venue
         const { data: venueRow, error: venueError } = await admin
           .from('venues')
           .upsert(

@@ -3,6 +3,9 @@ import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } fr
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useNearbyConcerts, ConcertWithDetails } from '../hooks/useNearbyConcerts';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { MapStackParamList } from '../navigation/MapStack';
 
 const DEFAULT_RADIUS_KM = 200;
 
@@ -17,6 +20,8 @@ export default function MapScreen() {
     location?.lng ?? null,
     DEFAULT_RADIUS_KM,
   );
+
+  const navigation = useNavigation<NativeStackNavigationProp<MapStackParamList>>();
 
   useEffect(() => {
     (async () => {
@@ -118,6 +123,16 @@ export default function MapScreen() {
               Desde {selected.price_min} {selected.currency}
             </Text>
           )}
+          <TouchableOpacity
+            style={styles.cardButton}
+            onPress={() => {
+              const id = selected.id;
+              setSelected(null);
+              navigation.navigate('ConcertDetail', { concertId: id });
+            }}
+          >
+            <Text style={styles.cardButtonText}>Ver detalle</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.closeButton} onPress={() => setSelected(null)}>
             <Text style={styles.closeButtonText}>Cerrar</Text>
           </TouchableOpacity>
