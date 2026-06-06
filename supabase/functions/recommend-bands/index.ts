@@ -79,10 +79,17 @@ async function getSimilarFromLastfm(
   );
 }
 
+type SpotifyArtistData = {
+  spotify_id: string;
+  name: string;
+  image_url: string | null;
+  genres: string[];
+};
+
 async function searchSpotifyArtist(
   name: string,
   token: string,
-) {
+): Promise<SpotifyArtistData | null> {
   const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(name)}&type=artist&limit=1`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
@@ -170,20 +177,26 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 2. Por cada banda seguida, pedir similares a Last.fm
-    const followedArr = Array.from(followedNames);
+    const followedArr = Array.from(
+      followedNames,
+    ) as string[];
+
+    // 2. Last.fm en paralelo: todas las bandas a la vez
+    const allSimilarLists = await Promise.all(
+      followedArr.map((name) =>
+        getSimilarFromLastfm(name),
+      ),
+    );
+
+    // 3. Agregar y puntuar candidatos
     const candidateScores = new Map<
       string,
       number
-    >(); // nombre -> puntuación
-
-    for (const name of followedArr) {
-      const similar = await getSimilarFromLastfm(
-        name as string,
-      );
+    >();
+    for (const similar of allSimilarLists) {
       for (const s of similar) {
         const key = s.toLowerCase();
-        if (followedNames.has(key)) continue; // ya la sigue
+        if (followedNames.has(key)) continue;
         candidateScores.set(
           key,
           (candidateScores.get(key) ?? 0) + 1,
@@ -191,7 +204,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 3. Top 15 candidatos por score
+    // 4. Top 15 candidatos por score
     const topCandidates = Array.from(
       candidateScores.entries(),
     )
@@ -199,17 +212,17 @@ Deno.serve(async (req) => {
       .slice(0, 15)
       .map(([name]) => name);
 
-    // 4. Enriquecer con datos de Spotify
+    // 5. Enriquecer con Spotify en paralelo
     const spotifyToken = await getSpotifyToken();
-    const recommendations: any[] = [];
+    const spotifyResults = await Promise.all(
+      topCandidates.map((c) =>
+        searchSpotifyArtist(c, spotifyToken),
+      ),
+    );
 
-    for (const candidate of topCandidates) {
-      const data = await searchSpotifyArtist(
-        candidate,
-        spotifyToken,
-      );
-      if (data) recommendations.push(data);
-    }
+    const recommendations = spotifyResults.filter(
+      (r): r is SpotifyArtistData => r !== null,
+    );
 
     return new Response(
       JSON.stringify({ recommendations }),
