@@ -14,17 +14,11 @@ import Slider from '@react-native-community/slider';
 import * as Location from 'expo-location';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { useFollowedBands } from '../hooks/useFollowedBands';
 import { useProfile } from '../hooks/useProfile';
 
 export default function ProfileScreen() {
   const { session } = useAuth();
-  const {
-    bands,
-    loading: loadingBands,
-    unfollow,
-    reload: reloadBands,
-  } = useFollowedBands();
+
   const { profile, update } = useProfile();
 
   const [radius, setRadius] = useState<
@@ -94,27 +88,6 @@ export default function ProfileScreen() {
     } finally {
       setSavingLocation(false);
     }
-  };
-
-  const handleUnfollow = (
-    bandId: string,
-    bandName: string,
-  ) => {
-    Alert.alert(
-      'Dejar de seguir',
-      `¿Quitar a ${bandName}?`,
-      [
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-        },
-        {
-          text: 'Quitar',
-          style: 'destructive',
-          onPress: () => unfollow(bandId),
-        },
-      ],
-    );
   };
 
   const handleRadiusComplete = async (
@@ -214,59 +187,6 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Bandas seguidas */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>
-            Bandas seguidas ({bands.length})
-          </Text>
-        </View>
-        {loadingBands ? (
-          <ActivityIndicator color="#dc2626" />
-        ) : bands.length === 0 ? (
-          <Text style={styles.emptyText}>
-            Aún no sigues ninguna banda
-          </Text>
-        ) : (
-          bands.map((b) => (
-            <View
-              key={b.id}
-              style={styles.bandRow}
-            >
-              {b.image_url ? (
-                <Image
-                  source={{
-                    uri: b.image_url,
-                  }}
-                  style={styles.bandImage}
-                />
-              ) : (
-                <View
-                  style={[
-                    styles.bandImage,
-                    {
-                      backgroundColor: '#333',
-                    },
-                  ]}
-                />
-              )}
-              <Text style={styles.bandName}>
-                {b.name}
-              </Text>
-              <TouchableOpacity
-                onPress={() =>
-                  handleUnfollow(b.id, b.name)
-                }
-              >
-                <Text style={styles.unfollow}>
-                  Quitar
-                </Text>
-              </TouchableOpacity>
-            </View>
-          ))
-        )}
-      </View>
-
       {/* Acciones */}
       <View style={styles.section}>
         <TouchableOpacity
@@ -349,31 +269,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 12,
   },
-  bandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  bandImage: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-  },
-  bandName: {
-    color: '#fff',
-    flex: 1,
-    marginLeft: 12,
-    fontSize: 15,
-  },
-  unfollow: {
-    color: '#dc2626',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  emptyText: {
-    color: '#666',
-    fontStyle: 'italic',
-  },
+
   actionButton: {
     backgroundColor: '#dc2626',
     padding: 14,
