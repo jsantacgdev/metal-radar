@@ -3,9 +3,10 @@ import { ActivityIndicator, View } from 'react-native';
 import { useAuth } from '../hooks/useAuth';
 import AuthNavigator from './AuthNavigator';
 import MainTabs from './MainTabs';
+import OnboardingScreen from '../screens/OnboardingScreen';
 
 export default function RootNavigator() {
-  const { session, loading } = useAuth();
+  const { session, loading, hasOnboarded, refreshOnboarding } = useAuth();
 
   if (loading) {
     return (
@@ -17,7 +18,13 @@ export default function RootNavigator() {
 
   return (
     <NavigationContainer theme={DarkTheme}>
-      {session ? <MainTabs /> : <AuthNavigator />}
+      {!session ? (
+        <AuthNavigator />
+      ) : hasOnboarded === false ? (
+        <OnboardingScreen onDone={refreshOnboarding} />
+      ) : (
+        <MainTabs />
+      )}
     </NavigationContainer>
   );
 }
