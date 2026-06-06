@@ -79,7 +79,7 @@ async function getSimilarFromLastfm(
   );
 }
 
-type SpotifyArtistData = {
+type BandData = {
   spotify_id: string;
   name: string;
   image_url: string | null;
@@ -89,7 +89,7 @@ type SpotifyArtistData = {
 async function searchSpotifyArtist(
   name: string,
   token: string,
-): Promise<SpotifyArtistData | null> {
+): Promise<BandData | null> {
   const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(name)}&type=artist&limit=1`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
@@ -181,7 +181,7 @@ Deno.serve(async (req) => {
       followedNames,
     ) as string[];
 
-    // 2. Last.fm en paralelo: todas las bandas a la vez
+    // 2. Last.fm en paralelo
     const allSimilarLists = await Promise.all(
       followedArr.map((name) =>
         getSimilarFromLastfm(name),
@@ -204,7 +204,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 4. Top 15 candidatos por score
+    // 4. Top 15 candidatos
     const topCandidates = Array.from(
       candidateScores.entries(),
     )
@@ -212,20 +212,127 @@ Deno.serve(async (req) => {
       .slice(0, 15)
       .map(([name]) => name);
 
-    // 5. Enriquecer con Spotify en paralelo
-    const spotifyToken = await getSpotifyToken();
-    const spotifyResults = await Promise.all(
-      topCandidates.map((c) =>
-        searchSpotifyArtist(c, spotifyToken),
-      ),
-    );
+    if (topCandidates.length === 0) {
+      return new Response(
+        JSON.stringify({ recommendations: [] }),
+        {
+          headers: {
+            ...CORS_HEADERS,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+    }
 
-    const recommendations = spotifyResults.filter(
-      (r): r is SpotifyArtistData => r !== null,
-    );
+    // 5. Buscar en caché (tabla bands) por nombre lowercase
+    const {
+      data: cachedBands,
+      error: cacheError,
+    } = await admin
+      .from('bands')
+      .select(
+        'spotify_id, name, image_url, genres',
+      )
+      .in('name', topCandidates) // matches case-sensitive
+      .not('spotify_id', 'is', null);
+
+    if (cacheError) {
+      console.warn(
+        'Cache lookup error:',
+        cacheError.message,
+      );
+    }
+
+    // También probar match case-insensitive: traer todas y filtrar en memoria
+    // Solo si lo anterior no encontró todo. Para simplificar, lo hacemos siempre:
+    const { data: allCandidateMatches } =
+      await admin
+        .from('bands')
+        .select(
+          'spotify_id, name, image_url, genres',
+        )
+        .not('spotify_id', 'is', null)
+        .filter(
+          'name',
+          'in',
+          `(${topCandidates.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')})`,
+        );
+
+    // Mapa de cacheadas por nombre normalizado
+    const cachedByName = new Map<
+      string,
+      BandData
+    >();
+    for (const row of cachedBands ?? []) {
+      cachedByName.set(
+        row.name.toLowerCase(),
+        row as BandData,
+      );
+    }
+    for (const row of allCandidateMatches ?? []) {
+      cachedByName.set(
+        row.name.toLowerCase(),
+        row as BandData,
+      );
+    }
+
+    // 6. Separar: cacheadas vs por buscar
+    const fromCache: BandData[] = [];
+    const toFetch: string[] = [];
+    for (const candidate of topCandidates) {
+      const cached = cachedByName.get(
+        candidate.toLowerCase(),
+      );
+      if (cached) fromCache.push(cached);
+      else toFetch.push(candidate);
+    }
+
+    // 7. Buscar los que faltan en Spotify (paralelo)
+    let fromSpotify: BandData[] = [];
+    if (toFetch.length > 0) {
+      const spotifyToken =
+        await getSpotifyToken();
+      const spotifyResults = await Promise.all(
+        toFetch.map((c) =>
+          searchSpotifyArtist(c, spotifyToken),
+        ),
+      );
+      fromSpotify = spotifyResults.filter(
+        (r): r is BandData => r !== null,
+      );
+
+      // Cachear en BD para futuros usuarios
+      if (fromSpotify.length > 0) {
+        const { error: insertError } = await admin
+          .from('bands')
+          .upsert(
+            fromSpotify.map((b) => ({
+              spotify_id: b.spotify_id,
+              name: b.name,
+              image_url: b.image_url,
+              genres: b.genres,
+            })),
+            { onConflict: 'spotify_id' },
+          );
+        if (insertError)
+          console.warn(
+            'Cache write error:',
+            insertError.message,
+          );
+      }
+    }
+
+    const recommendations = [
+      ...fromCache,
+      ...fromSpotify,
+    ];
 
     return new Response(
-      JSON.stringify({ recommendations }),
+      JSON.stringify({
+        recommendations,
+        cached: fromCache.length,
+        fetched: fromSpotify.length,
+      }),
       {
         headers: {
           ...CORS_HEADERS,

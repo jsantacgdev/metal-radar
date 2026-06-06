@@ -9,34 +9,45 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import {
+  useNavigation,
+  useFocusEffect,
+} from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback } from 'react';
-import { DiaryEntry, useDiary } from '../hooks/useDiary';
+import {
+  DiaryEntry,
+  useDiary,
+} from '../hooks/useDiary';
 import { DiaryStackParamList } from '../navigation/DiaryStack';
 
 type FilterMode = 'upcoming' | 'past';
 
 export default function DiaryScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<DiaryStackParamList>>();
-  const { entries, loading, error, reload } = useDiary();
-  const [filter, setFilter] = useState<FilterMode>('upcoming');
-
-  // Recargar al volver a la pantalla (por si marcaste algo en el detalle)
-  useFocusEffect(
-    useCallback(() => {
-      reload();
-    }, [reload]),
-  );
+  const navigation =
+    useNavigation<
+      NativeStackNavigationProp<DiaryStackParamList>
+    >();
+  const { entries, loading, error, reload } =
+    useDiary();
+  const [filter, setFilter] =
+    useState<FilterMode>('upcoming');
 
   const filtered = useMemo(() => {
     if (filter === 'upcoming') {
       return entries.filter(
-        (e) => e.status !== 'attended' && new Date(e.concert.event_date).getTime() >= Date.now(),
+        (e) =>
+          e.status !== 'attended' &&
+          new Date(
+            e.concert.event_date,
+          ).getTime() >= Date.now(),
       );
     }
     return entries.filter(
-      (e) => e.status === 'attended' || new Date(e.concert.event_date).getTime() < Date.now(),
+      (e) =>
+        e.status === 'attended' ||
+        new Date(e.concert.event_date).getTime() <
+          Date.now(),
     );
   }, [entries, filter]);
 
@@ -48,23 +59,34 @@ export default function DiaryScreen() {
           active={filter === 'upcoming'}
           onPress={() => setFilter('upcoming')}
         />
-        <FilterTab label="Pasados" active={filter === 'past'} onPress={() => setFilter('past')} />
+        <FilterTab
+          label="Pasados"
+          active={filter === 'past'}
+          onPress={() => setFilter('past')}
+        />
       </View>
 
       {error && (
         <View style={styles.errorBox}>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={styles.errorText}>
+            {error}
+          </Text>
         </View>
       )}
 
       {loading && entries.length === 0 ? (
         <View style={styles.centered}>
-          <ActivityIndicator color="#dc2626" size="large" />
+          <ActivityIndicator
+            color="#dc2626"
+            size="large"
+          />
         </View>
       ) : filtered.length === 0 ? (
         <View style={styles.centered}>
           <Text style={styles.emptyTitle}>
-            {filter === 'upcoming' ? 'Sin próximos conciertos' : 'Sin conciertos pasados'}
+            {filter === 'upcoming'
+              ? 'Sin próximos conciertos'
+              : 'Sin conciertos pasados'}
           </Text>
           <Text style={styles.emptySub}>
             {filter === 'upcoming'
@@ -78,12 +100,21 @@ export default function DiaryScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ padding: 16 }}
           refreshControl={
-            <RefreshControl refreshing={loading} onRefresh={reload} tintColor="#dc2626" />
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={reload}
+              tintColor="#dc2626"
+            />
           }
           renderItem={({ item }) => (
             <DiaryItem
               entry={item}
-              onPress={() => navigation.navigate('ConcertDetail', { concertId: item.concert_id })}
+              onPress={() =>
+                navigation.navigate(
+                  'ConcertDetail',
+                  { concertId: item.concert_id },
+                )
+              }
             />
           )}
         />
@@ -102,27 +133,55 @@ function FilterTab({
   onPress: () => void;
 }) {
   return (
-    <TouchableOpacity style={[styles.tab, active && styles.tabActive]} onPress={onPress}>
-      <Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text>
+    <TouchableOpacity
+      style={[
+        styles.tab,
+        active && styles.tabActive,
+      ]}
+      onPress={onPress}
+    >
+      <Text
+        style={[
+          styles.tabText,
+          active && styles.tabTextActive,
+        ]}
+      >
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 }
 
-function DiaryItem({ entry, onPress }: { entry: DiaryEntry; onPress: () => void }) {
+function DiaryItem({
+  entry,
+  onPress,
+}: {
+  entry: DiaryEntry;
+  onPress: () => void;
+}) {
   const date = new Date(entry.concert.event_date);
-  const dateStr = date.toLocaleDateString('es-ES', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  const dateStr = date.toLocaleDateString(
+    'es-ES',
+    {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    },
+  );
 
-  const statusLabel: Record<DiaryEntry['status'], string> = {
+  const statusLabel: Record<
+    DiaryEntry['status'],
+    string
+  > = {
     interested: 'Me interesa',
     going: 'Voy',
     attended: 'Asistí',
   };
 
-  const statusColor: Record<DiaryEntry['status'], string> = {
+  const statusColor: Record<
+    DiaryEntry['status'],
+    string
+  > = {
     interested: '#666',
     going: '#dc2626',
     attended: '#1f7a3a',
@@ -131,23 +190,55 @@ function DiaryItem({ entry, onPress }: { entry: DiaryEntry; onPress: () => void 
   const firstBand = entry.concert.bands[0];
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress}>
+    <TouchableOpacity
+      style={styles.card}
+      onPress={onPress}
+    >
       {firstBand?.image_url ? (
-        <Image source={{ uri: firstBand.image_url }} style={styles.cardImage} />
+        <Image
+          source={{ uri: firstBand.image_url }}
+          style={styles.cardImage}
+        />
       ) : (
-        <View style={[styles.cardImage, { backgroundColor: '#222' }]} />
+        <View
+          style={[
+            styles.cardImage,
+            { backgroundColor: '#222' },
+          ]}
+        />
       )}
       <View style={{ flex: 1, marginLeft: 12 }}>
-        <Text style={styles.cardTitle} numberOfLines={1}>
-          {entry.concert.bands.map((b) => b.name).join(' · ')}
+        <Text
+          style={styles.cardTitle}
+          numberOfLines={1}
+        >
+          {entry.concert.bands
+            .map((b) => b.name)
+            .join(' · ')}
         </Text>
-        <Text style={styles.cardSub} numberOfLines={1}>
-          {entry.concert.venue.name} · {entry.concert.venue.city}
+        <Text
+          style={styles.cardSub}
+          numberOfLines={1}
+        >
+          {entry.concert.venue.name} ·{' '}
+          {entry.concert.venue.city}
         </Text>
         <View style={styles.cardMetaRow}>
-          <Text style={styles.cardDate}>{dateStr}</Text>
-          <View style={[styles.badge, { backgroundColor: statusColor[entry.status] }]}>
-            <Text style={styles.badgeText}>{statusLabel[entry.status]}</Text>
+          <Text style={styles.cardDate}>
+            {dateStr}
+          </Text>
+          <View
+            style={[
+              styles.badge,
+              {
+                backgroundColor:
+                  statusColor[entry.status],
+              },
+            ]}
+          >
+            <Text style={styles.badgeText}>
+              {statusLabel[entry.status]}
+            </Text>
           </View>
         </View>
       </View>

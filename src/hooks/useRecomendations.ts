@@ -1,8 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useState,
-} from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 
 export type RecommendedBand = {
@@ -12,49 +8,37 @@ export type RecommendedBand = {
   genres: string[];
 };
 
+async function fetchRecommendations(): Promise<
+  RecommendedBand[]
+> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const res = await fetch(
+    `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/recommend-bands`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session?.access_token}`,
+      },
+    },
+  );
+  const json = await res.json();
+  if (json.error) throw new Error(json.error);
+  return json.recommendations ?? [];
+}
+
 export function useRecommendations() {
-  const [recommendations, setRecommendations] =
-    useState<RecommendedBand[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<
-    string | null
-  >(null);
-
-  const load = useCallback(async () => {
-    try {
-      setLoading(true);
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const res = await fetch(
-        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/recommend-bands`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${session?.access_token}`,
-          },
-        },
-      );
-      const json = await res.json();
-      if (json.error) throw new Error(json.error);
-      setRecommendations(
-        json.recommendations ?? [],
-      );
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const query = useQuery({
+    queryKey: ['recommendations'],
+    queryFn: fetchRecommendations,
+    staleTime: 10 * 60 * 1000,
+  });
 
   return {
-    recommendations,
-    loading,
-    error,
-    reload: load,
+    recommendations: query.data ?? [],
+    loading: query.isLoading,
+    error: query.error?.message ?? null,
+    reload: query.refetch,
   };
 }

@@ -15,7 +15,6 @@ export async function followBand(
   } = await supabase.auth.getUser();
   if (!user) throw new Error('Sin sesión');
 
-  // Upsert en bands
   const { data: bandRow, error: bandError } =
     await supabase
       .from('bands')
@@ -37,7 +36,6 @@ export async function followBand(
       new Error('Error al guardar banda')
     );
 
-  // Upsert en user_bands
   const { error: followError } = await supabase
     .from('user_bands')
     .upsert(

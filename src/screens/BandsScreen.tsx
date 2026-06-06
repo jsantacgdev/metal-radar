@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Image,
   RefreshControl,
   ScrollView,
@@ -22,29 +21,20 @@ import {
   RecommendedBand,
 } from '../hooks/useRecomendations';
 import { followBand } from '../lib/bands';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function BandsScreen() {
   const {
     bands: followedBands,
     loading: loadingFollowed,
-    reload: reloadFollowed,
     unfollow,
   } = useFollowedBands();
   const {
     recommendations,
     loading: loadingRecs,
-    reload: reloadRecs,
   } = useRecommendations();
 
-  useFocusEffect(
-    useCallback(() => {
-      reloadFollowed();
-    }, [reloadFollowed]),
-  );
-
   const followedSpotifyIds = useMemo(() => {
-    // No tenemos spotify_id en FollowedBand directamente. Lo añadimos al hook si quieres,
-    // pero como filtro extra usaremos comparación por nombre (case-insensitive).
     return new Set<string>();
   }, [followedBands]);
 
@@ -63,11 +53,18 @@ export default function BandsScreen() {
       !followedNames.has(r.name.toLowerCase()),
   );
 
+  const queryClient = useQueryClient();
+
   const handleFollowSearched = async (
     band: SearchedBand,
   ) => {
     await followBand(band);
-    await reloadFollowed();
+    queryClient.invalidateQueries({
+      queryKey: ['followedBands'],
+    });
+    queryClient.invalidateQueries({
+      queryKey: ['recommendations'],
+    });
   };
 
   const handleFollowRec = async (
@@ -75,8 +72,12 @@ export default function BandsScreen() {
   ) => {
     try {
       await followBand(band);
-      await reloadFollowed();
-      await reloadRecs();
+      queryClient.invalidateQueries({
+        queryKey: ['followedBands'],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['recommendations'],
+      });
     } catch (err: any) {
       Alert.alert('Error', err.message);
     }
@@ -112,10 +113,6 @@ export default function BandsScreen() {
           refreshing={
             loadingFollowed || loadingRecs
           }
-          onRefresh={() => {
-            reloadFollowed();
-            reloadRecs();
-          }}
           tintColor="#dc2626"
         />
       }
