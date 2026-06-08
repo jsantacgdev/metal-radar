@@ -58,16 +58,60 @@ type BandData = {
   genres: string[];
 };
 
-async function searchSpotifyArtist(name: string, token: string): Promise<BandData | null> {
+async function searchSpotifyArtist(
+  name: string,
+  token: string,
+  admin: any,
+  retryCount = 0,
+): Promise<BandData | null> {
+  // 1. Buscar primero en BD (case-insensitive con ilike)
+  const { data: existing } = await admin
+    .from('bands')
+    .select('spotify_id, name, image_url, genres')
+    .ilike('name', name)
+    .not('spotify_id', 'is', null)
+    .limit(1)
+    .maybeSingle();
+
+  if (existing) {
+    return {
+      spotify_id: existing.spotify_id,
+      name: existing.name,
+      image_url: existing.image_url,
+      genres: existing.genres ?? [],
+    };
+  }
+
+  // 2. Si no está en BD, consultar Spotify
   const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(name)}&type=artist&limit=1`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) return null;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+
+  if (res.status === 429 && retryCount < 2) {
+    const retryAfter = parseInt(res.headers.get('Retry-After') ?? '2', 10);
+    // Si el bloqueo es muy largo (>60s), abortamos para no quedarnos colgados
+    if (retryAfter > 60) {
+      console.log(`Spotify 429 for "${name}", retry too long (${retryAfter}s), skipping`);
+      return null;
+    }
+    console.log(`Spotify 429 for "${name}", retrying after ${retryAfter}s`);
+    await new Promise((r) => setTimeout(r, (retryAfter + 0.5) * 1000));
+    return searchSpotifyArtist(name, token, admin, retryCount + 1);
+  }
+
+  if (!res.ok) {
+    console.log(`Spotify search "${name}" → ${res.status}`);
+    return null;
+  }
+
   const data = await res.json();
   const artist = data.artists?.items?.[0];
-  if (!artist) return null;
-  if (artist.name.toLowerCase() !== name.toLowerCase()) return null;
+  if (!artist) {
+    console.log(`Spotify no result for "${name}"`);
+    return null;
+  }
+  if (artist.name.toLowerCase() !== name.toLowerCase()) {
+    return null;
+  }
   return {
     spotify_id: artist.id,
     name: artist.name,
@@ -112,6 +156,9 @@ Deno.serve(async (req) => {
       (userBands ?? []).map((ub: any) => ub.band?.name?.toLowerCase()).filter(Boolean),
     );
 
+    console.log(`userBands count: ${userBands?.length ?? 0}`);
+    console.log(`followedNames: ${Array.from(followedNames).slice(0, 5).join(', ')}...`);
+
     if (followedNames.size === 0) {
       return new Response(JSON.stringify({ recommendations: [] }), {
         headers: {
@@ -127,6 +174,7 @@ Deno.serve(async (req) => {
     const allSimilarLists = await Promise.all(
       followedArr.map((name) => getSimilarFromLastfm(name)),
     );
+    console.log(`Last.fm results per band: ${allSimilarLists.map((l) => l.length).join(', ')}`);
 
     // 3. Agregar y puntuar candidatos
     const candidateScores = new Map<string, number>();
@@ -145,6 +193,10 @@ Deno.serve(async (req) => {
 
     const topCandidates = topCandidatesWithScore.map(([name]) => name);
     const scoresByName = new Map(topCandidatesWithScore);
+
+    console.log(
+      `Total candidates: ${candidateScores.size}, top: ${topCandidates.slice(0, 5).join(', ')}`,
+    );
 
     if (topCandidates.length === 0) {
       return new Response(JSON.stringify({ recommendations: [] }), {
@@ -196,13 +248,24 @@ Deno.serve(async (req) => {
       else toFetch.push(candidate);
     }
 
+    console.log(`fromCache: ${fromCache.length}, toFetch: ${toFetch.length}`);
+
     // 7. Buscar los que faltan en Spotify (paralelo)
     let fromSpotify: BandData[] = [];
     if (toFetch.length > 0) {
       const spotifyToken = await getSpotifyToken();
-      const spotifyResults = await Promise.all(
-        toFetch.map((c) => searchSpotifyArtist(c, spotifyToken)),
-      );
+      const spotifyResults: (BandData | null)[] = [];
+      const BATCH_SIZE = 3;
+      for (let i = 0; i < toFetch.length; i += BATCH_SIZE) {
+        const batch = toFetch.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.all(
+          batch.map((c) => searchSpotifyArtist(c, spotifyToken, admin)),
+        );
+        spotifyResults.push(...batchResults);
+        if (i + BATCH_SIZE < toFetch.length) {
+          await new Promise((r) => setTimeout(r, 300));
+        }
+      }
       fromSpotify = spotifyResults.filter((r): r is BandData => r !== null);
 
       // Cachear en BD para futuros usuarios

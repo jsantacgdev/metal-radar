@@ -42,7 +42,7 @@ export default function BandSearch({
       setResults([]);
       return;
     }
-    const timer = setTimeout(() => doSearch(query.trim()), 400);
+    const timer = setTimeout(() => doSearch(query.trim()), 800);
     return () => clearTimeout(timer);
   }, [query]);
 

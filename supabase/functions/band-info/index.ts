@@ -106,7 +106,7 @@ async function fetchMusicBrainzDetail(mbid: string) {
   const genres = (data.genres || []).map((g: any) => g.name);
 
   return {
-    country: data.country || null,
+    country: data.country || data.area?.iso_3166_1_codes?.[0] || null,
     formed_year,
     members,
     genres,

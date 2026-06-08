@@ -117,7 +117,7 @@ export default function BandDetailScreen({ route }: Props) {
           {info.bio && (
             <Section title="BIOGRAFÍA">
               <Text variant="body" color="silver" style={{ lineHeight: 22 }}>
-                {info.bio.slice(0, 1000)}...
+                {info.bio.length > 1000 ? info.bio.slice(0, 1000) + '…' : info.bio}
               </Text>
             </Section>
           )}
@@ -126,7 +126,7 @@ export default function BandDetailScreen({ route }: Props) {
           {info.genres && info.genres.length > 1 && (
             <Section title="ESTILO">
               <View style={styles.tagsRow}>
-                {info.genres.slice(1).map((g, i) => (
+                {info.genres.map((g, i) => (
                   <Tag key={i} tone={i === 0 ? 'blood' : 'steel'}>
                     {g}
                   </Tag>
