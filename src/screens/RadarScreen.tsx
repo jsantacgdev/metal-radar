@@ -18,17 +18,19 @@ import PulsingBadge from '../components/PulsingBadge';
 import BandImage from '../components/BandImage';
 import { useFollowedBands, FollowedBand } from '../hooks/useFollowedBands';
 import { useRecommendations, RecommendedBand } from '../hooks/useRecommendations';
-import { followBand, syncBandConcerts } from '../lib/bands';
+import { followBand, getOrCreateBandId, syncBandConcerts } from '../lib/bands';
 import { usePreference } from '../hooks/usePreference';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from '../components/ui';
 import { supabase } from '../lib/supabase';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RadarStackParamList } from '../navigation/RadarStack';
 
 type Tab = 'foryou' | 'mybands';
 
 export default function RadarScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<NativeStackNavigationProp<RadarStackParamList>>();
   const queryClient = useQueryClient();
 
   const {
@@ -49,7 +51,6 @@ export default function RadarScreen() {
     bandIds: string[];
   } | null>(null);
 
-  // Búsqueda en "Mis bandas"
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
@@ -58,6 +59,33 @@ export default function RadarScreen() {
     'skipUnfollowConfirm',
     false,
   );
+
+  const openBandDetail = async (band: {
+    spotify_id?: string;
+    id?: string;
+    name: string;
+    image_url: string | null;
+    genres: string[];
+  }) => {
+    try {
+      let bandId: string;
+      if (band.id) {
+        bandId = band.id;
+      } else if (band.spotify_id) {
+        bandId = await getOrCreateBandId({
+          spotify_id: band.spotify_id,
+          name: band.name,
+          image_url: band.image_url,
+          genres: band.genres,
+        });
+      } else {
+        return;
+      }
+      navigation.navigate('BandDetail', { bandId });
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -125,7 +153,6 @@ export default function RadarScreen() {
     }
   }, [recommendations]);
 
-  // Debounced search
   useEffect(() => {
     if (searchQuery.trim().length < 2) {
       setSearchResults([]);
@@ -221,14 +248,11 @@ export default function RadarScreen() {
     .replace('.', '')
     .toUpperCase();
 
-  // Carrusel "Nuevo para ti": top 5
   const newForYou = visibleRecs.slice(0, 5);
-  // Lista "Emergentes": resto
   const emerging = visibleRecs.slice(5);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.md }]}>
-      {/* Header */}
       <View style={styles.header}>
         <View>
           <Text variant="monoMD" color="muted">
@@ -238,12 +262,14 @@ export default function RadarScreen() {
             Radar
           </Text>
         </View>
-        <TouchableOpacity style={styles.avatarBtn} onPress={() => navigation.navigate('Profile')}>
+        <TouchableOpacity
+          style={styles.avatarBtn}
+          onPress={() => navigation.getParent()?.navigate('Profile' as never)}
+        >
           <Ionicons name="person" size={18} color={colors.silver} />
         </TouchableOpacity>
       </View>
 
-      {/* Tabs filtro */}
       <View style={styles.tabsRow}>
         <TabPill
           label="Para ti"
@@ -268,7 +294,6 @@ export default function RadarScreen() {
             />
           }
         >
-          {/* NUEVO PARA TI - carrusel */}
           <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
             NUEVO PARA TI
           </Text>
@@ -288,7 +313,19 @@ export default function RadarScreen() {
                 const isNew = newBandIds.has(rec.spotify_id);
                 const isFollowing = followingId === rec.spotify_id;
                 return (
-                  <View key={rec.spotify_id} style={styles.carouselCard}>
+                  <TouchableOpacity
+                    key={rec.spotify_id}
+                    style={styles.carouselCard}
+                    onPress={() =>
+                      openBandDetail({
+                        spotify_id: rec.spotify_id,
+                        name: rec.name,
+                        image_url: rec.image_url,
+                        genres: rec.genres,
+                      })
+                    }
+                    activeOpacity={0.85}
+                  >
                     <View style={styles.carouselImageWrapper}>
                       <BandImage
                         url={rec.image_url}
@@ -327,13 +364,12 @@ export default function RadarScreen() {
                         </Text>
                       )}
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </ScrollView>
           )}
 
-          {/* EMERGENTES · AFINIDAD */}
           {emerging.length > 0 && (
             <>
               <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
@@ -343,9 +379,18 @@ export default function RadarScreen() {
                 {emerging.map((rec, i) => {
                   const isNew = newBandIds.has(rec.spotify_id);
                   return (
-                    <View
+                    <TouchableOpacity
                       key={rec.spotify_id}
                       style={[styles.row, i === emerging.length - 1 && { borderBottomWidth: 0 }]}
+                      onPress={() =>
+                        openBandDetail({
+                          spotify_id: rec.spotify_id,
+                          name: rec.name,
+                          image_url: rec.image_url,
+                          genres: rec.genres,
+                        })
+                      }
+                      activeOpacity={0.7}
                     >
                       <BandImage url={rec.image_url} size={50} showTag={!rec.image_url} />
                       <View style={styles.rowContent}>
@@ -392,7 +437,7 @@ export default function RadarScreen() {
                           )}
                         </TouchableOpacity>
                       </View>
-                    </View>
+                    </TouchableOpacity>
                   );
                 })}
               </View>
@@ -413,7 +458,6 @@ export default function RadarScreen() {
             />
           }
         >
-          {/* Buscador */}
           <View style={styles.searchWrapper}>
             <Ionicons name="search" size={18} color={colors.muted} style={styles.searchIcon} />
             <TextInput
@@ -429,15 +473,23 @@ export default function RadarScreen() {
             )}
           </View>
 
-          {/* Resultados de búsqueda */}
           {searchResults.length > 0 && (
             <View style={styles.listSection}>
               {searchResults.map((b: any, i) => {
                 const isFollowed = followedNames.has(b.name.toLowerCase());
                 return (
-                  <View
+                  <TouchableOpacity
                     key={b.spotify_id}
                     style={[styles.row, i === searchResults.length - 1 && { borderBottomWidth: 0 }]}
+                    onPress={() =>
+                      openBandDetail({
+                        spotify_id: b.spotify_id,
+                        name: b.name,
+                        image_url: b.image_url,
+                        genres: b.genres ?? [],
+                      })
+                    }
+                    activeOpacity={0.7}
                   >
                     <BandImage url={b.image_url} size={50} showTag={!b.image_url} />
                     <View style={styles.rowContent}>
@@ -472,13 +524,12 @@ export default function RadarScreen() {
                         )}
                       </TouchableOpacity>
                     )}
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </View>
           )}
 
-          {/* Lista de bandas seguidas */}
           {searchResults.length === 0 && (
             <>
               <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
@@ -493,12 +544,21 @@ export default function RadarScreen() {
               ) : (
                 <View style={styles.listSection}>
                   {followedBands.map((b: FollowedBand, i) => (
-                    <View
+                    <TouchableOpacity
                       key={b.id}
                       style={[
                         styles.row,
                         i === followedBands.length - 1 && { borderBottomWidth: 0 },
                       ]}
+                      onPress={() =>
+                        openBandDetail({
+                          id: b.id,
+                          name: b.name,
+                          image_url: b.image_url,
+                          genres: b.genres ?? [],
+                        })
+                      }
+                      activeOpacity={0.7}
                     >
                       <BandImage url={b.image_url} size={50} showTag={!b.image_url} />
                       <View style={styles.rowContent}>
@@ -523,7 +583,7 @@ export default function RadarScreen() {
                       >
                         <Ionicons name="close" size={18} color={colors.muted} />
                       </TouchableOpacity>
-                    </View>
+                    </TouchableOpacity>
                   ))}
                 </View>
               )}

@@ -69,3 +69,26 @@ export async function syncBandConcerts(
     return null;
   }
 }
+
+export async function getOrCreateBandId(spotify: {
+  spotify_id: string;
+  name: string;
+  image_url: string | null;
+  genres: string[];
+}): Promise<string> {
+  const { data, error } = await supabase
+    .from('bands')
+    .upsert(
+      {
+        spotify_id: spotify.spotify_id,
+        name: spotify.name,
+        image_url: spotify.image_url,
+        genres: spotify.genres,
+      },
+      { onConflict: 'spotify_id' },
+    )
+    .select('id')
+    .single();
+  if (error || !data) throw error ?? new Error('Error al obtener banda');
+  return data.id;
+}

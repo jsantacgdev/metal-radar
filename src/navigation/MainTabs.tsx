@@ -2,9 +2,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import RadarStack from './RadarStack';
 import MapStack from './MapStack';
 import DiaryStack from './DiaryStack';
-import RadarScreen from '../screens/RadarScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import { colors, fontFamily } from '../theme';
 
@@ -51,7 +51,7 @@ export default function MainTabs() {
     >
       <Tab.Screen
         name="Radar"
-        component={RadarScreen}
+        component={RadarStack}
         options={{
           title: 'Radar',
           tabBarIcon: ({ color, focused }) => (
