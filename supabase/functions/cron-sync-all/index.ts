@@ -15,6 +15,8 @@ const TRIBUTE_KEYWORDS =
 
 const VIP_KEYWORDS = /\b(vip packages?|paquetes? vip|hospitality|meet [&y] greet)\b/i;
 
+const STALE_THRESHOLD_HOURS = 12;
+
 function normalizeName(s: string): string {
   return s
     .toLowerCase()
@@ -75,7 +77,6 @@ type TmEvent = {
 };
 
 Deno.serve(async (req) => {
-  // Validar que la petición viene del cron y no de fuera
   const authHeader = req.headers.get('Authorization');
   if (authHeader !== `Bearer ${CRON_SECRET}`) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -87,16 +88,22 @@ Deno.serve(async (req) => {
   try {
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // 1. Obtener TODAS las bandas seguidas por al menos un usuario (deduplicadas)
+    const staleSince = new Date(Date.now() - STALE_THRESHOLD_HOURS * 60 * 60 * 1000).toISOString();
+
     const { data: allBands, error: bandsError } = await admin
       .from('user_bands')
-      .select('band:bands!inner(id, name, ticketmaster_id)');
+      .select('band:bands!inner(id, name, ticketmaster_id, last_concerts_sync_at)');
 
     if (bandsError) throw bandsError;
 
     const uniqueBands = new Map<
       string,
-      { id: string; name: string; ticketmaster_id: string | null }
+      {
+        id: string;
+        name: string;
+        ticketmaster_id: string | null;
+        last_concerts_sync_at: string | null;
+      }
     >();
     for (const ub of allBands ?? []) {
       const b: any = (ub as any).band;
@@ -107,11 +114,18 @@ Deno.serve(async (req) => {
 
     let totalSynced = 0;
     let totalDiscarded = 0;
+    let bandsSkipped = 0;
+    let bandsProcessed = 0;
 
-    // 2. Por cada banda única, sincronizar conciertos
     for (const band of uniqueBands.values()) {
+      if (band.last_concerts_sync_at && band.last_concerts_sync_at > staleSince) {
+        bandsSkipped++;
+        continue;
+      }
+
+      bandsProcessed++;
+
       try {
-        // Conseguir attractionId (cacheado o nuevo)
         let attractionId: string | null = band.ticketmaster_id;
 
         if (!attractionId) {
@@ -136,13 +150,17 @@ Deno.serve(async (req) => {
             });
           }
 
-          if (!matched) continue;
+          if (!matched) {
+            await admin
+              .from('bands')
+              .update({ last_concerts_sync_at: new Date().toISOString() })
+              .eq('id', band.id);
+            continue;
+          }
           attractionId = matched.id;
-
           await admin.from('bands').update({ ticketmaster_id: attractionId }).eq('id', band.id);
         }
 
-        // Eventos por attractionId
         const tmUrl =
           `https://app.ticketmaster.com/discovery/v2/events.json?` +
           `attractionId=${attractionId}` +
@@ -251,6 +269,11 @@ Deno.serve(async (req) => {
 
           totalSynced++;
         }
+
+        await admin
+          .from('bands')
+          .update({ last_concerts_sync_at: new Date().toISOString() })
+          .eq('id', band.id);
       } catch (err) {
         console.warn(`Error processing band ${band.name}:`, err);
       }
@@ -260,7 +283,9 @@ Deno.serve(async (req) => {
       JSON.stringify({
         synced: totalSynced,
         discarded: totalDiscarded,
-        bands_processed: uniqueBands.size,
+        bands_total: uniqueBands.size,
+        bands_processed: bandsProcessed,
+        bands_skipped: bandsSkipped,
         timestamp: new Date().toISOString(),
       }),
       { headers: { 'Content-Type': 'application/json' } },

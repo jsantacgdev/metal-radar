@@ -1,9 +1,11 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { StyleSheet, View } from 'react-native';
 import MapStack from './MapStack';
 import DiaryStack from './DiaryStack';
 import BandsScreen from '../screens/BandsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import { colors, fontFamily } from '../theme';
 
 export type MainTabsParamList = {
   MapTab: undefined;
@@ -15,8 +17,15 @@ export type MainTabsParamList = {
 const Tab = createBottomTabNavigator<MainTabsParamList>();
 
 const sharedHeader = {
-  headerStyle: { backgroundColor: '#0a0a0a' },
-  headerTitleStyle: { color: '#fff' },
+  headerStyle: { backgroundColor: colors.ink },
+  headerTitleStyle: {
+    color: colors.bright,
+    fontFamily: fontFamily.displayBold,
+    fontSize: 18,
+    letterSpacing: 1,
+    textTransform: 'uppercase' as const,
+  },
+  headerShadowVisible: false,
 };
 
 export default function MainTabs() {
@@ -24,9 +33,11 @@ export default function MainTabs() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: { backgroundColor: '#0a0a0a', borderTopColor: '#222' },
-        tabBarActiveTintColor: '#dc2626',
-        tabBarInactiveTintColor: '#666',
+        tabBarStyle: styles.tabBar,
+        tabBarActiveTintColor: colors.bloodBright,
+        tabBarInactiveTintColor: colors.muted,
+        tabBarLabelStyle: styles.tabLabel,
+        tabBarItemStyle: { paddingVertical: 6 },
       }}
     >
       <Tab.Screen
@@ -34,10 +45,10 @@ export default function MainTabs() {
         component={BandsScreen}
         options={{
           title: 'Bandas',
-          tabBarIcon: ({ color, size, focused }) => (
+          tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'musical-notes' : 'musical-notes-outline'}
-              size={size}
+              size={22}
               color={color}
             />
           ),
@@ -50,18 +61,19 @@ export default function MainTabs() {
         component={MapStack}
         options={{
           title: 'Mapa',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'map' : 'map-outline'} size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'location' : 'location-outline'} size={22} color={color} />
           ),
         }}
       />
+
       <Tab.Screen
         name="DiaryTab"
         component={DiaryStack}
         options={{
           title: 'Diario',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'book' : 'book-outline'} size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'book' : 'book-outline'} size={22} color={color} />
           ),
         }}
       />
@@ -70,8 +82,8 @@ export default function MainTabs() {
         component={ProfileScreen}
         options={{
           title: 'Perfil',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'person' : 'person-outline'} size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'person' : 'person-outline'} size={22} color={color} />
           ),
           headerShown: true,
           ...sharedHeader,
@@ -80,3 +92,19 @@ export default function MainTabs() {
     </Tab.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    backgroundColor: colors.ink,
+    borderTopColor: colors.line,
+    borderTopWidth: 1,
+    height: 72,
+    paddingTop: 4,
+  },
+  tabLabel: {
+    fontFamily: fontFamily.mono,
+    fontSize: 9,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+});

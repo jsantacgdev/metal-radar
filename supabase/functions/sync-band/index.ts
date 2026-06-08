@@ -97,15 +97,14 @@ Deno.serve(async (req) => {
     } = await userClient.auth.getUser();
     if (userError || !user) throw new Error('Usuario no autenticado');
 
-    const { band_id } = await req.json();
+    const { band_id, force } = await req.json();
     if (!band_id) throw new Error('Falta band_id');
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // 1. Verificar que el usuario sigue esa banda
     const { data: ub } = await admin
       .from('user_bands')
-      .select('band:bands(id, name, ticketmaster_id)')
+      .select('band:bands(id, name, ticketmaster_id, last_concerts_sync_at)')
       .eq('user_id', user.id)
       .eq('band_id', band_id)
       .maybeSingle();
@@ -113,10 +112,19 @@ Deno.serve(async (req) => {
     const band: any = (ub as any)?.band;
     if (!band) throw new Error('Banda no encontrada o no seguida por el usuario');
 
+    // Threshold de 12h (saltable con force=true)
+    const STALE_HOURS = 12;
+    const staleSince = new Date(Date.now() - STALE_HOURS * 60 * 60 * 1000).toISOString();
+    if (!force && band.last_concerts_sync_at && band.last_concerts_sync_at > staleSince) {
+      return new Response(
+        JSON.stringify({ synced: 0, discarded: 0, skipped: true, band: band.name }),
+        { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
+      );
+    }
+
     let synced = 0;
     let discarded = 0;
 
-    // 2. Conseguir attractionId
     let attractionId: string | null = band.ticketmaster_id;
 
     if (!attractionId) {
@@ -130,9 +138,7 @@ Deno.serve(async (req) => {
       if (!attrRes.ok) {
         return new Response(
           JSON.stringify({ synced: 0, discarded: 0, reason: 'attractions_error' }),
-          {
-            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-          },
+          { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
         );
       }
 
@@ -149,6 +155,11 @@ Deno.serve(async (req) => {
       }
 
       if (!matched) {
+        await admin
+          .from('bands')
+          .update({ last_concerts_sync_at: new Date().toISOString() })
+          .eq('id', band.id);
+
         return new Response(JSON.stringify({ synced: 0, discarded: 0, reason: 'no_match' }), {
           headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
         });
@@ -158,7 +169,6 @@ Deno.serve(async (req) => {
       await admin.from('bands').update({ ticketmaster_id: attractionId }).eq('id', band.id);
     }
 
-    // 3. Eventos por attractionId
     const tmUrl =
       `https://app.ticketmaster.com/discovery/v2/events.json?` +
       `attractionId=${attractionId}` +
@@ -271,6 +281,11 @@ Deno.serve(async (req) => {
 
       synced++;
     }
+
+    await admin
+      .from('bands')
+      .update({ last_concerts_sync_at: new Date().toISOString() })
+      .eq('id', band.id);
 
     return new Response(JSON.stringify({ synced, discarded, band: band.name }), {
       headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
