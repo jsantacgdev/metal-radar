@@ -23,14 +23,6 @@ type Member = {
   current: boolean;
 };
 
-type BandInfo = {
-  bio: string | null;
-  formed_year: number | null;
-  country: string | null;
-  members: Member[];
-  genres: string[];
-};
-
 // Búsqueda en MusicBrainz por nombre
 async function searchMusicBrainz(name: string): Promise<string | null> {
   const url = `https://musicbrainz.org/ws/2/artist?query=${encodeURIComponent(`artist:"${name}"`)}&fmt=json&limit=5`;
@@ -121,10 +113,11 @@ async function fetchMusicBrainzDetail(mbid: string) {
   };
 }
 
-// Biografía corta de Last.fm
+// Biografía de Last.fm (completa y en español)
 async function fetchLastfmBio(name: string): Promise<string | null> {
   try {
-    const url = `http://ws.audioscrobbler.com/2.0/?method=artist.getinfo&artist=${encodeURIComponent(name)}&api_key=${LASTFM_API_KEY}&format=json`;
+    // 1. Añadimos &lang=es a los parámetros de la URL
+    const url = `http://ws.audioscrobbler.com/2.0/?method=artist.getinfo&artist=${encodeURIComponent(name)}&api_key=${LASTFM_API_KEY}&format=json&lang=es`;
     const res = await fetch(url);
 
     if (!res.ok) {
@@ -133,12 +126,14 @@ async function fetchLastfmBio(name: string): Promise<string | null> {
     }
 
     const data = await res.json();
-    const summary = data.artist?.bio?.summary;
 
-    if (!summary) return null;
+    // 2. Cambiamos 'summary' por 'content' para obtener el texto completo
+    const bioContent = data.artist?.bio?.content;
+
+    if (!bioContent) return null;
 
     // Limpiar tags HTML y el "<a href...>Read more</a>" final
-    const clean = summary
+    const clean = bioContent
       .replace(/<a[^>]*>.*?<\/a>/g, '')
       .replace(/<[^>]+>/g, '')
       .replace(/\s+/g, ' ')

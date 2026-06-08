@@ -29,6 +29,18 @@ export default function BandDetailScreen({ route }: Props) {
     queryFn: () => fetchBandBasics(bandId),
   });
 
+  function getFlagEmoji(countryCode: string) {
+    // Si no es un código de 2 letras (por si acaso viene el nombre completo), lo devolvemos tal cual
+    if (!countryCode || countryCode.length !== 2) return countryCode;
+
+    const codePoints = countryCode
+      .toUpperCase()
+      .split('')
+      .map((char) => 127397 + char.charCodeAt(0));
+
+    return String.fromCodePoint(...codePoints);
+  }
+
   const { info, loading, error } = useBandInfo(bandId);
 
   return (
@@ -52,7 +64,7 @@ export default function BandDetailScreen({ route }: Props) {
             <View style={styles.countryRow}>
               <Ionicons name="location-outline" size={14} color={colors.silver} />
               <Text variant="monoMD" color="silver" style={{ marginLeft: 6 }}>
-                {info.country.toUpperCase()}
+                {getFlagEmoji(info.country)}
               </Text>
             </View>
           )}
@@ -81,16 +93,23 @@ export default function BandDetailScreen({ route }: Props) {
           {/* Meta strip */}
           <View style={styles.metaStrip}>
             {info.formed_year && (
-              <MetaItem label="DESDE" value={info.formed_year.toString()} accent />
+              <MetaItem label="DESDE" value={info.formed_year.toString()} accent center />
             )}
             {info.members && info.members.length > 0 && (
               <MetaItem
                 label="MIEMBROS"
                 value={info.members.filter((m) => m.current).length.toString()}
+                center
               />
             )}
             {info.genres && info.genres.length > 0 && (
-              <MetaItem label="GÉNERO" value={info.genres[0]} />
+              <MetaItem
+                label="GÉNERO"
+                // Si solo hay 1 género, lo mostramos. Si hay más, cogemos el segundo (índice 1)
+                value={info.genres.length > 1 ? info.genres[1] : info.genres[0]}
+                smallValue
+                center
+              />
             )}
           </View>
 
@@ -98,16 +117,16 @@ export default function BandDetailScreen({ route }: Props) {
           {info.bio && (
             <Section title="BIOGRAFÍA">
               <Text variant="body" color="silver" style={{ lineHeight: 22 }}>
-                {info.bio}
+                {info.bio.slice(0, 1000)}...
               </Text>
             </Section>
           )}
 
           {/* Géneros */}
-          {info.genres && info.genres.length > 0 && (
+          {info.genres && info.genres.length > 1 && (
             <Section title="ESTILO">
               <View style={styles.tagsRow}>
-                {info.genres.map((g, i) => (
+                {info.genres.slice(1).map((g, i) => (
                   <Tag key={i} tone={i === 0 ? 'blood' : 'steel'}>
                     {g}
                   </Tag>
@@ -131,11 +150,10 @@ export default function BandDetailScreen({ route }: Props) {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text variant="displaySM">{m.name}</Text>
-                    {(m.begin || m.end) && (
+                    {(m.begin || m.end || m.current) && (
                       <Text variant="monoSM" color="muted" style={{ marginTop: 4 }}>
-                        {m.begin
-                          ? `${m.begin.substring(0, 4)} — ${m.end ? m.end.substring(0, 4) : 'PRESENTE'}`
-                          : ''}
+                        {m.begin ? m.begin.substring(0, 4) : '?'} —{' '}
+                        {m.current ? 'PRESENTE' : m.end ? m.end.substring(0, 4) : '?'}
                       </Text>
                     )}
                   </View>
@@ -154,16 +172,29 @@ export default function BandDetailScreen({ route }: Props) {
   );
 }
 
-function MetaItem({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function MetaItem({
+  label,
+  value,
+  accent,
+  center,
+  smallValue,
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+  center?: boolean;
+  smallValue?: boolean;
+}) {
   return (
-    <View style={styles.metaItem}>
+    <View style={[styles.metaItem, center && { alignItems: 'center' }]}>
       <Text
         style={{
           fontFamily: fontFamily.displayBold,
-          fontSize: 22,
+          fontSize: smallValue ? 12 : 22, // <-- Texto más pequeño si smallValue es true
           letterSpacing: -0.4,
           color: accent ? colors.bloodBright : colors.bright,
-          textTransform: 'uppercase',
+          textTransform: smallValue ? 'capitalize' : 'uppercase',
+          textAlign: center ? 'center' : 'left', // <-- Centrado
         }}
         numberOfLines={1}
       >
