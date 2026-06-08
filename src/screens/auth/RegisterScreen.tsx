@@ -1,8 +1,19 @@
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { supabase } from '../../lib/supabase';
 import { AuthStackParamList } from '../../navigation/AuthNavigator';
+import { colors, fontFamily, radius, spacing } from '../../theme';
+import { Button, Text } from '../../components/ui';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
@@ -12,8 +23,12 @@ export default function RegisterScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
-    if (!email || !password) return Alert.alert('Faltan datos', 'Introduce email y contraseña');
-    if (password.length < 6) return Alert.alert('Contraseña corta', 'Mínimo 6 caracteres');
+    if (!email || !password) {
+      return Alert.alert('Faltan datos', 'Introduce email y contraseña');
+    }
+    if (password.length < 6) {
+      return Alert.alert('Contraseña corta', 'Mínimo 6 caracteres');
+    }
     try {
       setLoading(true);
       const { error } = await supabase.auth.signUp({ email, password });
@@ -26,26 +41,121 @@ export default function RegisterScreen({ navigation }: Props) {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Crear cuenta</Text>
-      <TextInput style={styles.input} placeholder="Email" placeholderTextColor="#666" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
-      <TextInput style={styles.input} placeholder="Contraseña (mín. 6)" placeholderTextColor="#666" value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" />
-      <TouchableOpacity style={[styles.button, loading && { opacity: 0.6 }]} onPress={handleRegister} disabled={loading}>
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Crear cuenta</Text>}
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <Ionicons name="chevron-back" size={24} color={colors.bright} />
       </TouchableOpacity>
-      <TouchableOpacity style={styles.switchButton} onPress={() => navigation.goBack()}>
-        <Text style={styles.switchText}>Volver a iniciar sesión</Text>
-      </TouchableOpacity>
-    </View>
+
+      <View style={styles.brand}>
+        <Ionicons name="radio" size={28} color={colors.bloodBright} />
+        <Text variant="monoMD" color="bloodBright" style={{ marginTop: spacing.md }}>
+          METAL RADAR
+        </Text>
+        <Text variant="displayXL" style={styles.title}>
+          Crea{'\n'}tu cuenta
+        </Text>
+      </View>
+
+      <View style={styles.form}>
+        <View style={styles.fieldGroup}>
+          <Text variant="monoSM" color="muted" style={styles.label}>
+            EMAIL
+          </Text>
+          <TextInput
+            style={styles.input}
+            placeholder="tu@correo.com"
+            placeholderTextColor={colors.faint}
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            autoComplete="email"
+          />
+        </View>
+
+        <View style={styles.fieldGroup}>
+          <Text variant="monoSM" color="muted" style={styles.label}>
+            CONTRASEÑA · MÍN. 6 CARACTERES
+          </Text>
+          <TextInput
+            style={styles.input}
+            placeholder="••••••••"
+            placeholderTextColor={colors.faint}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoCapitalize="none"
+          />
+        </View>
+
+        <Button label="Crear cuenta" onPress={handleRegister} loading={loading} />
+
+        <TouchableOpacity style={styles.switchLink} onPress={() => navigation.goBack()}>
+          <Text variant="monoMD" color="muted">
+            ¿YA TIENES CUENTA?{' '}
+          </Text>
+          <Text variant="monoMD" color="bloodBright">
+            INICIA SESIÓN
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#0a0a0a' },
-  title: { fontSize: 32, fontWeight: 'bold', color: '#fff', textAlign: 'center', marginBottom: 40 },
-  input: { backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#333', borderRadius: 8, padding: 14, fontSize: 16, color: '#fff', marginBottom: 12 },
-  button: { backgroundColor: '#dc2626', borderRadius: 8, padding: 16, alignItems: 'center', marginTop: 8 },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  switchButton: { marginTop: 20, alignItems: 'center' },
-  switchText: { color: '#999', fontSize: 14 },
+  container: {
+    flex: 1,
+    backgroundColor: colors.ink,
+    padding: spacing.xxl,
+    justifyContent: 'center',
+  },
+  backButton: {
+    position: 'absolute',
+    top: 60,
+    left: spacing.lg,
+    width: 40,
+    height: 40,
+    borderRadius: radius.full,
+    backgroundColor: colors.panel,
+    borderWidth: 1,
+    borderColor: colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  brand: {
+    alignItems: 'flex-start',
+    marginBottom: spacing.xxxl + spacing.sm,
+  },
+  title: {
+    marginTop: spacing.lg,
+  },
+  form: {
+    gap: spacing.lg,
+  },
+  fieldGroup: {
+    gap: spacing.sm,
+  },
+  label: {
+    paddingLeft: spacing.xs,
+  },
+  input: {
+    backgroundColor: colors.panel,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md + 2,
+    fontSize: 16,
+    color: colors.bright,
+    fontFamily: fontFamily.body,
+  },
+  switchLink: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: spacing.lg,
+  },
 });

@@ -1,8 +1,19 @@
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { supabase } from '../../lib/supabase';
 import { AuthStackParamList } from '../../navigation/AuthNavigator';
+import { colors, fontFamily, radius, spacing } from '../../theme';
+import { Button, Text } from '../../components/ui';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
@@ -12,7 +23,9 @@ export default function LoginScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!email || !password) return Alert.alert('Faltan datos', 'Introduce email y contraseña');
+    if (!email || !password) {
+      return Alert.alert('Faltan datos', 'Introduce email y contraseña');
+    }
     try {
       setLoading(true);
       const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -25,28 +38,104 @@ export default function LoginScreen({ navigation }: Props) {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Metal Radar</Text>
-      <Text style={styles.subtitle}>Inicia sesión</Text>
-      <TextInput style={styles.input} placeholder="Email" placeholderTextColor="#666" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
-      <TextInput style={styles.input} placeholder="Contraseña" placeholderTextColor="#666" value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" />
-      <TouchableOpacity style={[styles.button, loading && { opacity: 0.6 }]} onPress={handleLogin} disabled={loading}>
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Entrar</Text>}
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.switchButton} onPress={() => navigation.navigate('Register')}>
-        <Text style={styles.switchText}>¿No tienes cuenta? Regístrate</Text>
-      </TouchableOpacity>
-    </View>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <View style={styles.brand}>
+        <Ionicons name="radio" size={28} color={colors.bloodBright} />
+        <Text variant="monoMD" color="bloodBright" style={{ marginTop: spacing.md }}>
+          METAL RADAR
+        </Text>
+        <Text variant="displayXL" style={styles.title}>
+          Inicia{'\n'}sesión
+        </Text>
+      </View>
+
+      <View style={styles.form}>
+        <View style={styles.fieldGroup}>
+          <Text variant="monoSM" color="muted" style={styles.label}>
+            EMAIL
+          </Text>
+          <TextInput
+            style={styles.input}
+            placeholder="tu@correo.com"
+            placeholderTextColor={colors.faint}
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            autoComplete="email"
+          />
+        </View>
+
+        <View style={styles.fieldGroup}>
+          <Text variant="monoSM" color="muted" style={styles.label}>
+            CONTRASEÑA
+          </Text>
+          <TextInput
+            style={styles.input}
+            placeholder="••••••••"
+            placeholderTextColor={colors.faint}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoCapitalize="none"
+          />
+        </View>
+
+        <Button label="Entrar" onPress={handleLogin} loading={loading} />
+
+        <TouchableOpacity style={styles.switchLink} onPress={() => navigation.navigate('Register')}>
+          <Text variant="monoMD" color="muted">
+            ¿NO TIENES CUENTA?{' '}
+          </Text>
+          <Text variant="monoMD" color="bloodBright">
+            REGÍSTRATE
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#0a0a0a' },
-  title: { fontSize: 36, fontWeight: 'bold', color: '#fff', textAlign: 'center', marginBottom: 8 },
-  subtitle: { fontSize: 16, color: '#999', textAlign: 'center', marginBottom: 40 },
-  input: { backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: '#333', borderRadius: 8, padding: 14, fontSize: 16, color: '#fff', marginBottom: 12 },
-  button: { backgroundColor: '#dc2626', borderRadius: 8, padding: 16, alignItems: 'center', marginTop: 8 },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  switchButton: { marginTop: 20, alignItems: 'center' },
-  switchText: { color: '#999', fontSize: 14 },
+  container: {
+    flex: 1,
+    backgroundColor: colors.ink,
+    padding: spacing.xxl,
+    justifyContent: 'center',
+  },
+  brand: {
+    alignItems: 'flex-start',
+    marginBottom: spacing.xxxl + spacing.sm,
+  },
+  title: {
+    marginTop: spacing.lg,
+  },
+  form: {
+    gap: spacing.lg,
+  },
+  fieldGroup: {
+    gap: spacing.sm,
+  },
+  label: {
+    paddingLeft: spacing.xs,
+  },
+  input: {
+    backgroundColor: colors.panel,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md + 2,
+    fontSize: 16,
+    color: colors.bright,
+    fontFamily: fontFamily.body,
+  },
+  switchLink: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: spacing.lg,
+  },
 });
