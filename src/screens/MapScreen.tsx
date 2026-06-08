@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -16,7 +16,10 @@ const LOCATION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 export default function MapScreen() {
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
-  const [selected, setSelected] = useState<ConcertWithDetails | null>(null);
+  const [selectedVenue, setSelectedVenue] = useState<{
+    venue: ConcertWithDetails['venue'];
+    concerts: ConcertWithDetails[];
+  } | null>(null);
   const [showFar, setShowFar] = useState(false);
 
   const { concerts, farConcerts, loading, error } = useNearbyConcerts(
@@ -26,6 +29,30 @@ export default function MapScreen() {
   );
 
   const navigation = useNavigation<NativeStackNavigationProp<MapStackParamList>>();
+
+  const visible = showFar ? [...concerts, ...farConcerts] : concerts;
+
+  const byVenue = useMemo(() => {
+    const map = new Map<
+      string,
+      { venue: ConcertWithDetails['venue']; concerts: ConcertWithDetails[] }
+    >();
+    for (const c of visible) {
+      const existing = map.get(c.venue.id);
+      if (existing) {
+        existing.concerts.push(c);
+      } else {
+        map.set(c.venue.id, { venue: c.venue, concerts: [c] });
+      }
+    }
+    // Ordenar conciertos de cada venue por fecha
+    for (const group of map.values()) {
+      group.concerts.sort(
+        (a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime(),
+      );
+    }
+    return Array.from(map.values());
+  }, [visible]);
 
   useEffect(() => {
     (async () => {
@@ -111,19 +138,20 @@ export default function MapScreen() {
     longitudeDelta: 3,
   };
 
-  const visible = showFar ? [...concerts, ...farConcerts] : concerts;
-
   return (
     <View style={{ flex: 1 }}>
       <MapView style={{ flex: 1 }} initialRegion={region} showsUserLocation>
-        {visible.map((c) => (
-          <Marker
-            key={c.id}
-            coordinate={{ latitude: c.venue.lat, longitude: c.venue.lng }}
-            pinColor={c.distance_km > DEFAULT_RADIUS_KM ? '#999' : '#dc2626'}
-            onPress={() => setSelected(c)}
-          />
-        ))}
+        {byVenue.map((group) => {
+          const isFar = group.concerts.every((c) => c.distance_km > DEFAULT_RADIUS_KM);
+          return (
+            <Marker
+              key={group.venue.id}
+              coordinate={{ latitude: group.venue.lat, longitude: group.venue.lng }}
+              pinColor={isFar ? '#999' : '#dc2626'}
+              onPress={() => setSelectedVenue(group)}
+            />
+          );
+        })}
       </MapView>
 
       {/* Banner de carga / errores */}
@@ -154,37 +182,49 @@ export default function MapScreen() {
       )}
 
       {/* Popup del concierto seleccionado */}
-      {selected && (
+      {selectedVenue && (
         <View style={styles.bottomCard}>
-          <Text style={styles.cardTitle}>{selected.bands.map((b) => b.name).join(' · ')}</Text>
+          <Text style={styles.cardTitle}>{selectedVenue.venue.name}</Text>
           <Text style={styles.cardSubtitle}>
-            {selected.venue.name} · {selected.venue.city}
+            {selectedVenue.venue.city}
+            {selectedVenue.venue.country ? ` · ${selectedVenue.venue.country}` : ''}
           </Text>
           <Text style={styles.cardMeta}>
-            {new Date(selected.event_date).toLocaleDateString('es-ES', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-            })}
-            {'  ·  '}
-            {selected.distance_km.toFixed(0)} km
+            {selectedVenue.concerts[0].distance_km.toFixed(0)} km · {selectedVenue.concerts.length}{' '}
+            {selectedVenue.concerts.length === 1 ? 'concierto' : 'conciertos'}
           </Text>
-          {selected.price_min && (
-            <Text style={styles.cardMeta}>
-              Desde {selected.price_min} {selected.currency}
-            </Text>
-          )}
-          <TouchableOpacity
-            style={styles.cardButton}
-            onPress={() => {
-              const id = selected.id;
-              setSelected(null);
-              navigation.navigate('ConcertDetail', { concertId: id });
-            }}
-          >
-            <Text style={styles.cardButtonText}>Ver detalle</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.closeButton} onPress={() => setSelected(null)}>
+
+          <View style={styles.concertList}>
+            {selectedVenue.concerts.map((c) => {
+              const date = new Date(c.event_date);
+              const dateStr = date.toLocaleDateString('es-ES', {
+                weekday: 'short',
+                day: 'numeric',
+                month: 'short',
+              });
+              return (
+                <TouchableOpacity
+                  key={c.id}
+                  style={styles.concertRow}
+                  onPress={() => {
+                    const id = c.id;
+                    setSelectedVenue(null);
+                    navigation.navigate('ConcertDetail', { concertId: id });
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.concertBands} numberOfLines={1}>
+                      {c.bands.map((b) => b.name).join(' · ')}
+                    </Text>
+                    <Text style={styles.concertDate}>{dateStr}</Text>
+                  </View>
+                  <Text style={styles.concertArrow}>›</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <TouchableOpacity style={styles.closeButton} onPress={() => setSelectedVenue(null)}>
             <Text style={styles.closeButtonText}>Cerrar</Text>
           </TouchableOpacity>
         </View>
@@ -289,5 +329,31 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(220,38,38,0.9)',
     padding: 12,
     borderRadius: 8,
+  },
+  concertList: {
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  concertRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#2a2a2a',
+  },
+  concertBands: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  concertDate: {
+    color: '#999',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  concertArrow: {
+    color: '#666',
+    fontSize: 20,
+    marginLeft: 12,
   },
 });
