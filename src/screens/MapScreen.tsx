@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useNearbyConcerts, ConcertWithDetails } from '../hooks/useNearbyConcerts';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MapStackParamList } from '../navigation/MapStack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DEFAULT_RADIUS_KM = 200;
+
+const LOCATION_CACHE_KEY = 'last_known_location';
+const LOCATION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 export default function MapScreen() {
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -33,6 +37,53 @@ export default function MapScreen() {
       const pos = await Location.getCurrentPositionAsync({});
       setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
     })();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadLocation = async () => {
+      try {
+        const cached = await AsyncStorage.getItem(LOCATION_CACHE_KEY);
+        if (cached && !cancelled) {
+          const parsed = JSON.parse(cached);
+          if (Date.now() - parsed.timestamp < LOCATION_MAX_AGE_MS) {
+            setLocation({ lat: parsed.lat, lng: parsed.lng });
+          }
+        }
+      } catch {
+        // ignore
+      }
+
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        if (!cancelled) setPermissionDenied(true);
+        return;
+      }
+
+      try {
+        const pos = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced, // más rápido que High
+        });
+        if (cancelled) return;
+
+        const fresh = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setLocation(fresh);
+
+        await AsyncStorage.setItem(
+          LOCATION_CACHE_KEY,
+          JSON.stringify({ ...fresh, timestamp: Date.now() }),
+        );
+      } catch (err) {
+        console.warn('Error obteniendo ubicación:', err);
+      }
+    };
+
+    loadLocation();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (permissionDenied) {

@@ -14,7 +14,7 @@ import {
 import BandSearch, { SearchedBand } from '../components/BandSearch';
 import { useFollowedBands } from '../hooks/useFollowedBands';
 import { useRecommendations, RecommendedBand } from '../hooks/useRecomendations';
-import { followBand } from '../lib/bands';
+import { followBand, syncBandConcerts } from '../lib/bands';
 import { useQueryClient } from '@tanstack/react-query';
 import PulsingBadge from '../components/PulsingBadge';
 import { usePreference } from '../hooks/usePreference';
@@ -72,12 +72,14 @@ export default function BandsScreen() {
   }, [recommendations, followedNames, insertSlot]);
 
   const handleFollowSearched = async (band: SearchedBand) => {
-    await followBand(band);
-    queryClient.invalidateQueries({
-      queryKey: ['followedBands'],
-    });
-    queryClient.invalidateQueries({
-      queryKey: ['recommendations'],
+    const bandId = await followBand(band);
+    queryClient.invalidateQueries({ queryKey: ['followedBands'] });
+    queryClient.invalidateQueries({ queryKey: ['recommendations'] });
+
+    syncBandConcerts(bandId).then((result) => {
+      if (result && result.synced > 0) {
+        queryClient.invalidateQueries({ queryKey: ['nearbyConcerts'] });
+      }
     });
   };
 
@@ -85,14 +87,18 @@ export default function BandsScreen() {
     if (followingId) return;
     try {
       setFollowingId(band.spotify_id);
-
-      // Guardar la posición ANTES de cualquier cambio
       const position = visibleRecs.findIndex((r) => r.spotify_id === band.spotify_id);
       followedPositionRef.current = position;
 
-      await followBand(band);
+      const bandId = await followBand(band);
       queryClient.invalidateQueries({ queryKey: ['followedBands'] });
       queryClient.invalidateQueries({ queryKey: ['recommendations'] });
+
+      syncBandConcerts(bandId).then((result) => {
+        if (result && result.synced > 0) {
+          queryClient.invalidateQueries({ queryKey: ['nearbyConcerts'] });
+        }
+      });
     } catch (err: any) {
       Alert.alert('Error', err.message);
     } finally {

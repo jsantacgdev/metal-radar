@@ -16,6 +16,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { useProfile } from '../hooks/useProfile';
 import { usePreference } from '../hooks/usePreference';
+import { syncAllConcerts } from '../lib/sync';
 
 export default function ProfileScreen() {
   const { session } = useAuth();
@@ -36,23 +37,10 @@ export default function ProfileScreen() {
   const handleSyncConcerts = async () => {
     try {
       setSyncing(true);
-      const {
-        data: { session: s },
-      } = await supabase.auth.getSession();
-      const res = await fetch(
-        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/sync-concerts`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${s?.access_token}`,
-          },
-        },
-      );
-      const json = await res.json();
-      if (json.error) throw new Error(json.error);
+      const result = await syncAllConcerts();
       Alert.alert(
         'Sincronización completada',
-        `Conciertos: ${json.synced}\nDescartados: ${json.discarded ?? 0}`,
+        `Conciertos: ${result.synced}\nDescartados: ${result.discarded}\nBandas saltadas: ${result.bands_skipped}`,
       );
     } catch (err: any) {
       Alert.alert('Error', err.message);
@@ -180,17 +168,6 @@ export default function ProfileScreen() {
             <Text style={styles.actionButtonText}>Sincronizar conciertos</Text>
           )}
         </TouchableOpacity>
-
-        <Button
-          title="Print token"
-          onPress={async () => {
-            const {
-              data: { session },
-            } = await supabase.auth.getSession();
-            console.log(session?.access_token);
-          }}
-        />
-
         <TouchableOpacity
           style={[styles.actionButton, styles.logoutButton]}
           onPress={() => supabase.auth.signOut()}
