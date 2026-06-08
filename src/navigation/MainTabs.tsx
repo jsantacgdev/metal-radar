@@ -1,15 +1,16 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapStack from './MapStack';
 import DiaryStack from './DiaryStack';
-import BandsScreen from '../screens/BandsScreen';
+import RadarScreen from '../screens/RadarScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import { colors, fontFamily } from '../theme';
 
 export type MainTabsParamList = {
+  Radar: undefined;
   MapTab: undefined;
-  BandsTab: undefined;
   DiaryTab: undefined;
   Profile: undefined;
 };
@@ -29,11 +30,19 @@ const sharedHeader = {
 };
 
 export default function MainTabs() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [
+          styles.tabBar,
+          {
+            height: 60 + insets.bottom,
+            paddingBottom: insets.bottom,
+          },
+        ],
         tabBarActiveTintColor: colors.bloodBright,
         tabBarInactiveTintColor: colors.muted,
         tabBarLabelStyle: styles.tabLabel,
@@ -41,19 +50,13 @@ export default function MainTabs() {
       }}
     >
       <Tab.Screen
-        name="BandsTab"
-        component={BandsScreen}
+        name="Radar"
+        component={RadarScreen}
         options={{
-          title: 'Bandas',
+          title: 'Radar',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? 'musical-notes' : 'musical-notes-outline'}
-              size={22}
-              color={color}
-            />
+            <Ionicons name={focused ? 'radio' : 'radio-outline'} size={22} color={color} />
           ),
-          headerShown: true,
-          ...sharedHeader,
         }}
       />
       <Tab.Screen
@@ -66,7 +69,6 @@ export default function MainTabs() {
           ),
         }}
       />
-
       <Tab.Screen
         name="DiaryTab"
         component={DiaryStack}
@@ -98,8 +100,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.ink,
     borderTopColor: colors.line,
     borderTopWidth: 1,
-    height: 72,
-    paddingTop: 4,
   },
   tabLabel: {
     fontFamily: fontFamily.mono,

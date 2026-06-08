@@ -1,0 +1,713 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  LayoutAnimation,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useQueryClient } from '@tanstack/react-query';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import PulsingBadge from '../components/PulsingBadge';
+import BandImage from '../components/BandImage';
+import { useFollowedBands, FollowedBand } from '../hooks/useFollowedBands';
+import { useRecommendations, RecommendedBand } from '../hooks/useRecommendations';
+import { followBand, syncBandConcerts } from '../lib/bands';
+import { usePreference } from '../hooks/usePreference';
+import { colors, fontFamily, radius, spacing } from '../theme';
+import { Text } from '../components/ui';
+import { supabase } from '../lib/supabase';
+
+type Tab = 'foryou' | 'mybands';
+
+export default function RadarScreen() {
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
+  const queryClient = useQueryClient();
+
+  const {
+    bands: followedBands,
+    loading: loadingFollowed,
+    reload: reloadFollowed,
+    unfollow,
+  } = useFollowedBands();
+  const { recommendations, loading: loadingRecs, reload: reloadRecs } = useRecommendations();
+
+  const [activeTab, setActiveTab] = useState<Tab>('foryou');
+  const [followingId, setFollowingId] = useState<string | null>(null);
+  const [newBandIds, setNewBandIds] = useState<Set<string>>(new Set());
+  const previousIdsRef = useRef<Set<string> | null>(null);
+  const followedPositionRef = useRef<number | null>(null);
+  const [insertSlot, setInsertSlot] = useState<{
+    position: number;
+    bandIds: string[];
+  } | null>(null);
+
+  // Búsqueda en "Mis bandas"
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  const { value: skipConfirm, setValue: setSkipConfirm } = usePreference<boolean>(
+    'skipUnfollowConfirm',
+    false,
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      reloadFollowed();
+    }, [reloadFollowed]),
+  );
+
+  const followedNames = useMemo(
+    () => new Set(followedBands.map((b: FollowedBand) => b.name.toLowerCase())),
+    [followedBands],
+  );
+
+  const visibleRecs = useMemo(() => {
+    const filtered = recommendations.filter((r) => !followedNames.has(r.name.toLowerCase()));
+    if (!insertSlot || insertSlot.bandIds.length === 0) return filtered;
+    const insertSet = new Set(insertSlot.bandIds);
+    const newOnes: RecommendedBand[] = [];
+    const others: RecommendedBand[] = [];
+    for (const rec of filtered) {
+      if (insertSet.has(rec.spotify_id)) newOnes.push(rec);
+      else others.push(rec);
+    }
+    const result = [...others];
+    const insertAt = Math.min(insertSlot.position, result.length);
+    result.splice(insertAt, 0, ...newOnes);
+    return result;
+  }, [recommendations, followedNames, insertSlot]);
+
+  useEffect(() => {
+    if (recommendations.length === 0) return;
+    const currentIds = new Set(recommendations.map((r) => r.spotify_id));
+
+    if (previousIdsRef.current === null) {
+      previousIdsRef.current = currentIds;
+      return;
+    }
+
+    const fresh = new Set<string>();
+    for (const id of currentIds) {
+      if (!previousIdsRef.current.has(id)) fresh.add(id);
+    }
+    previousIdsRef.current = currentIds;
+
+    if (fresh.size > 0) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setNewBandIds((prev) => new Set([...prev, ...fresh]));
+
+      if (followedPositionRef.current !== null) {
+        setInsertSlot({
+          position: followedPositionRef.current,
+          bandIds: Array.from(fresh),
+        });
+        followedPositionRef.current = null;
+      }
+
+      setTimeout(() => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setNewBandIds((prev) => {
+          const next = new Set(prev);
+          for (const id of fresh) next.delete(id);
+          return next;
+        });
+        setInsertSlot(null);
+      }, 8000);
+    }
+  }, [recommendations]);
+
+  // Debounced search
+  useEffect(() => {
+    if (searchQuery.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        setSearching(true);
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const res = await fetch(
+          `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/search-bands?q=${encodeURIComponent(searchQuery.trim())}`,
+          {
+            headers: {
+              Authorization: `Bearer ${session?.access_token ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
+            },
+          },
+        );
+        const json = await res.json();
+        setSearchResults(json.bands ?? []);
+      } catch (err: any) {
+        Alert.alert('Error', err.message);
+      } finally {
+        setSearching(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const handleFollowRec = async (band: RecommendedBand) => {
+    if (followingId) return;
+    try {
+      setFollowingId(band.spotify_id);
+      const position = visibleRecs.findIndex((r) => r.spotify_id === band.spotify_id);
+      followedPositionRef.current = position;
+      const bandId = await followBand(band);
+      queryClient.invalidateQueries({ queryKey: ['followedBands'] });
+      queryClient.invalidateQueries({ queryKey: ['recommendations'] });
+      syncBandConcerts(bandId).then((result) => {
+        if (result && result.synced > 0) {
+          queryClient.invalidateQueries({ queryKey: ['nearbyConcerts'] });
+        }
+      });
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    } finally {
+      setFollowingId(null);
+    }
+  };
+
+  const handleFollowFromSearch = async (band: any) => {
+    try {
+      setFollowingId(band.spotify_id);
+      const bandId = await followBand(band);
+      setSearchQuery('');
+      setSearchResults([]);
+      queryClient.invalidateQueries({ queryKey: ['followedBands'] });
+      queryClient.invalidateQueries({ queryKey: ['recommendations'] });
+      syncBandConcerts(bandId).then((result) => {
+        if (result && result.synced > 0) {
+          queryClient.invalidateQueries({ queryKey: ['nearbyConcerts'] });
+        }
+      });
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    } finally {
+      setFollowingId(null);
+    }
+  };
+
+  const handleUnfollow = (bandId: string, bandName: string) => {
+    if (skipConfirm) {
+      unfollow(bandId);
+      return;
+    }
+    Alert.alert('Dejar de seguir', `¿Quitar a ${bandName}?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Quitar y no preguntar más',
+        style: 'destructive',
+        onPress: () => {
+          setSkipConfirm(true);
+          unfollow(bandId);
+        },
+      },
+      { text: 'Quitar', style: 'destructive', onPress: () => unfollow(bandId) },
+    ]);
+  };
+
+  const dateStr = new Date()
+    .toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })
+    .replace('.', '')
+    .toUpperCase();
+
+  // Carrusel "Nuevo para ti": top 5
+  const newForYou = visibleRecs.slice(0, 5);
+  // Lista "Emergentes": resto
+  const emerging = visibleRecs.slice(5);
+
+  return (
+    <View style={[styles.container, { paddingTop: insets.top + spacing.md }]}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View>
+          <Text variant="monoMD" color="muted">
+            {dateStr}
+          </Text>
+          <Text variant="displayLG" style={{ marginTop: 4 }}>
+            Radar
+          </Text>
+        </View>
+        <TouchableOpacity style={styles.avatarBtn} onPress={() => navigation.navigate('Profile')}>
+          <Ionicons name="person" size={18} color={colors.silver} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Tabs filtro */}
+      <View style={styles.tabsRow}>
+        <TabPill
+          label="Para ti"
+          active={activeTab === 'foryou'}
+          onPress={() => setActiveTab('foryou')}
+        />
+        <TabPill
+          label="Mis bandas"
+          active={activeTab === 'mybands'}
+          onPress={() => setActiveTab('mybands')}
+        />
+      </View>
+
+      {activeTab === 'foryou' ? (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={loadingRecs}
+              onRefresh={reloadRecs}
+              tintColor={colors.bloodBright}
+            />
+          }
+        >
+          {/* NUEVO PARA TI - carrusel */}
+          <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
+            NUEVO PARA TI
+          </Text>
+          {loadingRecs && newForYou.length === 0 ? (
+            <ActivityIndicator color={colors.bloodBright} style={{ marginVertical: spacing.xl }} />
+          ) : newForYou.length === 0 ? (
+            <Text variant="body" color="muted" style={styles.emptyText}>
+              Sigue bandas para recibir recomendaciones
+            </Text>
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.carouselContent}
+            >
+              {newForYou.map((rec) => {
+                const isNew = newBandIds.has(rec.spotify_id);
+                const isFollowing = followingId === rec.spotify_id;
+                return (
+                  <View key={rec.spotify_id} style={styles.carouselCard}>
+                    <View style={styles.carouselImageWrapper}>
+                      <BandImage
+                        url={rec.image_url}
+                        size={138}
+                        radiusOverride={radius.lg}
+                        showTag={!rec.image_url}
+                      />
+                      <TouchableOpacity
+                        style={[styles.carouselAddBtn, isFollowing && { opacity: 0.5 }]}
+                        onPress={() => handleFollowRec(rec)}
+                        disabled={followingId !== null}
+                        activeOpacity={0.8}
+                      >
+                        {isFollowing ? (
+                          <ActivityIndicator color="#fff" size="small" />
+                        ) : (
+                          <Ionicons name="add" size={18} color="#fff" />
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                    <View style={{ marginTop: spacing.sm, width: 138 }}>
+                      <View style={styles.cardNameRow}>
+                        <Text variant="displaySM" numberOfLines={1} style={{ flexShrink: 1 }}>
+                          {rec.name}
+                        </Text>
+                        {isNew && <PulsingBadge />}
+                      </View>
+                      {rec.genres.length > 0 && (
+                        <Text
+                          variant="monoSM"
+                          color="bloodBright"
+                          numberOfLines={1}
+                          style={{ marginTop: 6 }}
+                        >
+                          {rec.genres[0]}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          )}
+
+          {/* EMERGENTES · AFINIDAD */}
+          {emerging.length > 0 && (
+            <>
+              <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
+                EMERGENTES · AFINIDAD
+              </Text>
+              <View style={styles.listSection}>
+                {emerging.map((rec, i) => {
+                  const isNew = newBandIds.has(rec.spotify_id);
+                  return (
+                    <View
+                      key={rec.spotify_id}
+                      style={[styles.row, i === emerging.length - 1 && { borderBottomWidth: 0 }]}
+                    >
+                      <BandImage url={rec.image_url} size={50} showTag={!rec.image_url} />
+                      <View style={styles.rowContent}>
+                        <View style={styles.nameRow}>
+                          <Text variant="displaySM" numberOfLines={1} style={{ flexShrink: 1 }}>
+                            {rec.name}
+                          </Text>
+                          {isNew && <PulsingBadge />}
+                        </View>
+                        {rec.genres.length > 0 && (
+                          <Text
+                            variant="monoSM"
+                            color="muted"
+                            numberOfLines={1}
+                            style={{ marginTop: 4 }}
+                          >
+                            {rec.genres.slice(0, 2).join(' · ')}
+                          </Text>
+                        )}
+                      </View>
+                      <View style={styles.rowEnd}>
+                        <Text
+                          style={{
+                            fontFamily: fontFamily.mono,
+                            fontSize: 12,
+                            color: colors.bloodBright,
+                          }}
+                        >
+                          {rec.affinity}%
+                        </Text>
+                        <TouchableOpacity
+                          style={[
+                            styles.addBtn,
+                            followingId === rec.spotify_id && { opacity: 0.5 },
+                          ]}
+                          onPress={() => handleFollowRec(rec)}
+                          disabled={followingId !== null}
+                          activeOpacity={0.7}
+                        >
+                          {followingId === rec.spotify_id ? (
+                            <ActivityIndicator color={colors.silver} size="small" />
+                          ) : (
+                            <Ionicons name="add" size={18} color={colors.silver} />
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </>
+          )}
+
+          <View style={{ height: spacing.xxxl }} />
+        </ScrollView>
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl
+              refreshing={loadingFollowed}
+              onRefresh={reloadFollowed}
+              tintColor={colors.bloodBright}
+            />
+          }
+        >
+          {/* Buscador */}
+          <View style={styles.searchWrapper}>
+            <Ionicons name="search" size={18} color={colors.muted} style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Añadir banda..."
+              placeholderTextColor={colors.faint}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCapitalize="words"
+            />
+            {searching && (
+              <ActivityIndicator color={colors.bloodBright} style={{ marginLeft: spacing.sm }} />
+            )}
+          </View>
+
+          {/* Resultados de búsqueda */}
+          {searchResults.length > 0 && (
+            <View style={styles.listSection}>
+              {searchResults.map((b: any, i) => {
+                const isFollowed = followedNames.has(b.name.toLowerCase());
+                return (
+                  <View
+                    key={b.spotify_id}
+                    style={[styles.row, i === searchResults.length - 1 && { borderBottomWidth: 0 }]}
+                  >
+                    <BandImage url={b.image_url} size={50} showTag={!b.image_url} />
+                    <View style={styles.rowContent}>
+                      <Text variant="displaySM" numberOfLines={1}>
+                        {b.name}
+                      </Text>
+                      {b.genres?.length > 0 && (
+                        <Text
+                          variant="monoSM"
+                          color="muted"
+                          numberOfLines={1}
+                          style={{ marginTop: 4 }}
+                        >
+                          {b.genres.slice(0, 2).join(' · ')}
+                        </Text>
+                      )}
+                    </View>
+                    {isFollowed ? (
+                      <Text variant="monoSM" color="muted" style={{ marginRight: 4 }}>
+                        SIGUES
+                      </Text>
+                    ) : (
+                      <TouchableOpacity
+                        style={[styles.addBtn, followingId === b.spotify_id && { opacity: 0.5 }]}
+                        onPress={() => handleFollowFromSearch(b)}
+                        disabled={followingId !== null}
+                      >
+                        {followingId === b.spotify_id ? (
+                          <ActivityIndicator color={colors.silver} size="small" />
+                        ) : (
+                          <Ionicons name="add" size={18} color={colors.silver} />
+                        )}
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          {/* Lista de bandas seguidas */}
+          {searchResults.length === 0 && (
+            <>
+              <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
+                SIGUES · {followedBands.length}
+              </Text>
+              {loadingFollowed ? (
+                <ActivityIndicator color={colors.bloodBright} style={{ marginTop: spacing.lg }} />
+              ) : followedBands.length === 0 ? (
+                <Text variant="body" color="muted" style={styles.emptyText}>
+                  No sigues ninguna banda todavía
+                </Text>
+              ) : (
+                <View style={styles.listSection}>
+                  {followedBands.map((b: FollowedBand, i) => (
+                    <View
+                      key={b.id}
+                      style={[
+                        styles.row,
+                        i === followedBands.length - 1 && { borderBottomWidth: 0 },
+                      ]}
+                    >
+                      <BandImage url={b.image_url} size={50} showTag={!b.image_url} />
+                      <View style={styles.rowContent}>
+                        <Text variant="displaySM" numberOfLines={1}>
+                          {b.name}
+                        </Text>
+                        {b.genres && b.genres.length > 0 && (
+                          <Text
+                            variant="monoSM"
+                            color="muted"
+                            numberOfLines={1}
+                            style={{ marginTop: 4 }}
+                          >
+                            {b.genres.slice(0, 2).join(' · ')}
+                          </Text>
+                        )}
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => handleUnfollow(b.id, b.name)}
+                        style={styles.removeBtn}
+                        hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                      >
+                        <Ionicons name="close" size={18} color={colors.muted} />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </>
+          )}
+
+          <View style={{ height: spacing.xxxl }} />
+        </ScrollView>
+      )}
+    </View>
+  );
+}
+
+function TabPill({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.tabPill, active && styles.tabPillActive]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <Text
+        style={{
+          fontFamily: fontFamily.mono,
+          fontSize: 10,
+          letterSpacing: 0.8,
+          textTransform: 'uppercase',
+          color: active ? colors.ink : colors.silver,
+        }}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.ink,
+    paddingHorizontal: spacing.xl,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    marginBottom: spacing.lg,
+  },
+  avatarBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.full,
+    backgroundColor: colors.panel2,
+    borderWidth: 1,
+    borderColor: colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.xl,
+  },
+  tabPill: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 7,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: 'transparent',
+  },
+  tabPillActive: {
+    backgroundColor: colors.silver,
+    borderColor: colors.silver,
+  },
+  sectionTitle: {
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
+  },
+  emptyText: {
+    fontStyle: 'italic',
+    marginVertical: spacing.lg,
+  },
+  carouselContent: {
+    gap: spacing.md,
+    paddingRight: spacing.md,
+  },
+  carouselCard: {
+    width: 138,
+  },
+  cardNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  listSection: {
+    marginTop: spacing.xs,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.lineSoft,
+  },
+  rowContent: {
+    flex: 1,
+    marginLeft: spacing.md,
+    minWidth: 0,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  rowEnd: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  addBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.full,
+    backgroundColor: colors.panel2,
+    borderWidth: 1,
+    borderColor: colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.panel,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
+  },
+  searchIcon: {
+    marginRight: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: spacing.md + 2,
+    fontSize: 15,
+    color: colors.bright,
+    fontFamily: fontFamily.body,
+  },
+  carouselImageWrapper: {
+    position: 'relative',
+  },
+  carouselAddBtn: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    width: 32,
+    height: 32,
+    borderRadius: radius.full,
+    backgroundColor: colors.blood,
+    borderWidth: 1.5,
+    borderColor: colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.blood,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+});

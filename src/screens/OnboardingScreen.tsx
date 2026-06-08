@@ -5,13 +5,15 @@ import {
   FlatList,
   Image,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { supabase } from '../lib/supabase';
+import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '../lib/supabase';
+import { colors, fontFamily, radius, spacing } from '../theme';
+import { Button, Text } from '../components/ui';
 
 type Band = {
   spotify_id: string;
@@ -20,46 +22,26 @@ type Band = {
   genres: string[];
 };
 
-export default function OnboardingScreen({
-  onDone,
-}: {
-  onDone: () => void;
-}) {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<Band[]>(
-    [],
-  );
-  const [searching, setSearching] =
-    useState(false);
-  const [selected, setSelected] = useState<
-    Map<string, Band>
-  >(new Map());
-  const [saving, setSaving] = useState(false);
+export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
   const queryClient = useQueryClient();
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<Band[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [selected, setSelected] = useState<Map<string, Band>>(new Map());
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (query.trim().length < 2) {
       setResults([]);
       return;
     }
-    const timer = setTimeout(
-      () => doSearch(query.trim()),
-      400,
-    );
+    const timer = setTimeout(() => doSearch(query.trim()), 400);
     return () => clearTimeout(timer);
   }, [query]);
 
   const doSearch = async (q: string) => {
     try {
       setSearching(true);
-      const { data, error } =
-        await supabase.functions.invoke(
-          'search-bands',
-          {
-            method: 'GET',
-          } as any,
-        );
-
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -75,10 +57,7 @@ export default function OnboardingScreen({
       if (json.error) throw new Error(json.error);
       setResults(json.bands ?? []);
     } catch (err: any) {
-      Alert.alert(
-        'Error de búsqueda',
-        err.message,
-      );
+      Alert.alert('Error de búsqueda', err.message);
     } finally {
       setSearching(false);
     }
@@ -86,8 +65,7 @@ export default function OnboardingScreen({
 
   const toggleBand = (band: Band) => {
     const next = new Map(selected);
-    if (next.has(band.spotify_id))
-      next.delete(band.spotify_id);
+    if (next.has(band.spotify_id)) next.delete(band.spotify_id);
     else next.set(band.spotify_id, band);
     setSelected(next);
   };
@@ -101,17 +79,11 @@ export default function OnboardingScreen({
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user)
-        throw new Error('Sesión no encontrada');
+      if (!user) throw new Error('Sesión no encontrada');
 
-      const bandsArray = Array.from(
-        selected.values(),
-      );
+      const bandsArray = Array.from(selected.values());
 
-      const {
-        data: insertedBands,
-        error: bandsError,
-      } = await supabase
+      const { data: insertedBands, error: bandsError } = await supabase
         .from('bands')
         .upsert(
           bandsArray.map((b) => ({
@@ -126,30 +98,18 @@ export default function OnboardingScreen({
 
       if (bandsError) throw bandsError;
 
-      const { error: followError } =
-        await supabase.from('user_bands').upsert(
-          insertedBands!.map((b) => ({
-            user_id: user.id,
-            band_id: b.id,
-          })),
-          { onConflict: 'user_id,band_id' },
-        );
+      const { error: followError } = await supabase.from('user_bands').upsert(
+        insertedBands!.map((b) => ({ user_id: user.id, band_id: b.id })),
+        { onConflict: 'user_id,band_id' },
+      );
 
       if (followError) throw followError;
 
-      queryClient.invalidateQueries({
-        queryKey: ['followedBands'],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ['recommendations'],
-      });
-
+      queryClient.invalidateQueries({ queryKey: ['followedBands'] });
+      queryClient.invalidateQueries({ queryKey: ['recommendations'] });
       onDone();
     } catch (err: any) {
-      Alert.alert(
-        'Error al guardar',
-        err.message,
-      );
+      Alert.alert('Error al guardar', err.message);
     } finally {
       setSaving(false);
     }
@@ -157,114 +117,102 @@ export default function OnboardingScreen({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>
-        Elige tus bandas
-      </Text>
-      <Text style={styles.subtitle}>
-        Mínimo 3 para empezar ({selected.size}{' '}
-        seleccionadas)
-      </Text>
+      <View style={styles.header}>
+        <Text variant="monoMD" color="bloodBright">
+          PASO 1 · TU PERFIL
+        </Text>
+        <Text variant="displayLG" style={styles.title}>
+          Elige tus{'\n'}bandas
+        </Text>
+        <Text variant="body" color="muted" style={styles.subtitle}>
+          Mínimo 3 para empezar a descubrir conciertos
+        </Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Buscar banda..."
-        placeholderTextColor="#666"
-        value={query}
-        onChangeText={setQuery}
-        autoCapitalize="words"
-      />
+        <View style={styles.counter}>
+          <Text variant="displayMD" color="bloodBright">
+            {selected.size}
+          </Text>
+          <Text variant="monoSM" color="muted" style={{ marginLeft: 6 }}>
+            SELECCIONADAS
+          </Text>
+        </View>
+      </View>
 
-      {searching && (
-        <ActivityIndicator
-          color="#dc2626"
-          style={{ marginVertical: 12 }}
+      <View style={styles.searchWrapper}>
+        <Ionicons name="search" size={18} color={colors.muted} style={styles.searchIcon} />
+        <TextInput
+          style={styles.input}
+          placeholder="Buscar banda..."
+          placeholderTextColor={colors.faint}
+          value={query}
+          onChangeText={setQuery}
+          autoCapitalize="words"
         />
-      )}
+        {searching && (
+          <ActivityIndicator color={colors.bloodBright} style={{ marginLeft: spacing.sm }} />
+        )}
+      </View>
 
       <FlatList
         data={results}
         keyExtractor={(item) => item.spotify_id}
-        style={{ flex: 1 }}
+        style={{ flex: 1, marginTop: spacing.md }}
         keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: spacing.xl }}
         renderItem={({ item }) => {
-          const isSelected = selected.has(
-            item.spotify_id,
-          );
+          const isSelected = selected.has(item.spotify_id);
           return (
             <TouchableOpacity
-              style={[
-                styles.bandRow,
-                isSelected &&
-                  styles.bandRowSelected,
-              ]}
+              style={[styles.bandRow, isSelected && styles.bandRowSelected]}
               onPress={() => toggleBand(item)}
+              activeOpacity={0.7}
             >
               {item.image_url ? (
-                <Image
-                  source={{ uri: item.image_url }}
-                  style={styles.bandImage}
-                />
+                <Image source={{ uri: item.image_url }} style={styles.bandImage} />
               ) : (
-                <View
-                  style={[
-                    styles.bandImage,
-                    styles.bandImagePlaceholder,
-                  ]}
-                />
+                <View style={[styles.bandImage, { backgroundColor: colors.panel3 }]} />
               )}
-              <View
-                style={{
-                  flex: 1,
-                  marginLeft: 12,
-                }}
-              >
-                <Text style={styles.bandName}>
+              <View style={{ flex: 1, marginLeft: spacing.md, minWidth: 0 }}>
+                <Text variant="displaySM" numberOfLines={1}>
                   {item.name}
                 </Text>
                 {item.genres.length > 0 && (
-                  <Text
-                    style={styles.bandGenres}
-                    numberOfLines={1}
-                  >
-                    {item.genres
-                      .slice(0, 3)
-                      .join(' · ')}
+                  <Text variant="monoSM" color="muted" numberOfLines={1} style={{ marginTop: 4 }}>
+                    {item.genres.slice(0, 2).join(' · ')}
                   </Text>
                 )}
               </View>
-              <Text style={styles.checkMark}>
-                {isSelected ? '✓' : '+'}
-              </Text>
+              <View style={[styles.checkCircle, isSelected && styles.checkCircleSelected]}>
+                <Ionicons
+                  name={isSelected ? 'checkmark' : 'add'}
+                  size={18}
+                  color={isSelected ? '#fff' : colors.silver}
+                />
+              </View>
             </TouchableOpacity>
           );
         }}
         ListEmptyComponent={
           !searching && query.length >= 2 ? (
-            <Text style={styles.emptyText}>
-              Sin resultados
+            <Text
+              variant="monoMD"
+              color="muted"
+              style={{ textAlign: 'center', marginTop: spacing.xl }}
+            >
+              SIN RESULTADOS
             </Text>
           ) : null
         }
       />
 
-      <TouchableOpacity
-        style={[
-          styles.continueButton,
-          (!canContinue || saving) && {
-            opacity: 0.4,
-          },
-        ]}
-        onPress={handleContinue}
-        disabled={!canContinue || saving}
-      >
-        {saving ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.continueText}>
-            Continuar
-          </Text>
-        )}
-      </TouchableOpacity>
+      <View style={styles.footer}>
+        <Button
+          label={canContinue ? 'Continuar' : `Faltan ${3 - selected.size} bandas`}
+          onPress={handleContinue}
+          loading={saving}
+          disabled={!canContinue}
+        />
+      </View>
     </View>
   );
 }
@@ -272,83 +220,78 @@ export default function OnboardingScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
-    padding: 20,
-    paddingTop: 60,
+    backgroundColor: colors.ink,
+    paddingHorizontal: spacing.xl,
+    paddingTop: 70,
+  },
+  header: {
+    marginBottom: spacing.xl,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
+    marginTop: spacing.md,
   },
   subtitle: {
-    color: '#999',
-    marginTop: 4,
-    marginBottom: 20,
+    marginTop: spacing.sm,
+  },
+  counter: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginTop: spacing.lg,
+  },
+  searchWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.panel,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+  },
+  searchIcon: {
+    marginRight: spacing.sm,
   },
   input: {
-    backgroundColor: '#1a1a1a',
-    borderWidth: 1,
-    borderColor: '#333',
-    borderRadius: 8,
-    padding: 14,
-    fontSize: 16,
-    color: '#fff',
-    marginBottom: 12,
+    flex: 1,
+    paddingVertical: spacing.md + 2,
+    fontSize: 15,
+    color: colors.bright,
+    fontFamily: fontFamily.body,
   },
   bandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
-    borderRadius: 8,
-    marginVertical: 4,
-    backgroundColor: '#141414',
+    padding: spacing.md,
+    borderRadius: radius.md,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.panel,
+    borderWidth: 1,
+    borderColor: colors.line,
   },
   bandRowSelected: {
-    backgroundColor: '#2a0e0e',
-    borderWidth: 1,
-    borderColor: '#dc2626',
+    backgroundColor: colors.bloodTint,
+    borderColor: colors.bloodTintBorder,
   },
   bandImage: {
     width: 50,
     height: 50,
-    borderRadius: 25,
-    backgroundColor: '#222',
+    borderRadius: radius.md,
   },
-  bandImagePlaceholder: {
-    backgroundColor: '#333',
-  },
-  bandName: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  bandGenres: {
-    color: '#777',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  checkMark: {
-    color: '#dc2626',
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginRight: 8,
-  },
-  emptyText: {
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 20,
-  },
-  continueButton: {
-    backgroundColor: '#dc2626',
-    borderRadius: 8,
-    padding: 16,
+  checkCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.line,
     alignItems: 'center',
-    marginTop: 12,
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
-  continueText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+  checkCircleSelected: {
+    backgroundColor: colors.blood,
+    borderColor: colors.bloodBright,
+  },
+  footer: {
+    paddingVertical: spacing.lg,
+    paddingBottom: spacing.xxl + spacing.md,
   },
 });

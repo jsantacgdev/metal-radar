@@ -6,23 +6,17 @@ export type RecommendedBand = {
   name: string;
   image_url: string | null;
   genres: string[];
+  affinity: number;
 };
 
-async function fetchRecommendations(): Promise<
-  RecommendedBand[]
-> {
+async function fetchRecommendations(): Promise<RecommendedBand[]> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  const res = await fetch(
-    `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/recommend-bands`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${session?.access_token}`,
-      },
-    },
-  );
+  const res = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/recommend-bands`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${session?.access_token}` },
+  });
   const json = await res.json();
   if (json.error) throw new Error(json.error);
   return json.recommendations ?? [];

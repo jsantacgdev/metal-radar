@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text } from 'react-native';
+import { Animated, StyleSheet } from 'react-native';
+import { colors, fontFamily, radius } from '../theme';
 
 export default function PulsingBadge({ label = 'NUEVO' }: { label?: string }) {
   const scale = useRef(new Animated.Value(1)).current;
@@ -7,16 +8,8 @@ export default function PulsingBadge({ label = 'NUEVO' }: { label?: string }) {
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(scale, {
-          toValue: 1.1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scale, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
+        Animated.timing(scale, { toValue: 1.15, duration: 600, useNativeDriver: true }),
+        Animated.timing(scale, { toValue: 1, duration: 600, useNativeDriver: true }),
       ]),
     );
     loop.start();
@@ -25,23 +18,25 @@ export default function PulsingBadge({ label = 'NUEVO' }: { label?: string }) {
 
   return (
     <Animated.View style={[styles.badge, { transform: [{ scale }] }]}>
-      <Text style={styles.text}>{label}</Text>
+      <Animated.Text style={styles.text}>{label}</Animated.Text>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   badge: {
-    backgroundColor: '#1f7a3a',
+    backgroundColor: colors.bloodTint,
+    borderWidth: 1,
+    borderColor: colors.bloodTintBorder,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
-    marginRight: 5,
+    borderRadius: radius.sm,
+    marginRight: 10,
   },
   text: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
+    color: colors.bloodBright,
+    fontSize: 9,
+    fontFamily: fontFamily.monoBold,
+    letterSpacing: 1,
   },
 });

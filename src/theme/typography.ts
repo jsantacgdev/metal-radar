@@ -16,7 +16,7 @@ export const textStyles = {
     fontSize: 44,
     lineHeight: 41,
     letterSpacing: -1,
-    textTransform: 'uppercase' as const,
+    // textTransform: 'uppercase' as const,
     color: colors.bright,
   },
   displayLG: {
@@ -24,7 +24,7 @@ export const textStyles = {
     fontSize: 34,
     lineHeight: 32,
     letterSpacing: -0.7,
-    textTransform: 'uppercase' as const,
+    // textTransform: 'uppercase' as const,
     color: colors.bright,
   },
   displayMD: {
@@ -32,15 +32,14 @@ export const textStyles = {
     fontSize: 22,
     lineHeight: 24,
     letterSpacing: -0.4,
-    textTransform: 'uppercase' as const,
+    // textTransform: 'uppercase' as const,
     color: colors.bright,
   },
   displaySM: {
     fontFamily: fontFamily.displayBold,
     fontSize: 17,
-    lineHeight: 19,
+    lineHeight: 15,
     letterSpacing: -0.2,
-    textTransform: 'uppercase' as const,
     color: colors.bright,
   },
 

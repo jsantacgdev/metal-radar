@@ -5,12 +5,14 @@ import {
   FlatList,
   Image,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
+import { colors, fontFamily, radius, spacing } from '../theme';
+import { Text } from './ui';
 
 export type SearchedBand = {
   spotify_id: string;
@@ -31,24 +33,16 @@ export default function BandSearch({
   placeholder = 'Buscar banda...',
 }: Props) {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<
-    SearchedBand[]
-  >([]);
-  const [searching, setSearching] =
-    useState(false);
-  const [followingId, setFollowingId] = useState<
-    string | null
-  >(null);
+  const [results, setResults] = useState<SearchedBand[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [followingId, setFollowingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (query.trim().length < 2) {
       setResults([]);
       return;
     }
-    const timer = setTimeout(
-      () => doSearch(query.trim()),
-      400,
-    );
+    const timer = setTimeout(() => doSearch(query.trim()), 400);
     return () => clearTimeout(timer);
   }, [query]);
 
@@ -70,18 +64,13 @@ export default function BandSearch({
       if (json.error) throw new Error(json.error);
       setResults(json.bands ?? []);
     } catch (err: any) {
-      Alert.alert(
-        'Error de búsqueda',
-        err.message,
-      );
+      Alert.alert('Error de búsqueda', err.message);
     } finally {
       setSearching(false);
     }
   };
 
-  const handleFollow = async (
-    band: SearchedBand,
-  ) => {
+  const handleFollow = async (band: SearchedBand) => {
     try {
       setFollowingId(band.spotify_id);
       await onFollow(band);
@@ -94,21 +83,18 @@ export default function BandSearch({
 
   return (
     <View>
-      <TextInput
-        style={styles.input}
-        placeholder={placeholder}
-        placeholderTextColor="#666"
-        value={query}
-        onChangeText={setQuery}
-        autoCapitalize="words"
-      />
-
-      {searching && (
-        <ActivityIndicator
-          color="#dc2626"
-          style={{ marginVertical: 8 }}
+      <View style={styles.searchWrapper}>
+        <Ionicons name="search" size={18} color={colors.muted} style={styles.searchIcon} />
+        <TextInput
+          style={styles.input}
+          placeholder={placeholder}
+          placeholderTextColor={colors.faint}
+          value={query}
+          onChangeText={setQuery}
+          autoCapitalize="words"
         />
-      )}
+        {searching && <ActivityIndicator color={colors.bloodBright} style={styles.searchSpinner} />}
+      </View>
 
       {results.length > 0 && (
         <FlatList
@@ -116,77 +102,45 @@ export default function BandSearch({
           keyExtractor={(item) => item.spotify_id}
           scrollEnabled={false}
           keyboardShouldPersistTaps="handled"
+          style={{ marginTop: spacing.md }}
           renderItem={({ item }) => {
-            const isFollowed =
-              followedSpotifyIds.has(
-                item.spotify_id,
-              );
-            const isLoading =
-              followingId === item.spotify_id;
+            const isFollowed = followedSpotifyIds.has(item.spotify_id);
+            const isLoading = followingId === item.spotify_id;
             return (
               <View style={styles.row}>
                 {item.image_url ? (
-                  <Image
-                    source={{
-                      uri: item.image_url,
-                    }}
-                    style={styles.image}
-                  />
+                  <Image source={{ uri: item.image_url }} style={styles.image} />
                 ) : (
-                  <View
-                    style={[
-                      styles.image,
-                      { backgroundColor: '#333' },
-                    ]}
-                  />
+                  <View style={[styles.image, styles.imagePlaceholder]} />
                 )}
-                <View
-                  style={{
-                    flex: 1,
-                    marginLeft: 12,
-                  }}
-                >
-                  <Text style={styles.name}>
+                <View style={styles.rowContent}>
+                  <Text variant="displaySM" numberOfLines={1}>
                     {item.name}
                   </Text>
                   {item.genres.length > 0 && (
-                    <Text
-                      style={styles.genres}
-                      numberOfLines={1}
-                    >
-                      {item.genres
-                        .slice(0, 3)
-                        .join(' · ')}
+                    <Text variant="monoSM" color="muted" numberOfLines={1} style={{ marginTop: 4 }}>
+                      {item.genres.slice(0, 2).join(' · ')}
                     </Text>
                   )}
                 </View>
                 {isFollowed ? (
-                  <Text
-                    style={styles.followedLabel}
-                  >
-                    Sigues
-                  </Text>
+                  <View style={styles.followedBadge}>
+                    <Ionicons name="checkmark" size={14} color={colors.muted} />
+                    <Text variant="monoSM" color="muted">
+                      SIGUES
+                    </Text>
+                  </View>
                 ) : (
                   <TouchableOpacity
                     style={styles.followBtn}
-                    onPress={() =>
-                      handleFollow(item)
-                    }
+                    onPress={() => handleFollow(item)}
                     disabled={isLoading}
+                    activeOpacity={0.7}
                   >
                     {isLoading ? (
-                      <ActivityIndicator
-                        color="#fff"
-                        size="small"
-                      />
+                      <ActivityIndicator color="#fff" size="small" />
                     ) : (
-                      <Text
-                        style={
-                          styles.followBtnText
-                        }
-                      >
-                        Seguir
-                      </Text>
+                      <Ionicons name="add" size={20} color="#fff" />
                     )}
                   </TouchableOpacity>
                 )}
@@ -200,54 +154,62 @@ export default function BandSearch({
 }
 
 const styles = StyleSheet.create({
-  input: {
-    backgroundColor: '#1a1a1a',
+  searchWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.panel,
     borderWidth: 1,
-    borderColor: '#333',
-    borderRadius: 8,
-    padding: 14,
-    fontSize: 16,
-    color: '#fff',
-    marginBottom: 12,
+    borderColor: colors.line,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+  },
+  searchIcon: {
+    marginRight: spacing.sm,
+  },
+  searchSpinner: {
+    marginLeft: spacing.sm,
+  },
+  input: {
+    flex: 1,
+    paddingVertical: spacing.md + 2,
+    fontSize: 15,
+    color: colors.bright,
+    fontFamily: fontFamily.body,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
-    borderRadius: 8,
-    marginVertical: 4,
-    backgroundColor: '#141414',
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.lineSoft,
   },
   image: {
     width: 50,
     height: 50,
-    borderRadius: 25,
+    borderRadius: radius.md,
   },
-  name: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
+  imagePlaceholder: {
+    backgroundColor: colors.panel3,
   },
-  genres: {
-    color: '#777',
-    fontSize: 12,
-    marginTop: 2,
+  rowContent: {
+    flex: 1,
+    marginLeft: spacing.md,
+    minWidth: 0,
+  },
+  followedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.md,
   },
   followBtn: {
-    backgroundColor: '#dc2626',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 16,
-  },
-  followBtnText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  followedLabel: {
-    color: '#777',
-    fontSize: 13,
-    fontStyle: 'italic',
-    marginRight: 6,
+    width: 38,
+    height: 38,
+    borderRadius: radius.full,
+    backgroundColor: colors.blood,
+    borderWidth: 1,
+    borderColor: colors.bloodBright,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
