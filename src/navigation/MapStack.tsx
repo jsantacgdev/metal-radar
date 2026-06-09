@@ -19,7 +19,11 @@ export default function MapStack() {
         contentStyle: { backgroundColor: '#0a0a0a' },
       }}
     >
-      <Stack.Screen name="MapHome" component={MapScreen} options={{ title: 'Mapa' }} />
+      <Stack.Screen
+        name="MapHome"
+        component={MapScreen}
+        options={{ title: 'Mapa', headerShown: false }}
+      />
       <Stack.Screen
         name="ConcertDetail"
         component={ConcertDetailScreen}

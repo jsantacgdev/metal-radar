@@ -189,7 +189,7 @@ Deno.serve(async (req) => {
     // 4. Top 15 candidatos
     const topCandidatesWithScore = Array.from(candidateScores.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 15);
+      .slice(0, 25);
 
     const topCandidates = topCandidatesWithScore.map(([name]) => name);
     const scoresByName = new Map(topCandidatesWithScore);

@@ -1,19 +1,44 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
+import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import MapView, { Marker, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { useNearbyConcerts, ConcertWithDetails } from '../hooks/useNearbyConcerts';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNearbyConcerts, ConcertWithDetails } from '../hooks/useNearbyConcerts';
 import { MapStackParamList } from '../navigation/MapStack';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const DEFAULT_RADIUS_KM = 200;
+import { useProfile } from '../hooks/useProfile';
+import { colors, fontFamily, radius, spacing } from '../theme';
+import { Text } from '../components/ui';
+import BandImage from '../components/BandImage';
 
 const LOCATION_CACHE_KEY = 'last_known_location';
 const LOCATION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
+const DARK_MAP_STYLE = [
+  { elementType: 'geometry', stylers: [{ color: '#1d1d22' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#0a0a0c' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#82858d' }] },
+  {
+    featureType: 'administrative.locality',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#c7cad0' }],
+  },
+  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2a2a30' }] },
+  { featureType: 'road', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0a0a0c' }] },
+  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#5a5d64' }] },
+  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+];
+
 export default function MapScreen() {
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation<NativeStackNavigationProp<MapStackParamList>>();
+  const { profile } = useProfile();
+
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [selectedVenue, setSelectedVenue] = useState<{
@@ -21,15 +46,16 @@ export default function MapScreen() {
     concerts: ConcertWithDetails[];
   } | null>(null);
 
+  const radiusKm = profile?.search_radius_km ?? 500;
+
   const { concerts, farConcerts, loading, error } = useNearbyConcerts(
     location?.lat ?? null,
     location?.lng ?? null,
-    DEFAULT_RADIUS_KM,
+    radiusKm,
   );
 
-  const navigation = useNavigation<NativeStackNavigationProp<MapStackParamList>>();
-
-  const visible = [...concerts, ...farConcerts];
+  // Mostrar todos los markers, distinguiendo cercanos y lejanos por color
+  const visible = useMemo(() => [...concerts, ...farConcerts], [concerts, farConcerts]);
 
   const byVenue = useMemo(() => {
     const map = new Map<
@@ -44,7 +70,6 @@ export default function MapScreen() {
         map.set(c.venue.id, { venue: c.venue, concerts: [c] });
       }
     }
-    // Ordenar conciertos de cada venue por fecha
     for (const group of map.values()) {
       group.concerts.sort(
         (a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime(),
@@ -52,18 +77,6 @@ export default function MapScreen() {
     }
     return Array.from(map.values());
   }, [visible]);
-
-  useEffect(() => {
-    (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setPermissionDenied(true);
-        return;
-      }
-      const pos = await Location.getCurrentPositionAsync({});
-      setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-    })();
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -89,7 +102,7 @@ export default function MapScreen() {
 
       try {
         const pos = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced, // más rápido que High
+          accuracy: Location.Accuracy.Balanced,
         });
         if (cancelled) return;
 
@@ -115,8 +128,13 @@ export default function MapScreen() {
   if (permissionDenied) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.error}>Necesitamos permiso de ubicación.</Text>
-        <Text style={styles.errorSub}>Actívalo en los ajustes del sistema.</Text>
+        <Ionicons name="location-outline" size={48} color={colors.bloodBright} />
+        <Text variant="displaySM" style={{ marginTop: spacing.lg, textAlign: 'center' }}>
+          Permiso de ubicación necesario
+        </Text>
+        <Text variant="body" color="muted" style={{ marginTop: spacing.sm, textAlign: 'center' }}>
+          Actívalo en los ajustes del sistema para ver conciertos cerca
+        </Text>
       </View>
     );
   }
@@ -124,8 +142,10 @@ export default function MapScreen() {
   if (!location) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#dc2626" size="large" />
-        <Text style={styles.loadingText}>Obteniendo ubicación...</Text>
+        <ActivityIndicator color={colors.bloodBright} size="large" />
+        <Text variant="monoMD" color="muted" style={{ marginTop: spacing.lg }}>
+          OBTENIENDO UBICACIÓN...
+        </Text>
       </View>
     );
   }
@@ -138,100 +158,170 @@ export default function MapScreen() {
   };
 
   return (
-    <View style={{ flex: 1 }}>
-      <MapView style={{ flex: 1 }} initialRegion={region} showsUserLocation>
+    <View style={{ flex: 1, backgroundColor: colors.ink, marginTop: spacing.xxl }}>
+      <MapView
+        style={{ flex: 1 }}
+        initialRegion={region}
+        showsUserLocation
+        customMapStyle={DARK_MAP_STYLE}
+      >
         {byVenue.map((group) => {
-          const isFar = group.concerts.every((c) => c.distance_km > DEFAULT_RADIUS_KM);
+          const isFar = group.concerts.every((c) => c.distance_km > radiusKm);
           return (
             <Marker
               key={group.venue.id}
               coordinate={{ latitude: group.venue.lat, longitude: group.venue.lng }}
-              pinColor={isFar ? '#999' : '#dc2626'}
+              pinColor={isFar ? colors.silver : colors.bloodBright}
               onPress={() => setSelectedVenue(group)}
             />
           );
         })}
       </MapView>
 
-      {/* Banner de carga / errores */}
+      {/* Header flotante */}
+      <View style={[styles.headerOverlay, { paddingTop: insets.top + spacing.md }]}>
+        <View style={styles.headerCard}>
+          <Ionicons name="radio" size={18} color={colors.bloodBright} />
+          <View style={{ marginLeft: spacing.sm }}>
+            <Text
+              style={{
+                fontFamily: fontFamily.displayBold,
+                fontSize: 14,
+                letterSpacing: 1,
+                color: colors.bright,
+                textTransform: 'uppercase',
+              }}
+            >
+              Mapa
+            </Text>
+            <Text variant="monoSM" color="muted">
+              {visible.length} CONCIERTOS · {concerts.length} CERCA
+            </Text>
+          </View>
+        </View>
+      </View>
+
       {loading && (
-        <View style={styles.topBanner}>
-          <ActivityIndicator color="#fff" />
-          <Text style={styles.bannerText}>Cargando conciertos...</Text>
+        <View style={[styles.loadingBanner, { top: insets.top + 80 }]}>
+          <ActivityIndicator color={colors.bloodBright} size="small" />
+          <Text variant="monoSM" color="silver" style={{ marginLeft: spacing.sm }}>
+            CARGANDO CONCIERTOS...
+          </Text>
         </View>
       )}
 
-      {/* Mensaje cuando no hay conciertos cerca */}
-      {!loading && concerts.length === 0 && farConcerts.length > 0 && (
-        <View style={styles.bottomCard}>
-          <Text style={styles.cardTitle}>No hay conciertos a menos de {DEFAULT_RADIUS_KM}km</Text>
-          <Text style={styles.cardSubtitle}>Pero hay {farConcerts.length} más lejos</Text>
-          <TouchableOpacity style={styles.cardButton}>
-            <Text style={styles.cardButtonText}>Mostrar todos</Text>
-          </TouchableOpacity>
+      {/* Empty state cuando no hay nada */}
+      {!loading && visible.length === 0 && (
+        <View style={styles.emptyCard}>
+          <Text variant="displaySM" style={{ textAlign: 'center' }}>
+            Sin conciertos disponibles
+          </Text>
+          <Text variant="bodySM" color="muted" style={styles.emptyText}>
+            Sigue más bandas en el Radar o vuelve más tarde
+          </Text>
         </View>
       )}
 
-      {/* Cuando no hay nada en absoluto */}
-      {!loading && concerts.length === 0 && farConcerts.length === 0 && (
-        <View style={styles.bottomCard}>
-          <Text style={styles.cardTitle}>Sin conciertos disponibles</Text>
-          <Text style={styles.cardSubtitle}>Sigue más bandas o vuelve más tarde</Text>
-        </View>
-      )}
-
-      {/* Popup del concierto seleccionado */}
+      {/* Popup del venue seleccionado */}
       {selectedVenue && (
         <View style={styles.bottomCard}>
-          <Text style={styles.cardTitle}>{selectedVenue.venue.name}</Text>
-          <Text style={styles.cardSubtitle}>
-            {selectedVenue.venue.city}
-            {selectedVenue.venue.country ? ` · ${selectedVenue.venue.country}` : ''}
-          </Text>
-          <Text style={styles.cardMeta}>
-            {selectedVenue.concerts[0].distance_km.toFixed(0)} km · {selectedVenue.concerts.length}{' '}
-            {selectedVenue.concerts.length === 1 ? 'concierto' : 'conciertos'}
-          </Text>
+          <View style={styles.cardHeader}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text variant="monoSM" color="bloodBright">
+                {selectedVenue.concerts[0].distance_km.toFixed(0)} KM ·{' '}
+                {selectedVenue.concerts.length === 1
+                  ? '1 CONCIERTO'
+                  : `${selectedVenue.concerts.length} CONCIERTOS`}
+              </Text>
+              <Text variant="displayMD" numberOfLines={1} style={{ marginTop: 4 }}>
+                {selectedVenue.venue.name}
+              </Text>
+              <Text variant="monoSM" color="muted" style={{ marginTop: 4 }}>
+                {selectedVenue.venue.city?.toUpperCase()}
+                {selectedVenue.venue.country
+                  ? ` · ${selectedVenue.venue.country.toUpperCase()}`
+                  : ''}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => setSelectedVenue(null)}
+              style={styles.closeBtn}
+              hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+            >
+              <Ionicons name="close" size={20} color={colors.muted} />
+            </TouchableOpacity>
+          </View>
 
           <View style={styles.concertList}>
-            {selectedVenue.concerts.map((c) => {
+            {selectedVenue.concerts.map((c, i) => {
               const date = new Date(c.event_date);
-              const dateStr = date.toLocaleDateString('es-ES', {
-                weekday: 'short',
-                day: 'numeric',
-                month: 'short',
-              });
+              const month = date
+                .toLocaleDateString('es-ES', { month: 'short' })
+                .toUpperCase()
+                .replace('.', '');
+              const day = date.getDate().toString();
+              const firstBand = c.bands[0];
+
               return (
                 <TouchableOpacity
                   key={c.id}
-                  style={styles.concertRow}
+                  style={[
+                    styles.concertRow,
+                    i === selectedVenue.concerts.length - 1 && { borderBottomWidth: 0 },
+                  ]}
                   onPress={() => {
                     const id = c.id;
                     setSelectedVenue(null);
                     navigation.navigate('ConcertDetail', { concertId: id });
                   }}
+                  activeOpacity={0.7}
                 >
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.concertBands} numberOfLines={1}>
+                  <View style={styles.dateBox}>
+                    <Text
+                      style={{
+                        fontFamily: fontFamily.mono,
+                        fontSize: 9,
+                        letterSpacing: 1,
+                        color: colors.bloodBright,
+                      }}
+                    >
+                      {month}
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: fontFamily.displayBold,
+                        fontSize: 18,
+                        lineHeight: 20,
+                        color: colors.bright,
+                      }}
+                    >
+                      {day}
+                    </Text>
+                  </View>
+                  <BandImage
+                    url={firstBand?.image_url ?? null}
+                    size={44}
+                    showTag={!firstBand?.image_url}
+                    style={{ marginLeft: spacing.md }}
+                  />
+                  <View style={styles.concertInfo}>
+                    <Text variant="displaySM" numberOfLines={1}>
                       {c.bands.map((b) => b.name).join(' · ')}
                     </Text>
-                    <Text style={styles.concertDate}>{dateStr}</Text>
                   </View>
-                  <Text style={styles.concertArrow}>›</Text>
+                  <Ionicons name="chevron-forward" size={18} color={colors.faint} />
                 </TouchableOpacity>
               );
             })}
           </View>
-
-          <TouchableOpacity style={styles.closeButton} onPress={() => setSelectedVenue(null)}>
-            <Text style={styles.closeButtonText}>Cerrar</Text>
-          </TouchableOpacity>
         </View>
       )}
 
       {error && (
-        <View style={styles.errorBanner}>
-          <Text style={styles.error}>Error: {error}</Text>
+        <View style={[styles.errorBanner, { top: insets.top + 80 }]}>
+          <Text variant="bodySM" color="bloodBright">
+            {error}
+          </Text>
         </View>
       )}
     </View>
@@ -243,116 +333,113 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0a0a0a',
-    padding: 20,
+    backgroundColor: colors.ink,
+    padding: spacing.xl,
   },
-  loadingText: {
-    color: '#999',
-    marginTop: 12,
-  },
-  error: {
-    color: '#dc2626',
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  errorSub: {
-    color: '#999',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  topBanner: {
+  headerOverlay: {
     position: 'absolute',
-    top: 16,
-    left: 16,
-    right: 16,
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    padding: 12,
-    borderRadius: 8,
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: spacing.lg,
+  },
+  headerCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'rgba(10,10,12,0.85)',
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
   },
-  bannerText: {
-    color: '#fff',
-    marginLeft: 10,
+  loadingBanner: {
+    position: 'absolute',
+    left: spacing.lg,
+    right: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(10,10,12,0.85)',
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.md,
+    padding: spacing.md,
+  },
+  emptyCard: {
+    position: 'absolute',
+    bottom: spacing.xl,
+    left: spacing.lg,
+    right: spacing.lg,
+    padding: spacing.lg,
+    backgroundColor: colors.panel,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.lg,
+  },
+  emptyText: {
+    textAlign: 'center',
+    marginTop: spacing.sm,
   },
   bottomCard: {
     position: 'absolute',
-    bottom: 20,
-    left: 16,
-    right: 16,
-    backgroundColor: '#1a1a1a',
-    padding: 16,
-    borderRadius: 12,
+    bottom: spacing.lg,
+    left: spacing.lg,
+    right: spacing.lg,
+    backgroundColor: colors.panel,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: colors.line,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    maxHeight: 400,
   },
-  cardTitle: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 4,
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
   },
-  cardSubtitle: {
-    color: '#bbb',
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  cardMeta: {
-    color: '#888',
-    fontSize: 13,
-    marginTop: 2,
-  },
-  cardButton: {
-    marginTop: 12,
-    backgroundColor: '#dc2626',
-    padding: 10,
-    borderRadius: 6,
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.full,
+    backgroundColor: colors.panel2,
+    borderWidth: 1,
+    borderColor: colors.line,
     alignItems: 'center',
-  },
-  cardButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  closeButton: {
-    marginTop: 10,
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    color: '#999',
-  },
-  errorBanner: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    right: 16,
-    backgroundColor: 'rgba(220,38,38,0.9)',
-    padding: 12,
-    borderRadius: 8,
+    justifyContent: 'center',
+    marginLeft: spacing.md,
   },
   concertList: {
-    marginTop: 12,
-    marginBottom: 4,
+    marginTop: spacing.lg,
   },
   concertRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#2a2a2a',
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.lineSoft,
   },
-  concertBands: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
+  dateBox: {
+    width: 44,
+    height: 48,
+    borderRadius: radius.sm,
+    backgroundColor: colors.bloodTint,
+    borderWidth: 1,
+    borderColor: colors.bloodTintBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  concertDate: {
-    color: '#999',
-    fontSize: 12,
-    marginTop: 2,
+  concertInfo: {
+    flex: 1,
+    marginLeft: spacing.md,
+    minWidth: 0,
   },
-  concertArrow: {
-    color: '#666',
-    fontSize: 20,
-    marginLeft: 12,
+  errorBanner: {
+    position: 'absolute',
+    left: spacing.lg,
+    right: spacing.lg,
+    padding: spacing.md,
+    backgroundColor: colors.bloodTint,
+    borderWidth: 1,
+    borderColor: colors.bloodTintBorder,
+    borderRadius: radius.md,
   },
 });
