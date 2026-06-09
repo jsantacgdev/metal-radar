@@ -62,19 +62,19 @@ Deno.serve(async (req) => {
     // 1. Buscar primero en BD
     const { data: cached } = await admin
       .from('bands')
-      .select('spotify_id, name, image_url, genres')
+      .select('id, spotify_id, name, image_url, genres')
       .ilike('name', `${query}%`)
-      .not('spotify_id', 'is', null)
       .limit(10);
 
     const cachedBands = (cached ?? []).map((b: any) => ({
+      id: b.id,
       spotify_id: b.spotify_id,
       name: b.name,
       image_url: b.image_url,
       genres: b.genres ?? [],
     }));
 
-    // Si ya hay 5+ cacheados, no necesitamos llamar a Spotify
+    // Si ya hay 5+ cacheados, devolverlos directamente
     if (cachedBands.length >= 5) {
       return new Response(JSON.stringify({ bands: cachedBands, source: 'cache' }), {
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },

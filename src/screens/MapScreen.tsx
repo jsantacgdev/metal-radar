@@ -158,7 +158,7 @@ export default function MapScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.ink, marginTop: spacing.xxxl }}>
+    <View style={{ flex: 1, backgroundColor: colors.ink, marginTop: spacing.xxl }}>
       <MapView
         style={{ flex: 1 }}
         initialRegion={region}
@@ -167,12 +167,23 @@ export default function MapScreen() {
       >
         {byVenue.map((group) => {
           const isFar = group.concerts.every((c) => c.distance_km > radiusKm);
+          const count = group.concerts.length;
+          const hasFestival = group.concerts.some((c) => c.is_festival);
+
+          let pinColor: string;
+          if (isFar) pinColor = colors.silver;
+          else if (hasFestival)
+            pinColor = '#ffa500'; // naranja para festivales
+          else if (count > 1) pinColor = colors.bloodBright;
+          else pinColor = colors.bloodDeep;
+
           return (
             <Marker
               key={group.venue.id}
               coordinate={{ latitude: group.venue.lat, longitude: group.venue.lng }}
-              pinColor={isFar ? colors.silver : colors.bloodBright}
+              pinColor={pinColor}
               onPress={() => setSelectedVenue(group)}
+              title={hasFestival ? 'Festival' : count > 1 ? `${count} conciertos` : undefined}
             />
           );
         })}
@@ -276,6 +287,13 @@ export default function MapScreen() {
                   }}
                   activeOpacity={0.7}
                 >
+                  {c.is_festival && (
+                    <View style={styles.festivalBadge}>
+                      <Text variant="monoSM" color="bloodBright">
+                        🎪 FESTIVAL · {c.festival_name?.toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
                   <View style={styles.dateBox}>
                     <Text
                       style={{
@@ -441,5 +459,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.bloodTintBorder,
     borderRadius: radius.md,
+  },
+  festivalBadge: {
+    position: 'absolute',
+    top: -2,
+    right: 0,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    backgroundColor: colors.bloodTint,
+    borderWidth: 1,
+    borderColor: colors.bloodTintBorder,
+    borderRadius: 4,
+    zIndex: 1,
   },
 });
