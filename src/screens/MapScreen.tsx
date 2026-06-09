@@ -20,7 +20,6 @@ export default function MapScreen() {
     venue: ConcertWithDetails['venue'];
     concerts: ConcertWithDetails[];
   } | null>(null);
-  const [showFar, setShowFar] = useState(false);
 
   const { concerts, farConcerts, loading, error } = useNearbyConcerts(
     location?.lat ?? null,
@@ -30,7 +29,7 @@ export default function MapScreen() {
 
   const navigation = useNavigation<NativeStackNavigationProp<MapStackParamList>>();
 
-  const visible = showFar ? [...concerts, ...farConcerts] : concerts;
+  const visible = [...concerts, ...farConcerts];
 
   const byVenue = useMemo(() => {
     const map = new Map<
@@ -163,11 +162,11 @@ export default function MapScreen() {
       )}
 
       {/* Mensaje cuando no hay conciertos cerca */}
-      {!loading && concerts.length === 0 && farConcerts.length > 0 && !showFar && (
+      {!loading && concerts.length === 0 && farConcerts.length > 0 && (
         <View style={styles.bottomCard}>
           <Text style={styles.cardTitle}>No hay conciertos a menos de {DEFAULT_RADIUS_KM}km</Text>
           <Text style={styles.cardSubtitle}>Pero hay {farConcerts.length} más lejos</Text>
-          <TouchableOpacity style={styles.cardButton} onPress={() => setShowFar(true)}>
+          <TouchableOpacity style={styles.cardButton}>
             <Text style={styles.cardButtonText}>Mostrar todos</Text>
           </TouchableOpacity>
         </View>
