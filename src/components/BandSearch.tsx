@@ -99,7 +99,7 @@ export default function BandSearch({
       {results.length > 0 && (
         <FlatList
           data={results}
-          keyExtractor={(item) => item.spotify_id}
+          keyExtractor={(item, index) => item.spotify_id ?? `name-${item.name}-${index}`}
           scrollEnabled={false}
           keyboardShouldPersistTaps="handled"
           style={{ marginTop: spacing.md }}
