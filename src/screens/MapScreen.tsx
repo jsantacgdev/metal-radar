@@ -158,7 +158,7 @@ export default function MapScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.ink, marginTop: spacing.xxl }}>
+    <View style={{ flex: 1, backgroundColor: colors.ink, marginTop: spacing.xxxl }}>
       <MapView
         style={{ flex: 1 }}
         initialRegion={region}

@@ -2,45 +2,54 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Button,
-  Image,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import * as Location from 'expo-location';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { useProfile } from '../hooks/useProfile';
 import { usePreference } from '../hooks/usePreference';
-import { syncAllConcerts } from '../lib/sync';
+import { colors, fontFamily, radius, spacing } from '../theme';
+import { Button, Text } from '../components/ui';
 
 export default function ProfileScreen() {
   const { session } = useAuth();
-
   const { profile, update } = useProfile();
 
   const [radius, setRadius] = useState<number | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [savingLocation, setSavingLocation] = useState(false);
 
-  const displayRadius = radius ?? profile?.search_radius_km ?? 200;
-
   const { value: skipConfirm, setValue: setSkipConfirm } = usePreference<boolean>(
     'skipUnfollowConfirm',
     false,
   );
 
+  const displayRadius = radius ?? profile?.search_radius_km ?? 500;
+
   const handleSyncConcerts = async () => {
     try {
       setSyncing(true);
-      const result = await syncAllConcerts();
+      const {
+        data: { session: s },
+      } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/sync-concerts`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${s?.access_token}` },
+        },
+      );
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
       Alert.alert(
         'Sincronización completada',
-        `Conciertos: ${result.synced}\nDescartados: ${result.discarded}\nBandas saltadas: ${result.bands_skipped}`,
+        `Conciertos: ${json.synced}\nDescartados: ${json.discarded ?? 0}\nBandas saltadas: ${json.bands_skipped ?? 0}`,
       );
     } catch (err: any) {
       Alert.alert('Error', err.message);
@@ -73,176 +82,257 @@ export default function ProfileScreen() {
   const handleRadiusComplete = async (value: number) => {
     const rounded = Math.round(value / 10) * 10;
     try {
-      await update({
-        search_radius_km: rounded,
-      });
+      await update({ search_radius_km: rounded });
     } catch (err: any) {
       Alert.alert('Error al guardar radio', err.message);
     }
   };
 
+  const handleLogout = () => {
+    Alert.alert('Cerrar sesión', '¿Seguro que quieres salir?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Cerrar sesión', style: 'destructive', onPress: () => supabase.auth.signOut() },
+    ]);
+  };
+
   return (
     <ScrollView
-      style={{
-        flex: 1,
-        backgroundColor: '#0a0a0a',
-      }}
+      style={{ flex: 1, backgroundColor: colors.ink }}
+      contentContainerStyle={{ paddingBottom: spacing.xxxl, paddingTop: spacing.xxxl }}
     >
-      {/* Cabecera */}
-      <View style={styles.section}>
-        <Text style={styles.email}>{session?.user.email}</Text>
+      {/* Avatar + email */}
+      <View style={styles.userBlock}>
+        <View style={styles.avatar}>
+          <Ionicons name="person" size={28} color={colors.silver} />
+        </View>
+        <View style={{ flex: 1, marginLeft: spacing.md, minWidth: 0 }}>
+          <Text variant="monoMD" color="bloodBright">
+            CUENTA
+          </Text>
+          <Text variant="displaySM" numberOfLines={1} style={{ marginTop: 4 }}>
+            {session?.user.email ?? '—'}
+          </Text>
+        </View>
       </View>
 
-      {/* Radio de búsqueda (push) */}
+      {/* Radio de notificaciones */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Radio para notificaciones</Text>
-        <Text style={styles.sectionDescription}>
-          Distancia máxima desde tu ubicación de referencia para avisarte de nuevos conciertos.
+        <Text variant="monoMD" color="muted" style={styles.sectionLabel}>
+          RADIO DE NOTIFICACIONES
         </Text>
-        <Text style={styles.radiusValue}>{displayRadius} km</Text>
+        <Text variant="bodySM" color="muted" style={styles.sectionDesc}>
+          Distancia máxima para avisarte de conciertos cerca de tu ubicación de referencia
+        </Text>
+
+        <View style={styles.radiusDisplay}>
+          <Text
+            style={{
+              fontFamily: fontFamily.displayBold,
+              fontSize: 28,
+              letterSpacing: -1,
+              color: colors.bloodBright,
+            }}
+          >
+            {displayRadius}
+          </Text>
+          <Text variant="monoMD" color="muted" style={{ marginLeft: spacing.sm }}>
+            KM
+          </Text>
+        </View>
+
         <Slider
-          style={{
-            width: '100%',
-            height: 40,
-          }}
+          style={{ width: '100%', height: 40 }}
           minimumValue={50}
-          maximumValue={500}
-          step={10}
-          value={profile?.search_radius_km ?? 200}
-          minimumTrackTintColor="#dc2626"
-          maximumTrackTintColor="#333"
-          thumbTintColor="#dc2626"
+          maximumValue={2000}
+          step={50}
+          value={profile?.search_radius_km ?? 500}
+          minimumTrackTintColor={colors.bloodBright}
+          maximumTrackTintColor={colors.line}
+          thumbTintColor={colors.bloodBright}
           onValueChange={setRadius}
           onSlidingComplete={handleRadiusComplete}
         />
+        <View style={styles.sliderLabels}>
+          <Text variant="monoSM" color="faint">
+            50 KM
+          </Text>
+          <Text variant="monoSM" color="faint">
+            2000 KM
+          </Text>
+        </View>
       </View>
 
       {/* Ubicación de referencia */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Ubicación de referencia</Text>
-        <Text style={styles.sectionDescription}>
+        <Text variant="monoMD" color="muted" style={styles.sectionLabel}>
+          UBICACIÓN DE REFERENCIA
+        </Text>
+        <Text variant="bodySM" color="muted" style={styles.sectionDesc}>
           Solo para notificaciones. El mapa usa siempre tu ubicación actual.
         </Text>
-        {profile?.home_lat && profile?.home_lng ? (
-          <Text style={styles.locationText}>
-            {profile.home_lat.toFixed(3)}, {profile.home_lng.toFixed(3)}
+
+        <View style={styles.locationCard}>
+          <Ionicons
+            name="location"
+            size={18}
+            color={profile?.home_lat ? colors.bloodBright : colors.faint}
+          />
+          <Text
+            variant="body"
+            color={profile?.home_lat ? 'silver' : 'faint'}
+            style={{ marginLeft: spacing.sm, flex: 1 }}
+            numberOfLines={1}
+          >
+            {profile?.home_lat && profile?.home_lng
+              ? `${profile.home_lat.toFixed(3)}, ${profile.home_lng.toFixed(3)}`
+              : 'Sin establecer'}
           </Text>
-        ) : (
-          <Text style={styles.locationText}>Sin establecer</Text>
-        )}
-        <TouchableOpacity
-          style={styles.secondaryButton}
+        </View>
+
+        <Button
+          label={profile?.home_lat ? 'Actualizar ubicación' : 'Usar mi ubicación actual'}
+          variant="secondary"
           onPress={handleSetHomeLocation}
-          disabled={savingLocation}
-        >
-          {savingLocation ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.secondaryButtonText}>Usar mi ubicación actual</Text>
-          )}
-        </TouchableOpacity>
+          loading={savingLocation}
+          icon={<Ionicons name="locate" size={18} color={colors.bright} />}
+        />
       </View>
 
-      {skipConfirm && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Confirmaciones</Text>
-          <Text style={styles.sectionDescription}>
-            Has desactivado la confirmación al dejar de seguir bandas.
-          </Text>
-          <TouchableOpacity style={styles.secondaryButton} onPress={() => setSkipConfirm(false)}>
-            <Text style={styles.secondaryButtonText}>Volver a preguntar</Text>
+      {/* Preferencias */}
+      <View style={styles.section}>
+        <Text variant="monoMD" color="muted" style={styles.sectionLabel}>
+          PREFERENCIAS
+        </Text>
+
+        <View style={styles.toggleRow}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text variant="bodyLG">Confirmar al quitar bandas</Text>
+            <Text variant="bodySM" color="muted" style={{ marginTop: 2 }}>
+              Pregunta antes de dejar de seguir
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.toggle, !skipConfirm && styles.toggleActive]}
+            onPress={() => setSkipConfirm(!skipConfirm)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.toggleKnob, !skipConfirm && styles.toggleKnobActive]} />
           </TouchableOpacity>
         </View>
-      )}
+      </View>
 
       {/* Acciones */}
       <View style={styles.section}>
-        <TouchableOpacity
-          style={styles.actionButton}
+        <Text variant="monoMD" color="muted" style={styles.sectionLabel}>
+          MANTENIMIENTO
+        </Text>
+
+        <Button
+          label="Sincronizar conciertos"
           onPress={handleSyncConcerts}
-          disabled={syncing}
-        >
-          {syncing ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.actionButtonText}>Sincronizar conciertos</Text>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.logoutButton]}
-          onPress={() => supabase.auth.signOut()}
-        >
-          <Text style={styles.actionButtonText}>Cerrar sesión</Text>
-        </TouchableOpacity>
+          loading={syncing}
+          icon={<Ionicons name="sync" size={18} color="#fff" />}
+        />
+
+        <View style={{ height: spacing.sm }} />
+
+        <Button
+          label="Cerrar sesión"
+          variant="ghost"
+          onPress={handleLogout}
+          icon={<Ionicons name="log-out-outline" size={18} color={colors.silver} />}
+        />
       </View>
 
-      <View style={{ height: 40 }} />
+      {/* Footer */}
+      <View style={styles.footer}>
+        <Text variant="monoSM" color="faint" style={{ textAlign: 'center' }}>
+          METAL RADAR · MVP
+        </Text>
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  section: {
-    padding: 20,
+  userBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.xl,
     borderBottomWidth: 1,
-    borderBottomColor: '#1a1a1a',
+    borderBottomColor: colors.line,
   },
-  sectionHeader: {
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.full,
+    backgroundColor: colors.panel2,
+    borderWidth: 1,
+    borderColor: colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  section: {
+    padding: spacing.xl,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.line,
+  },
+  sectionLabel: {
+    marginBottom: spacing.sm,
+  },
+  sectionDesc: {
+    marginBottom: spacing.lg,
+  },
+  radiusDisplay: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: spacing.sm,
+  },
+  sliderLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: spacing.xs,
+    paddingHorizontal: 4,
+  },
+  locationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    backgroundColor: colors.panel,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.md,
+    marginBottom: spacing.md,
+  },
+  toggleRow: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  sectionTitle: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 6,
+  toggle: {
+    width: 48,
+    height: 28,
+    borderRadius: radius.full,
+    backgroundColor: colors.panel2,
+    borderWidth: 1,
+    borderColor: colors.line,
+    padding: 2,
+    justifyContent: 'center',
   },
-  sectionDescription: {
-    color: '#777',
-    fontSize: 13,
-    marginBottom: 12,
+  toggleActive: {
+    backgroundColor: colors.blood,
+    borderColor: colors.bloodBright,
   },
-  email: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
+  toggleKnob: {
+    width: 22,
+    height: 22,
+    borderRadius: radius.full,
+    backgroundColor: colors.faint,
   },
-  radiusValue: {
-    color: '#dc2626',
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginVertical: 4,
+  toggleKnobActive: {
+    backgroundColor: '#fff',
+    alignSelf: 'flex-end',
   },
-  locationText: {
-    color: '#bbb',
-    fontSize: 14,
-    marginBottom: 12,
-  },
-
-  actionButton: {
-    backgroundColor: '#dc2626',
-    padding: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  actionButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  logoutButton: {
-    backgroundColor: '#333',
-  },
-  secondaryButton: {
-    backgroundColor: '#222',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  secondaryButtonText: {
-    color: '#fff',
-    fontWeight: '600',
+  footer: {
+    marginTop: spacing.xxxl,
   },
 });

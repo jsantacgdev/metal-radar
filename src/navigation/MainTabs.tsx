@@ -87,8 +87,7 @@ export default function MainTabs() {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'person' : 'person-outline'} size={22} color={color} />
           ),
-          headerShown: true,
-          ...sharedHeader,
+          headerShown: false,
         }}
       />
     </Tab.Navigator>
