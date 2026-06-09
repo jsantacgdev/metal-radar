@@ -73,6 +73,11 @@ type TmEvent = {
       country?: { name: string };
       location?: { latitude: string; longitude: string };
     }[];
+    attractions?: {
+      id: string;
+      name: string;
+      images?: { url: string }[];
+    }[];
   };
 };
 
@@ -258,18 +263,66 @@ Deno.serve(async (req) => {
 
           if (!concertRow) continue;
 
-          await admin.from('concert_bands').upsert(
-            {
-              concert_id: concertRow.id,
-              band_id: band.id,
-              is_headliner: true,
-            },
-            { onConflict: 'concert_id,band_id' },
-          );
+          // Guardar TODAS las attractions del evento como bandas del cartel
+          const attractions = ev._embedded?.attractions ?? [];
+
+          if (attractions.length === 0) {
+            // Fallback: si no hay attractions, al menos asociamos la banda que sincronizamos
+            await admin
+              .from('concert_bands')
+              .upsert(
+                { concert_id: concertRow.id, band_id: band.id, is_headliner: true },
+                { onConflict: 'concert_id,band_id' },
+              );
+          } else {
+            for (let idx = 0; idx < attractions.length; idx++) {
+              const attr = attractions[idx];
+              if (!attr.name) continue;
+
+              // Buscar o crear banda en BD
+              const { data: existingBand } = await admin
+                .from('bands')
+                .select('id')
+                .or(`ticketmaster_id.eq.${attr.id},name.ilike.${attr.name.replace(/,/g, '')}`)
+                .limit(1)
+                .maybeSingle();
+
+              let bandIdInDb = existingBand?.id;
+
+              if (!bandIdInDb) {
+                const imageUrl = attr.images?.[0]?.url ?? null;
+                const { data: newBand } = await admin
+                  .from('bands')
+                  .upsert(
+                    {
+                      name: attr.name,
+                      ticketmaster_id: attr.id,
+                      image_url: imageUrl,
+                    },
+                    { onConflict: 'ticketmaster_id' },
+                  )
+                  .select('id')
+                  .single();
+                bandIdInDb = newBand?.id;
+              }
+
+              if (bandIdInDb) {
+                await admin.from('concert_bands').upsert(
+                  {
+                    concert_id: concertRow.id,
+                    band_id: bandIdInDb,
+                    is_headliner: idx === 0,
+                  },
+                  { onConflict: 'concert_id,band_id' },
+                );
+              }
+            }
+          }
 
           totalSynced++;
         }
 
+        // Marcar la banda como sincronizada correctamente después de procesar todos sus eventos
         await admin
           .from('bands')
           .update({ last_concerts_sync_at: new Date().toISOString() })

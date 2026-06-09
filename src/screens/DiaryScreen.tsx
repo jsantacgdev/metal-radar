@@ -1,66 +1,83 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   RefreshControl,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import {
-  useNavigation,
-  useFocusEffect,
-} from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useCallback } from 'react';
-import {
-  DiaryEntry,
-  useDiary,
-} from '../hooks/useDiary';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { DiaryEntry, useDiary } from '../hooks/useDiary';
 import { DiaryStackParamList } from '../navigation/DiaryStack';
+import { colors, fontFamily, radius, spacing } from '../theme';
+import { Text } from '../components/ui';
+import BandImage from '../components/BandImage';
 
-type FilterMode = 'upcoming' | 'past';
+type Filter = 'upcoming' | 'past';
 
 export default function DiaryScreen() {
-  const navigation =
-    useNavigation<
-      NativeStackNavigationProp<DiaryStackParamList>
-    >();
-  const { entries, loading, error, reload } =
-    useDiary();
-  const [filter, setFilter] =
-    useState<FilterMode>('upcoming');
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation<NativeStackNavigationProp<DiaryStackParamList>>();
+  const { entries, loading, error, reload } = useDiary();
+  const [filter, setFilter] = useState<Filter>('upcoming');
 
-  const filtered = useMemo(() => {
-    if (filter === 'upcoming') {
-      return entries.filter(
-        (e) =>
-          e.status !== 'attended' &&
-          new Date(
-            e.concert.event_date,
-          ).getTime() >= Date.now(),
-      );
+  useFocusEffect(
+    useCallback(() => {
+      reload();
+    }, [reload]),
+  );
+
+  const { upcoming, past } = useMemo(() => {
+    const now = Date.now();
+    const up: DiaryEntry[] = [];
+    const pa: DiaryEntry[] = [];
+    for (const e of entries) {
+      const isPast = new Date(e.concert.event_date).getTime() < now;
+      if (e.status === 'attended' || isPast) pa.push(e);
+      else up.push(e);
     }
-    return entries.filter(
-      (e) =>
-        e.status === 'attended' ||
-        new Date(e.concert.event_date).getTime() <
-          Date.now(),
-    );
-  }, [entries, filter]);
+    return { upcoming: up, past: pa };
+  }, [entries]);
+
+  const filtered = filter === 'upcoming' ? upcoming : past;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.tabs}>
-        <FilterTab
-          label="Próximos"
+    <View style={[styles.container, { paddingTop: insets.top + spacing.md }]}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View>
+          <Text variant="monoMD" color="muted">
+            TU HISTORIAL
+          </Text>
+          <Text variant="displayLG" style={{ marginTop: 4 }}>
+            Diario
+          </Text>
+        </View>
+      </View>
+
+      {/* Stats strip */}
+      <View style={styles.statsStrip}>
+        <StatCard value={upcoming.length} label="PRÓXIMOS" accent />
+        <StatCard value={past.length} label="ASISTIDOS" />
+        <StatCard
+          value={new Set(entries.map((e) => e.concert.bands[0]?.id).filter(Boolean)).size}
+          label="BANDAS"
+        />
+      </View>
+
+      {/* Tabs filtro */}
+      <View style={styles.tabsRow}>
+        <TabPill
+          label={`Próximos · ${upcoming.length}`}
           active={filter === 'upcoming'}
           onPress={() => setFilter('upcoming')}
         />
-        <FilterTab
-          label="Pasados"
+        <TabPill
+          label={`Pasados · ${past.length}`}
           active={filter === 'past'}
           onPress={() => setFilter('past')}
         />
@@ -68,7 +85,7 @@ export default function DiaryScreen() {
 
       {error && (
         <View style={styles.errorBox}>
-          <Text style={styles.errorText}>
+          <Text variant="bodySM" color="bloodBright">
             {error}
           </Text>
         </View>
@@ -76,19 +93,14 @@ export default function DiaryScreen() {
 
       {loading && entries.length === 0 ? (
         <View style={styles.centered}>
-          <ActivityIndicator
-            color="#dc2626"
-            size="large"
-          />
+          <ActivityIndicator color={colors.bloodBright} size="large" />
         </View>
       ) : filtered.length === 0 ? (
         <View style={styles.centered}>
-          <Text style={styles.emptyTitle}>
-            {filter === 'upcoming'
-              ? 'Sin próximos conciertos'
-              : 'Sin conciertos pasados'}
+          <Text variant="displaySM" color="silver" style={{ textAlign: 'center' }}>
+            {filter === 'upcoming' ? 'Sin próximos conciertos' : 'Sin conciertos pasados'}
           </Text>
-          <Text style={styles.emptySub}>
+          <Text variant="bodySM" color="muted" style={styles.emptySub}>
             {filter === 'upcoming'
               ? 'Marca conciertos como "Voy" desde el mapa'
               : 'Aquí aparecerán los conciertos a los que asistas'}
@@ -98,23 +110,18 @@ export default function DiaryScreen() {
         <FlatList
           data={filtered}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: 16 }}
+          contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl
               refreshing={loading}
               onRefresh={reload}
-              tintColor="#dc2626"
+              tintColor={colors.bloodBright}
             />
           }
           renderItem={({ item }) => (
             <DiaryItem
               entry={item}
-              onPress={() =>
-                navigation.navigate(
-                  'ConcertDetail',
-                  { concertId: item.concert_id },
-                )
-              }
+              onPress={() => navigation.navigate('ConcertDetail', { concertId: item.concert_id })}
             />
           )}
         />
@@ -123,7 +130,27 @@ export default function DiaryScreen() {
   );
 }
 
-function FilterTab({
+function StatCard({ value, label, accent }: { value: number; label: string; accent?: boolean }) {
+  return (
+    <View style={styles.statCard}>
+      <Text
+        style={{
+          fontFamily: fontFamily.displayBold,
+          fontSize: 24,
+          letterSpacing: -0.4,
+          color: accent ? colors.bloodBright : colors.bright,
+        }}
+      >
+        {value}
+      </Text>
+      <Text variant="monoSM" color="muted" style={{ marginTop: 4 }}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function TabPill({
   label,
   active,
   onPress,
@@ -134,17 +161,18 @@ function FilterTab({
 }) {
   return (
     <TouchableOpacity
-      style={[
-        styles.tab,
-        active && styles.tabActive,
-      ]}
+      style={[styles.tabPill, active && styles.tabPillActive]}
       onPress={onPress}
+      activeOpacity={0.7}
     >
       <Text
-        style={[
-          styles.tabText,
-          active && styles.tabTextActive,
-        ]}
+        style={{
+          fontFamily: fontFamily.mono,
+          fontSize: 10,
+          letterSpacing: 0.8,
+          textTransform: 'uppercase',
+          color: active ? colors.ink : colors.silver,
+        }}
       >
         {label}
       </Text>
@@ -152,96 +180,79 @@ function FilterTab({
   );
 }
 
-function DiaryItem({
-  entry,
-  onPress,
-}: {
-  entry: DiaryEntry;
-  onPress: () => void;
-}) {
+function DiaryItem({ entry, onPress }: { entry: DiaryEntry; onPress: () => void }) {
   const date = new Date(entry.concert.event_date);
-  const dateStr = date.toLocaleDateString(
-    'es-ES',
-    {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    },
-  );
+  const month = date.toLocaleDateString('es-ES', { month: 'short' }).toUpperCase().replace('.', '');
+  const day = date.getDate().toString();
 
-  const statusLabel: Record<
-    DiaryEntry['status'],
-    string
-  > = {
-    interested: 'Me interesa',
-    going: 'Voy',
-    attended: 'Asistí',
+  const statusLabel: Record<DiaryEntry['status'], string> = {
+    interested: 'INTERESADO',
+    going: 'VOY',
+    attended: 'ASISTÍ',
   };
 
-  const statusColor: Record<
-    DiaryEntry['status'],
-    string
-  > = {
-    interested: '#666',
-    going: '#dc2626',
-    attended: '#1f7a3a',
-  };
-
+  const isHighlight = entry.status === 'going' || entry.status === 'attended';
   const firstBand = entry.concert.bands[0];
 
   return (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={onPress}
-    >
-      {firstBand?.image_url ? (
-        <Image
-          source={{ uri: firstBand.image_url }}
-          style={styles.cardImage}
-        />
-      ) : (
-        <View
-          style={[
-            styles.cardImage,
-            { backgroundColor: '#222' },
-          ]}
-        />
-      )}
-      <View style={{ flex: 1, marginLeft: 12 }}>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
+      {/* Bloque de fecha tipo "calendar tag" */}
+      <View style={[styles.dateBox, isHighlight && styles.dateBoxActive]}>
         <Text
-          style={styles.cardTitle}
-          numberOfLines={1}
+          style={{
+            fontFamily: fontFamily.mono,
+            fontSize: 9,
+            letterSpacing: 1,
+            color: isHighlight ? colors.bloodBright : colors.muted,
+          }}
         >
-          {entry.concert.bands
-            .map((b) => b.name)
-            .join(' · ')}
+          {month}
         </Text>
         <Text
-          style={styles.cardSub}
-          numberOfLines={1}
+          style={{
+            fontFamily: fontFamily.displayBold,
+            fontSize: 22,
+            lineHeight: 24,
+            color: colors.bright,
+            marginTop: 2,
+          }}
         >
-          {entry.concert.venue.name} ·{' '}
-          {entry.concert.venue.city}
+          {day}
         </Text>
-        <View style={styles.cardMetaRow}>
-          <Text style={styles.cardDate}>
-            {dateStr}
-          </Text>
+      </View>
+
+      {/* Imagen banda */}
+      <BandImage
+        url={firstBand?.image_url ?? null}
+        size={56}
+        radiusOverride={radius.md}
+        showTag={!firstBand?.image_url}
+        style={{ marginLeft: spacing.md }}
+      />
+
+      {/* Contenido */}
+      <View style={styles.cardContent}>
+        <Text variant="displaySM" numberOfLines={1}>
+          {entry.concert.bands.map((b) => b.name).join(' · ')}
+        </Text>
+        <Text variant="monoSM" color="muted" numberOfLines={1} style={{ marginTop: 4 }}>
+          {entry.concert.venue.name}
+          {entry.concert.venue.city ? ` · ${entry.concert.venue.city.toUpperCase()}` : ''}
+        </Text>
+        <View style={styles.statusRow}>
           <View
             style={[
-              styles.badge,
-              {
-                backgroundColor:
-                  statusColor[entry.status],
-              },
+              styles.statusDot,
+              { backgroundColor: isHighlight ? colors.bloodBright : colors.faint },
             ]}
-          >
-            <Text style={styles.badgeText}>
-              {statusLabel[entry.status]}
-            </Text>
-          </View>
+          />
+          <Text variant="monoSM" color={isHighlight ? 'bloodBright' : 'muted'}>
+            {statusLabel[entry.status]}
+          </Text>
         </View>
       </View>
+
+      <Ionicons name="chevron-forward" size={18} color={colors.faint} />
     </TouchableOpacity>
   );
 }
@@ -249,95 +260,101 @@ function DiaryItem({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: colors.ink,
+    paddingHorizontal: spacing.xl,
+  },
+  header: {
+    marginBottom: spacing.lg,
+  },
+  statsStrip: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  statCard: {
+    flex: 1,
+    padding: spacing.md,
+    backgroundColor: colors.panel,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.md,
+  },
+  tabsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  tabPill: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 7,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: 'transparent',
+  },
+  tabPillActive: {
+    backgroundColor: colors.silver,
+    borderColor: colors.silver,
+  },
+  errorBox: {
+    padding: spacing.md,
+    backgroundColor: colors.bloodTint,
+    borderWidth: 1,
+    borderColor: colors.bloodTintBorder,
+    borderRadius: radius.md,
+    marginBottom: spacing.md,
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
-  },
-  emptyTitle: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 8,
+    paddingHorizontal: spacing.xl,
   },
   emptySub: {
-    color: '#777',
     textAlign: 'center',
+    marginTop: spacing.md,
   },
-  errorBox: {
-    padding: 16,
-    backgroundColor: '#7a1f1f',
-    margin: 16,
-    borderRadius: 8,
-  },
-  errorText: {
-    color: '#fff',
-  },
-  tabs: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#1a1a1a',
-  },
-  tab: {
-    flex: 1,
-    padding: 16,
-    alignItems: 'center',
-  },
-  tabActive: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#dc2626',
-  },
-  tabText: {
-    color: '#777',
-    fontWeight: '600',
-  },
-  tabTextActive: {
-    color: '#fff',
+  listContent: {
+    paddingBottom: spacing.xxxl,
+    gap: spacing.sm,
   },
   card: {
     flexDirection: 'row',
-    backgroundColor: '#141414',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 12,
     alignItems: 'center',
+    padding: spacing.md,
+    backgroundColor: colors.panel,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.md,
   },
-  cardImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+  dateBox: {
+    width: 52,
+    height: 56,
+    borderRadius: radius.md,
+    backgroundColor: colors.panel2,
+    borderWidth: 1,
+    borderColor: colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  cardTitle: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+  dateBoxActive: {
+    borderColor: colors.bloodTintBorder,
+    backgroundColor: colors.bloodTint,
   },
-  cardSub: {
-    color: '#999',
-    fontSize: 13,
-    marginTop: 2,
+  cardContent: {
+    flex: 1,
+    marginLeft: spacing.md,
+    minWidth: 0,
   },
-  cardMetaRow: {
+  statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     marginTop: 6,
+    gap: 6,
   },
-  cardDate: {
-    color: '#bbb',
-    fontSize: 12,
-  },
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  badgeText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '600',
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: radius.full,
   },
 });
