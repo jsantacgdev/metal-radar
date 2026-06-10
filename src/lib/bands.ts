@@ -13,29 +13,55 @@ export async function followBand(band: BandToFollow): Promise<string> {
   } = await supabase.auth.getUser();
   if (!user) throw new Error('Sin sesión');
 
-  const { data: bandRow, error: bandError } = await supabase
+  // 1. Buscar banda existente por nombre (case-insensitive)
+  const { data: existing } = await supabase
     .from('bands')
-    .upsert(
-      {
+    .select('id, spotify_id, image_url, genres')
+    .ilike('name', band.name)
+    .maybeSingle();
+
+  let bandId: string;
+
+  if (existing) {
+    // Banda ya existe: actualizamos enriqueciendo datos que falten
+    const mergedGenres = Array.from(new Set([...(existing.genres ?? []), ...(band.genres ?? [])]));
+
+    const { error: updateError } = await supabase
+      .from('bands')
+      .update({
+        spotify_id: existing.spotify_id ?? band.spotify_id,
+        image_url: existing.image_url ?? band.image_url,
+        genres: mergedGenres,
+      })
+      .eq('id', existing.id);
+
+    if (updateError) throw updateError;
+    bandId = existing.id;
+  } else {
+    // Banda no existe: insertamos
+    const { data: newBand, error: insertError } = await supabase
+      .from('bands')
+      .insert({
         spotify_id: band.spotify_id,
         name: band.name,
         image_url: band.image_url,
         genres: band.genres,
-      },
-      { onConflict: 'spotify_id' },
-    )
-    .select('id')
-    .single();
+      })
+      .select('id')
+      .single();
 
-  if (bandError || !bandRow) throw bandError ?? new Error('Error al guardar banda');
+    if (insertError || !newBand) throw insertError ?? new Error('Error al guardar banda');
+    bandId = newBand.id;
+  }
 
+  // 2. Crear relación user_bands (idempotente)
   const { error: followError } = await supabase
     .from('user_bands')
-    .insert({ user_id: user.id, band_id: bandRow.id });
+    .insert({ user_id: user.id, band_id: bandId });
 
   if (followError && followError.code !== '23505') throw followError;
 
-  return bandRow.id;
+  return bandId;
 }
 
 export async function syncBandConcerts(

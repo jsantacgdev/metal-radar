@@ -1,12 +1,5 @@
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Alert, Linking, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import * as Location from 'expo-location';
@@ -16,6 +9,8 @@ import { useProfile } from '../hooks/useProfile';
 import { usePreference } from '../hooks/usePreference';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Button, Text } from '../components/ui';
+import { useEffect } from 'react';
+import { registerForPushNotifications, checkNotificationPermissions } from '../lib/notifications';
 
 export default function ProfileScreen() {
   const { session } = useAuth();
@@ -24,11 +19,18 @@ export default function ProfileScreen() {
   const [radius, setRadius] = useState<number | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [savingLocation, setSavingLocation] = useState(false);
+  const [pushStatus, setPushStatus] = useState<
+    'granted' | 'denied' | 'undetermined' | 'unsupported' | 'loading'
+  >('loading');
 
   const { value: skipConfirm, setValue: setSkipConfirm } = usePreference<boolean>(
     'skipUnfollowConfirm',
     false,
   );
+
+  useEffect(() => {
+    checkNotificationPermissions().then(setPushStatus);
+  }, []);
 
   const displayRadius = radius ?? profile?.search_radius_km ?? 500;
 
@@ -85,6 +87,29 @@ export default function ProfileScreen() {
       await update({ search_radius_km: rounded });
     } catch (err: any) {
       Alert.alert('Error al guardar radio', err.message);
+    }
+  };
+
+  const handleEnableNotifications = async () => {
+    setPushStatus('loading');
+    const ok = await registerForPushNotifications();
+    if (ok) {
+      setPushStatus('granted');
+      Alert.alert('Listo', 'Notificaciones activadas');
+    } else {
+      const newStatus = await checkNotificationPermissions();
+      setPushStatus(newStatus);
+      if (newStatus === 'denied') {
+        Alert.alert(
+          'Permisos denegados',
+          'Para activarlas tienes que ir a los ajustes del sistema y dar permiso a Metal Radar',
+        );
+      } else if (newStatus === 'unsupported') {
+        Alert.alert(
+          'No disponible',
+          'Las notificaciones solo funcionan en builds nativos, no en Expo Go',
+        );
+      }
     }
   };
 
@@ -221,6 +246,47 @@ export default function ProfileScreen() {
         </View>
       </View>
 
+      {/* Notificaciones */}
+      <View style={styles.section}>
+        <Text variant="monoMD" color="muted" style={styles.sectionLabel}>
+          NOTIFICACIONES
+        </Text>
+
+        <View style={styles.pushCard}>
+          <Ionicons
+            name={pushStatus === 'granted' ? 'notifications' : 'notifications-off-outline'}
+            size={20}
+            color={pushStatus === 'granted' ? colors.bloodBright : colors.faint}
+          />
+          <View style={{ flex: 1, marginLeft: spacing.md, minWidth: 0 }}>
+            <Text variant="body">
+              {pushStatus === 'granted' && 'Notificaciones activadas'}
+              {pushStatus === 'denied' && 'Notificaciones bloqueadas'}
+              {pushStatus === 'undetermined' && 'Notificaciones desactivadas'}
+              {pushStatus === 'unsupported' && 'No disponibles en Expo Go'}
+              {pushStatus === 'loading' && 'Comprobando…'}
+            </Text>
+            <Text variant="bodySM" color="muted" style={{ marginTop: 2 }}>
+              {pushStatus === 'granted'
+                ? 'Recibirás avisos de nuevos conciertos cerca'
+                : 'Activa para no perderte fechas cerca de ti'}
+            </Text>
+          </View>
+        </View>
+
+        {pushStatus !== 'granted' && pushStatus !== 'unsupported' && pushStatus !== 'loading' && (
+          <View style={{ marginTop: spacing.md }}>
+            <Button
+              label={pushStatus === 'denied' ? 'Abrir ajustes' : 'Activar notificaciones'}
+              onPress={
+                pushStatus === 'denied' ? () => Linking.openSettings() : handleEnableNotifications
+              }
+              icon={<Ionicons name="notifications" size={18} color="#fff" />}
+            />
+          </View>
+        )}
+      </View>
+
       {/* Acciones */}
       <View style={styles.section}>
         <Text variant="monoMD" color="muted" style={styles.sectionLabel}>
@@ -334,5 +400,14 @@ const styles = StyleSheet.create({
   },
   footer: {
     marginTop: spacing.xxxl,
+  },
+  pushCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    backgroundColor: colors.panel,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.md,
   },
 });

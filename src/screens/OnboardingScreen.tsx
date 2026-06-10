@@ -15,6 +15,7 @@ import { supabase } from '../lib/supabase';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Button, Text } from '../components/ui';
 import { registerForPushNotifications } from '../lib/notifications';
+import { followBand } from '../lib/bands';
 
 type Band = {
   spotify_id: string;
@@ -86,39 +87,15 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
     if (!canContinue) return;
     try {
       setSaving(true);
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error('Sesión no encontrada');
-
       const bandsArray = Array.from(selected.values());
 
-      const { data: insertedBands, error: bandsError } = await supabase
-        .from('bands')
-        .upsert(
-          bandsArray.map((b) => ({
-            spotify_id: b.spotify_id,
-            name: b.name,
-            image_url: b.image_url,
-            genres: b.genres,
-          })),
-          { onConflict: 'spotify_id' },
-        )
-        .select('id, spotify_id');
-
-      if (bandsError) throw bandsError;
-
-      const { error: followError } = await supabase.from('user_bands').upsert(
-        insertedBands!.map((b) => ({ user_id: user.id, band_id: b.id })),
-        { onConflict: 'user_id,band_id' },
-      );
-
-      if (followError) throw followError;
+      for (const band of bandsArray) {
+        await followBand(band);
+      }
 
       queryClient.invalidateQueries({ queryKey: ['followedBands'] });
       queryClient.invalidateQueries({ queryKey: ['recommendations'] });
 
-      // Avanzar al paso 2
       setStep('notifications');
     } catch (err: any) {
       Alert.alert('Error al guardar', err.message);
