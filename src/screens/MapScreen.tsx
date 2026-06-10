@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
@@ -13,26 +12,10 @@ import { useProfile } from '../hooks/useProfile';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from '../components/ui';
 import BandImage from '../components/BandImage';
+import LeafletMap, { LeafletMarker } from '../components/LeafletMap';
 
 const LOCATION_CACHE_KEY = 'last_known_location';
 const LOCATION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-
-const DARK_MAP_STYLE = [
-  { elementType: 'geometry', stylers: [{ color: '#1d1d22' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#0a0a0c' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#82858d' }] },
-  {
-    featureType: 'administrative.locality',
-    elementType: 'labels.text.fill',
-    stylers: [{ color: '#c7cad0' }],
-  },
-  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2a2a30' }] },
-  { featureType: 'road', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0a0a0c' }] },
-  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#5a5d64' }] },
-  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-];
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
@@ -76,6 +59,34 @@ export default function MapScreen() {
     }
     return Array.from(map.values());
   }, [visible]);
+
+  // Convertir grupos a markers de Leaflet
+  const markers = useMemo<LeafletMarker[]>(() => {
+    return byVenue.map((group) => {
+      const isFar = group.concerts.every((c) => c.distance_km > radiusKm);
+      const count = group.concerts.length;
+      const hasFestival = group.concerts.some((c) => c.is_festival);
+
+      let color: string;
+      if (isFar) color = colors.faint;
+      else if (hasFestival) color = '#ffa500';
+      else if (count > 1) color = colors.bloodBright;
+      else color = colors.bloodDeep;
+
+      return {
+        id: group.venue.id,
+        lat: group.venue.lat,
+        lng: group.venue.lng,
+        color,
+        count,
+      };
+    });
+  }, [byVenue, radiusKm]);
+
+  const handleMarkerPress = (venueId: string) => {
+    const group = byVenue.find((g) => g.venue.id === venueId);
+    if (group) setSelectedVenue(group);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -147,46 +158,18 @@ export default function MapScreen() {
     );
   }
 
-  const region: Region = {
-    latitude: location.lat,
-    longitude: location.lng,
-    latitudeDelta: 3,
-    longitudeDelta: 3,
-  };
-
   return (
-    <View style={{ flex: 1, backgroundColor: colors.ink, marginTop: spacing.xxl }}>
-      <MapView
-        style={{ flex: 1 }}
-        initialRegion={region}
-        showsUserLocation
-        customMapStyle={DARK_MAP_STYLE}
-      >
-        {byVenue.map((group) => {
-          const isFar = group.concerts.every((c) => c.distance_km > radiusKm);
-          const count = group.concerts.length;
-          const hasFestival = group.concerts.some((c) => c.is_festival);
-
-          let pinColor: string;
-          if (isFar) pinColor = colors.silver;
-          else if (hasFestival) pinColor = '#ffa500';
-          else if (count > 1) pinColor = colors.bloodBright;
-          else pinColor = colors.bloodDeep;
-
-          return (
-            <Marker
-              key={group.venue.id}
-              coordinate={{ latitude: group.venue.lat, longitude: group.venue.lng }}
-              pinColor={pinColor}
-              onPress={() => setSelectedVenue(group)}
-              title={hasFestival ? 'Festival' : count > 1 ? `${count} conciertos` : undefined}
-            />
-          );
-        })}
-      </MapView>
+    <View style={{ flex: 1, backgroundColor: colors.ink }}>
+      <LeafletMap
+        centerLat={location.lat}
+        centerLng={location.lng}
+        zoom={6}
+        markers={markers}
+        onMarkerPress={handleMarkerPress}
+      />
 
       {/* Header flotante */}
-      <View style={[styles.headerOverlay, { paddingTop: insets.top + spacing.md }]}>
+      <View style={[styles.headerOverlay, { paddingTop: insets.top + spacing.xs }]}>
         <View style={styles.headerCard}>
           <Ionicons name="radio" size={18} color={colors.bloodBright} />
           <View style={{ marginLeft: spacing.sm }}>
@@ -217,7 +200,6 @@ export default function MapScreen() {
         </View>
       )}
 
-      {/* Empty state cuando no hay nada */}
       {!loading && visible.length === 0 && (
         <View style={styles.emptyCard}>
           <Text variant="displaySM" style={{ textAlign: 'center' }}>
@@ -229,7 +211,6 @@ export default function MapScreen() {
         </View>
       )}
 
-      {/* Popup del venue seleccionado */}
       {selectedVenue && (
         <View style={styles.bottomCard}>
           <View style={styles.cardHeader}>
