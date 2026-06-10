@@ -49,7 +49,7 @@ export default function BandDetailScreen({ route }: Props) {
       <View style={styles.hero}>
         <BandImage
           url={basics?.image_url ?? null}
-          size={180}
+          size={160}
           radiusOverride={radius.lg}
           showTag={!basics?.image_url}
         />
@@ -57,7 +57,7 @@ export default function BandDetailScreen({ route }: Props) {
           <Text variant="monoMD" color="bloodBright">
             FICHA DE BANDA
           </Text>
-          <Text variant="displayLG" style={{ marginTop: spacing.sm }}>
+          <Text variant="displayMD" style={{ marginTop: spacing.sm }}>
             {basics?.name ?? '...'}
           </Text>
           {info?.country && (

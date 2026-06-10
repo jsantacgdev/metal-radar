@@ -326,6 +326,7 @@ export default function RadarScreen() {
                     }
                     activeOpacity={0.85}
                   >
+                    {/* Contenedor de la imagen */}
                     <View style={styles.carouselImageWrapper}>
                       <BandImage
                         url={rec.image_url}
@@ -333,12 +334,16 @@ export default function RadarScreen() {
                         radiusOverride={radius.lg}
                         showTag={!rec.image_url}
                       />
-                      <TouchableOpacity
-                        style={[styles.carouselAddBtn, isFollowing && { opacity: 0.5 }]}
-                        onPress={() => handleFollowRec(rec)}
-                        disabled={followingId !== null}
-                        activeOpacity={0.8}
-                      >
+
+                      {/* Etiqueta arriba a la izquierda */}
+                      {isNew && (
+                        <View style={styles.topLeftBadge}>
+                          <PulsingBadge label="NUEVO" />
+                        </View>
+                      )}
+
+                      {/* El botón de añadir (+) se queda abajo a la derecha como estaba */}
+                      <TouchableOpacity style={styles.carouselAddBtn}>
                         {isFollowing ? (
                           <ActivityIndicator color="#fff" size="small" />
                         ) : (
@@ -346,13 +351,20 @@ export default function RadarScreen() {
                         )}
                       </TouchableOpacity>
                     </View>
+
+                    {/* Info de la banda debajo de la imagen */}
                     <View style={{ marginTop: spacing.sm, width: 138 }}>
                       <View style={styles.cardNameRow}>
-                        <Text variant="displaySM" numberOfLines={1} style={{ flexShrink: 1 }}>
+                        <Text
+                          variant="displaySM"
+                          numberOfLines={1}
+                          style={{ flexShrink: 1, paddingVertical: 2 }}
+                        >
                           {rec.name}
                         </Text>
-                        {isNew && <PulsingBadge />}
+                        {/* ◄--- CAMBIO 2: ELIMINADO EL ANTERIOR PULSINGBADGE DE AQUÍ */}
                       </View>
+
                       {rec.genres.length > 0 && (
                         <Text
                           variant="monoSM"
@@ -395,7 +407,11 @@ export default function RadarScreen() {
                       <BandImage url={rec.image_url} size={50} showTag={!rec.image_url} />
                       <View style={styles.rowContent}>
                         <View style={styles.nameRow}>
-                          <Text variant="displaySM" numberOfLines={1} style={{ flexShrink: 1 }}>
+                          <Text
+                            variant="displaySM"
+                            numberOfLines={1}
+                            style={{ flexShrink: 1, paddingVertical: 2 }}
+                          >
                             {rec.name}
                           </Text>
                           {isNew && <PulsingBadge />}
@@ -493,7 +509,7 @@ export default function RadarScreen() {
                   >
                     <BandImage url={b.image_url} size={50} showTag={!b.image_url} />
                     <View style={styles.rowContent}>
-                      <Text variant="displaySM" numberOfLines={1}>
+                      <Text variant="displaySM" numberOfLines={1} style={{ paddingVertical: 2 }}>
                         {b.name}
                       </Text>
                       {b.genres?.length > 0 && (
@@ -562,7 +578,7 @@ export default function RadarScreen() {
                     >
                       <BandImage url={b.image_url} size={50} showTag={!b.image_url} />
                       <View style={styles.rowContent}>
-                        <Text variant="displaySM" numberOfLines={1}>
+                        <Text variant="displaySM" numberOfLines={1} style={{ paddingVertical: 2 }}>
                           {b.name}
                         </Text>
                         {b.genres && b.genres.length > 0 && (
@@ -751,6 +767,12 @@ const styles = StyleSheet.create({
   },
   carouselImageWrapper: {
     position: 'relative',
+  },
+  topLeftBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 5, // Un poco separado del borde del radio de la imagen
+    zIndex: 10,
   },
   carouselAddBtn: {
     position: 'absolute',
