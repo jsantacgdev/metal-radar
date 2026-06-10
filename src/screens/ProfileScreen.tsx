@@ -29,8 +29,8 @@ export default function ProfileScreen() {
   );
 
   useEffect(() => {
-    checkNotificationPermissions().then(setPushStatus);
-  }, []);
+    refreshPushStatus();
+  }, [profile?.push_token]);
 
   const displayRadius = radius ?? profile?.search_radius_km ?? 500;
 
@@ -90,24 +90,36 @@ export default function ProfileScreen() {
     }
   };
 
+  const refreshPushStatus = async () => {
+    const sysStatus = await checkNotificationPermissions();
+
+    if (sysStatus !== 'granted') {
+      setPushStatus(sysStatus);
+      return;
+    }
+
+    // Sistema dice "granted" → verificar que también tenemos token en BD
+    if (profile?.push_token) {
+      setPushStatus('granted');
+    } else {
+      // Permiso concedido pero sin token guardado → tratar como undetermined
+      setPushStatus('undetermined');
+    }
+  };
+
   const handleEnableNotifications = async () => {
     setPushStatus('loading');
     const ok = await registerForPushNotifications();
     if (ok) {
       setPushStatus('granted');
-      Alert.alert('Listo', 'Notificaciones activadas');
+      Alert.alert('¡Listo!', 'Notificaciones activadas con éxito.');
     } else {
-      const newStatus = await checkNotificationPermissions();
-      setPushStatus(newStatus);
-      if (newStatus === 'denied') {
+      await refreshPushStatus();
+      const status = await checkNotificationPermissions();
+      if (status === 'denied') {
         Alert.alert(
           'Permisos denegados',
           'Para activarlas tienes que ir a los ajustes del sistema y dar permiso a Metal Radar',
-        );
-      } else if (newStatus === 'unsupported') {
-        Alert.alert(
-          'No disponible',
-          'Las notificaciones solo funcionan en builds nativos, no en Expo Go',
         );
       }
     }

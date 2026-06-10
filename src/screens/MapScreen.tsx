@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -13,6 +13,7 @@ import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from '../components/ui';
 import BandImage from '../components/BandImage';
 import LeafletMap, { LeafletMarker } from '../components/LeafletMap';
+import { useFocusEffect } from '@react-navigation/native';
 
 const LOCATION_CACHE_KEY = 'last_known_location';
 const LOCATION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -88,50 +89,63 @@ export default function MapScreen() {
     if (group) setSelectedVenue(group);
   };
 
-  useEffect(() => {
-    let cancelled = false;
+  const lastFreshRef = useRef<number>(0);
 
-    const loadLocation = async () => {
+  const loadLocation = useCallback(async (forceFresh = false) => {
+    // Throttle: si pedimos fresh y ya hemos pedido hace <30s, ignoramos
+    if (forceFresh && Date.now() - lastFreshRef.current < 30_000) {
+      return;
+    }
+
+    // Si no se fuerza fresh, intentamos cache primero
+    if (!forceFresh) {
       try {
         const cached = await AsyncStorage.getItem(LOCATION_CACHE_KEY);
-        if (cached && !cancelled) {
+        if (cached) {
           const parsed = JSON.parse(cached);
           if (Date.now() - parsed.timestamp < LOCATION_MAX_AGE_MS) {
             setLocation({ lat: parsed.lat, lng: parsed.lng });
           }
         }
-      } catch {}
-
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        if (!cancelled) setPermissionDenied(true);
-        return;
+      } catch {
+        // ignore
       }
+    }
 
-      try {
-        const pos = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-        if (cancelled) return;
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      setPermissionDenied(true);
+      return;
+    }
 
-        const fresh = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setLocation(fresh);
+    try {
+      const pos = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      const fresh = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      setLocation(fresh);
+      lastFreshRef.current = Date.now();
 
-        await AsyncStorage.setItem(
-          LOCATION_CACHE_KEY,
-          JSON.stringify({ ...fresh, timestamp: Date.now() }),
-        );
-      } catch (err) {
-        console.warn('Error obteniendo ubicación:', err);
-      }
-    };
-
-    loadLocation();
-
-    return () => {
-      cancelled = true;
-    };
+      await AsyncStorage.setItem(
+        LOCATION_CACHE_KEY,
+        JSON.stringify({ ...fresh, timestamp: Date.now() }),
+      );
+    } catch (err) {
+      console.warn('Error obteniendo ubicación:', err);
+    }
   }, []);
+
+  // Carga inicial al montar
+  useEffect(() => {
+    loadLocation();
+  }, [loadLocation]);
+
+  // Refrescar cada vez que se enfoca el tab (con throttle de 30s dentro de loadLocation)
+  useFocusEffect(
+    useCallback(() => {
+      loadLocation(true);
+    }, [loadLocation]),
+  );
 
   if (permissionDenied) {
     return (

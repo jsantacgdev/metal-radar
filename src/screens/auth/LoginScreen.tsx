@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import {
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -40,61 +43,75 @@ export default function LoginScreen({ navigation }: Props) {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View style={styles.brand}>
-        <Ionicons name="radio" size={28} color={colors.bloodBright} />
-        <Text variant="monoMD" color="bloodBright" style={{ marginTop: spacing.md }}>
-          METAL RADAR
-        </Text>
-        <Text variant="displayXL" style={styles.title}>
-          Inicia{'\n'}sesión
-        </Text>
-      </View>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.brand}>
+            <Ionicons name="radio" size={28} color={colors.bloodBright} />
+            <Text variant="monoMD" color="bloodBright" style={{ marginTop: spacing.md }}>
+              METAL RADAR
+            </Text>
+            <Text variant="displayXL" style={styles.title}>
+              Inicia{'\n'}sesión
+            </Text>
+          </View>
 
-      <View style={styles.form}>
-        <View style={styles.fieldGroup}>
-          <Text variant="monoSM" color="muted" style={styles.label}>
-            EMAIL
-          </Text>
-          <TextInput
-            style={styles.input}
-            placeholder="tu@correo.com"
-            placeholderTextColor={colors.faint}
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            autoComplete="email"
-          />
-        </View>
+          <View style={styles.form}>
+            <View style={styles.fieldGroup}>
+              <Text variant="monoSM" color="muted" style={styles.label}>
+                EMAIL
+              </Text>
+              <TextInput
+                style={styles.input}
+                placeholder="tu@correo.com"
+                placeholderTextColor={colors.faint}
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                autoComplete="email"
+                returnKeyType="next"
+              />
+            </View>
 
-        <View style={styles.fieldGroup}>
-          <Text variant="monoSM" color="muted" style={styles.label}>
-            CONTRASEÑA
-          </Text>
-          <TextInput
-            style={styles.input}
-            placeholder="••••••••"
-            placeholderTextColor={colors.faint}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoCapitalize="none"
-          />
-        </View>
+            <View style={styles.fieldGroup}>
+              <Text variant="monoSM" color="muted" style={styles.label}>
+                CONTRASEÑA
+              </Text>
+              <TextInput
+                style={styles.input}
+                placeholder="••••••••"
+                placeholderTextColor={colors.faint}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                autoCapitalize="none"
+                returnKeyType="done"
+                onSubmitEditing={handleLogin}
+              />
+            </View>
 
-        <Button label="Entrar" onPress={handleLogin} loading={loading} />
+            <Button label="Entrar" onPress={handleLogin} loading={loading} />
 
-        <TouchableOpacity style={styles.switchLink} onPress={() => navigation.navigate('Register')}>
-          <Text variant="monoMD" color="muted">
-            ¿NO TIENES CUENTA?{' '}
-          </Text>
-          <Text variant="monoMD" color="bloodBright">
-            REGÍSTRATE
-          </Text>
-        </TouchableOpacity>
-      </View>
+            <TouchableOpacity
+              style={styles.switchLink}
+              onPress={() => navigation.navigate('Register')}
+            >
+              <Text variant="monoMD" color="muted">
+                ¿NO TIENES CUENTA?{' '}
+              </Text>
+              <Text variant="monoMD" color="bloodBright">
+                REGÍSTRATE
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
 }
@@ -103,6 +120,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.ink,
+  },
+  scrollContent: {
+    flexGrow: 1,
     padding: spacing.xxl,
     justifyContent: 'center',
   },
