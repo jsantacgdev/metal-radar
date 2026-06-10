@@ -237,7 +237,7 @@ export default function MapScreen() {
                   ? '1 CONCIERTO'
                   : `${selectedVenue.concerts.length} CONCIERTOS`}
               </Text>
-              <Text variant="displayMD" numberOfLines={1} style={{ marginTop: 4 }}>
+              <Text variant="displaySM" numberOfLines={1} style={{ marginTop: 4 }}>
                 {selectedVenue.venue.name}
               </Text>
               <Text variant="monoSM" color="muted" style={{ marginTop: 4 }}>
@@ -284,13 +284,7 @@ export default function MapScreen() {
                   }}
                   activeOpacity={0.7}
                 >
-                  {c.is_festival && (
-                    <View style={styles.festivalBadge}>
-                      <Text variant="monoSM" color="bloodBright">
-                        🎪 FESTIVAL · {c.festival_name?.toUpperCase()}
-                      </Text>
-                    </View>
-                  )}
+                  {/* Contenedor de Fecha */}
                   <View style={styles.dateBox}>
                     <Text
                       style={{
@@ -313,17 +307,45 @@ export default function MapScreen() {
                       {day}
                     </Text>
                   </View>
-                  <BandImage
-                    url={firstBand?.image_url ?? null}
-                    size={44}
-                    showTag={!firstBand?.image_url}
-                    style={{ marginLeft: spacing.md }}
-                  />
+
+                  {/* Imagen de la banda principal o del festival */}
+                  {!c.is_festival && (
+                    <BandImage
+                      url={firstBand?.image_url ?? null}
+                      size={44}
+                      showTag={!firstBand?.image_url}
+                      style={{ marginLeft: spacing.md }}
+                    />
+                  )}
                   <View style={styles.concertInfo}>
-                    <Text variant="displaySM" numberOfLines={1}>
-                      {c.bands.map((b) => b.name).join(' · ')}
-                    </Text>
+                    {c.is_festival ? (
+                      <>
+                        <Text variant="displayMD" numberOfLines={1} style={{ color: '#ffa500' }}>
+                          {c.festival_name}
+                        </Text>
+                        <Text
+                          variant="monoSM"
+                          color="muted"
+                          style={{ marginTop: 2 }}
+                          numberOfLines={1}
+                        >
+                          Bandas:{' '}
+                          {c.bands
+                            .map((b) => b.name)
+                            .join(' · ')
+                            .slice(0, 25)}
+                          ...
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <Text variant="displaySM" numberOfLines={1}>
+                          {c.bands.map((b) => b.name).join(' · ')}
+                        </Text>
+                      </>
+                    )}
                   </View>
+
                   <Ionicons name="chevron-forward" size={18} color={colors.faint} />
                 </TouchableOpacity>
               );
@@ -423,24 +445,25 @@ const styles = StyleSheet.create({
     marginLeft: spacing.md,
   },
   concertList: {
-    marginTop: spacing.lg,
+    marginTop: spacing.sm,
   },
   concertRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.lineSoft,
   },
   dateBox: {
     width: 44,
-    height: 48,
+    height: 49,
     borderRadius: radius.sm,
     backgroundColor: colors.bloodTint,
     borderWidth: 1,
     borderColor: colors.bloodTintBorder,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: -4,
   },
   concertInfo: {
     flex: 1,
@@ -456,17 +479,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.bloodTintBorder,
     borderRadius: radius.md,
-  },
-  festivalBadge: {
-    position: 'absolute',
-    top: -12,
-    left: 0,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    backgroundColor: colors.bloodTint,
-    borderWidth: 1,
-    borderColor: colors.bloodTintBorder,
-    borderRadius: 4,
-    zIndex: 1,
   },
 });
