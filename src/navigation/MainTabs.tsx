@@ -7,6 +7,7 @@ import MapStack from './MapStack';
 import DiaryStack from './DiaryStack';
 import ProfileScreen from '../screens/ProfileScreen';
 import { colors, fontFamily } from '../theme';
+import { useNotificationResponse } from '../hooks/useNotificationResponse';
 
 export type MainTabsParamList = {
   Radar: undefined;
@@ -31,7 +32,7 @@ const sharedHeader = {
 
 export default function MainTabs() {
   const insets = useSafeAreaInsets();
-
+  useNotificationResponse();
   return (
     <Tab.Navigator
       screenOptions={{
