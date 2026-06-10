@@ -247,6 +247,7 @@ function ActionPill({
       activeOpacity={0.7}
     >
       <Text
+        numberOfLines={1}
         style={{
           fontFamily: fontFamily.mono,
           fontSize: 11,
@@ -325,7 +326,6 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: 'row',
     gap: spacing.sm,
-    flexWrap: 'wrap',
   },
   actionPill: {
     paddingHorizontal: spacing.lg,

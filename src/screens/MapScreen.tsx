@@ -179,6 +179,8 @@ export default function MapScreen() {
         centerLng={location.lng}
         zoom={6}
         markers={markers}
+        userLat={location.lat}
+        userLng={location.lng}
         onMarkerPress={handleMarkerPress}
       />
 

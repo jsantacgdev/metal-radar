@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Alert, Linking, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
@@ -11,8 +11,12 @@ import { colors, fontFamily, radius, spacing } from '../theme';
 import { Button, Text } from '../components/ui';
 import { useEffect } from 'react';
 import { registerForPushNotifications, checkNotificationPermissions } from '../lib/notifications';
+import { useQueryClient } from '@tanstack/react-query';
+import { useFocusEffect } from '@react-navigation/native';
 
 export default function ProfileScreen() {
+  const queryClient = useQueryClient();
+
   const { session } = useAuth();
   const { profile, update } = useProfile();
 
@@ -28,9 +32,11 @@ export default function ProfileScreen() {
     false,
   );
 
-  useEffect(() => {
-    refreshPushStatus();
-  }, [profile?.push_token]);
+  useFocusEffect(
+    useCallback(() => {
+      refreshPushStatus();
+    }, [profile?.push_token]),
+  );
 
   const displayRadius = radius ?? profile?.search_radius_km ?? 500;
 
@@ -111,8 +117,10 @@ export default function ProfileScreen() {
     setPushStatus('loading');
     const ok = await registerForPushNotifications();
     if (ok) {
+      // Invalidar el cache de profile para que se recargue con el nuevo push_token
+      await queryClient.invalidateQueries({ queryKey: ['profile'] });
       setPushStatus('granted');
-      Alert.alert('¡Listo!', 'Notificaciones activadas con éxito.');
+      Alert.alert('Listo', 'Notificaciones activadas');
     } else {
       await refreshPushStatus();
       const status = await checkNotificationPermissions();

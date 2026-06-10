@@ -16,6 +16,8 @@ type Props = {
   centerLng: number;
   zoom: number;
   markers: LeafletMarker[];
+  userLat?: number;
+  userLng?: number;
   onMarkerPress?: (markerId: string) => void;
 };
 
@@ -24,7 +26,7 @@ export type LeafletMapRef = {
 };
 
 const LeafletMap = forwardRef<LeafletMapRef, Props>(
-  ({ centerLat, centerLng, zoom, markers, onMarkerPress }, ref) => {
+  ({ centerLat, centerLng, zoom, markers, userLat, userLng, onMarkerPress }, ref) => {
     const webviewRef = useRef<WebView>(null);
 
     useImperativeHandle(ref, () => ({
@@ -37,11 +39,9 @@ const LeafletMap = forwardRef<LeafletMapRef, Props>(
     }));
 
     const html = useMemo(
-      () => buildHtml(centerLat, centerLng, zoom, markers),
-      // Re-renderizamos el HTML solo cuando cambian los markers (no por cada re-render del padre).
-      // El centro/zoom inicial los fija la primera carga; setCenter lo cambia después.
+      () => buildHtml(centerLat, centerLng, zoom, markers, userLat, userLng),
       // eslint-disable-next-line react-hooks/exhaustive-deps
-      [markers],
+      [markers, userLat, userLng],
     );
 
     const handleMessage = (event: WebViewMessageEvent) => {
@@ -83,8 +83,13 @@ function buildHtml(
   centerLng: number,
   zoom: number,
   markers: LeafletMarker[],
+  userLat?: number,
+  userLng?: number,
 ): string {
   const markersJson = JSON.stringify(markers);
+  const userJson = JSON.stringify(
+    userLat != null && userLng != null ? { lat: userLat, lng: userLng } : null,
+  );
 
   return `
 <!DOCTYPE html>
@@ -115,6 +120,23 @@ function buildHtml(
       font-weight: 700;
       font-size: 11px;
     }
+    .user-pin-outer {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: rgba(63, 137, 255, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .user-pin-inner {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #3f89ff;
+      border: 3px solid #fff;
+      box-shadow: 0 0 6px rgba(63, 137, 255, 0.8);
+    }
     .leaflet-control-attribution {
       font-size: 9px;
       background: rgba(10,10,12,0.7) !important;
@@ -139,17 +161,29 @@ function buildHtml(
       attributionControl: true,
     });
 
-    // Tile layer estilo oscuro de CARTO (gratis, sin API key)
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; OpenStreetMap &copy; CARTO',
       subdomains: 'abcd',
       maxZoom: 19,
     }).addTo(map);
 
-    const markers = ${markersJson};
+    // Marker del usuario (azul pulsante)
+    const user = ${userJson};
+    if (user) {
+      const userIcon = L.divIcon({
+        html: '<div class="user-pin-outer"><div class="user-pin-inner"></div></div>',
+        className: '',
+        iconSize: [26, 26],
+        iconAnchor: [13, 13],
+      });
+      L.marker([user.lat, user.lng], { icon: userIcon, interactive: false, zIndexOffset: 1000 }).addTo(map);
+    }
 
+    const markers = ${markersJson};
     markers.forEach((m) => {
-      const html = '<div class="marker-pin" style="background:' + m.color + '">' +
+      const isLight = m.color === '#c7cad0';
+      const textColor = isLight ? '#0a0a0c' : '#fff';
+      const html = '<div class="marker-pin" style="background:' + m.color + ';color:' + textColor + '">' +
         (m.count && m.count > 1 ? m.count : '') +
         '</div>';
       const icon = L.divIcon({
