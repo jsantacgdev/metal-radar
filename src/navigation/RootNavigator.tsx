@@ -4,14 +4,22 @@ import { useAuth } from '../hooks/useAuth';
 import AuthNavigator from './AuthNavigator';
 import MainTabs from './MainTabs';
 import OnboardingScreen from '../screens/OnboardingScreen';
+import { colors } from '../theme';
 
 export default function RootNavigator() {
   const { session, loading, hasOnboarded, refreshOnboarding } = useAuth();
 
-  if (loading) {
+  if (loading || (session && hasOnboarded === null)) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0a0a0a' }}>
-        <ActivityIndicator color="#dc2626" size="large" />
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: colors.ink,
+        }}
+      >
+        <ActivityIndicator color={colors.bloodBright} size="large" />
       </View>
     );
   }

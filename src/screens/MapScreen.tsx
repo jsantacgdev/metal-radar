@@ -54,7 +54,6 @@ export default function MapScreen() {
     radiusKm,
   );
 
-  // Mostrar todos los markers, distinguiendo cercanos y lejanos por color
   const visible = useMemo(() => [...concerts, ...farConcerts], [concerts, farConcerts]);
 
   const byVenue = useMemo(() => {
@@ -90,9 +89,7 @@ export default function MapScreen() {
             setLocation({ lat: parsed.lat, lng: parsed.lng });
           }
         }
-      } catch {
-        // ignore
-      }
+      } catch {}
 
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -172,8 +169,7 @@ export default function MapScreen() {
 
           let pinColor: string;
           if (isFar) pinColor = colors.silver;
-          else if (hasFestival)
-            pinColor = '#ffa500'; // naranja para festivales
+          else if (hasFestival) pinColor = '#ffa500';
           else if (count > 1) pinColor = colors.bloodBright;
           else pinColor = colors.bloodDeep;
 
@@ -281,9 +277,13 @@ export default function MapScreen() {
                     i === selectedVenue.concerts.length - 1 && { borderBottomWidth: 0 },
                   ]}
                   onPress={() => {
-                    const id = c.id;
                     setSelectedVenue(null);
-                    navigation.navigate('ConcertDetail', { concertId: id });
+                    if (c.is_festival) {
+                      const festivalId = c.id.replace(/^fest_/, '');
+                      navigation.navigate('FestivalDetail', { festivalId });
+                    } else {
+                      navigation.navigate('ConcertDetail', { concertId: c.id });
+                    }
                   }}
                   activeOpacity={0.7}
                 >
@@ -462,8 +462,8 @@ const styles = StyleSheet.create({
   },
   festivalBadge: {
     position: 'absolute',
-    top: -2,
-    right: 0,
+    top: -12,
+    left: 0,
     paddingHorizontal: 6,
     paddingVertical: 2,
     backgroundColor: colors.bloodTint,

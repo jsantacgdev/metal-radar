@@ -8,32 +8,45 @@ export function useAuth() {
   const [hasOnboarded, setHasOnboarded] = useState<boolean | null>(null);
 
   const checkOnboarding = async (userId: string) => {
-    const { count, error } = await supabase
-      .from('user_bands')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId);
-    if (error) {
-      console.warn('Error checking onboarding:', error.message);
+    try {
+      const { count, error } = await supabase
+        .from('user_bands')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+      if (error) throw error;
+      setHasOnboarded((count ?? 0) > 0);
+    } catch (err) {
+      console.warn('Error checking onboarding:', err);
       setHasOnboarded(false);
-      return;
     }
-    setHasOnboarded((count ?? 0) > 0);
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
+    let cancelled = false;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
       setSession(data.session);
-      if (data.session) await checkOnboarding(data.session.user.id);
       setLoading(false);
+      if (data.session) {
+        checkOnboarding(data.session.user.id);
+      }
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, s) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, s) => {
+      if (cancelled) return;
       setSession(s);
-      if (s) await checkOnboarding(s.user.id);
-      else setHasOnboarded(null);
+      if (s) {
+        checkOnboarding(s.user.id);
+      } else {
+        setHasOnboarded(null);
+      }
     });
 
-    return () => listener.subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   const refreshOnboarding = async () => {
