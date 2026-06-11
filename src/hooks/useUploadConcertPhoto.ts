@@ -1,7 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
-import * as FileSystem from 'expo-file-system';
 import { supabase } from '../lib/supabase';
 
 type Args = {
@@ -14,7 +13,7 @@ async function pickImage(source: 'camera' | 'library') {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) throw new Error('Permiso de cámara denegado');
     return ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       quality: 0.9,
       exif: true,
     });
@@ -22,7 +21,7 @@ async function pickImage(source: 'camera' | 'library') {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) throw new Error('Permiso de galería denegado');
     return ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       quality: 0.9,
       exif: true,
     });
@@ -47,10 +46,7 @@ export function useUploadConcertPhoto() {
       );
 
       // Leer bytes
-      const base64 = await FileSystem.readAsStringAsync(manipulated.uri, {
-        encoding: 'base64',
-      });
-      const byteArray = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+      const arrayBuffer = await fetch(manipulated.uri).then((res) => res.arrayBuffer());
 
       // Sesión actual
       const {
@@ -65,7 +61,7 @@ export function useUploadConcertPhoto() {
       // Subir a Storage
       const { error: uploadError } = await supabase.storage
         .from('concert-photos')
-        .upload(storagePath, byteArray, {
+        .upload(storagePath, arrayBuffer, {
           contentType: 'image/jpeg',
           upsert: false,
         });
