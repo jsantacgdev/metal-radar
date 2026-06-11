@@ -7,6 +7,7 @@ export type DiaryEntry = {
   status: 'interested' | 'going' | 'attended';
   rating: number | null;
   notes: string | null;
+  photo_url: string | null;
   created_at: string;
   concert: {
     id: string;
@@ -15,6 +16,8 @@ export type DiaryEntry = {
       name: string;
       city: string | null;
       country: string | null;
+      lat: number | null;
+      lng: number | null;
     };
     bands: {
       id: string;
@@ -24,9 +27,7 @@ export type DiaryEntry = {
   };
 };
 
-async function fetchDiary(): Promise<
-  DiaryEntry[]
-> {
+async function fetchDiary(): Promise<DiaryEntry[]> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -36,10 +37,10 @@ async function fetchDiary(): Promise<
     .from('user_concerts')
     .select(
       `
-      id, concert_id, status, rating, notes, created_at,
+      id, concert_id, status, rating, notes, photo_url, created_at,
       concert:concerts!inner (
         id, event_date,
-        venue:venues!inner ( name, city, country ),
+        venue:venues!inner ( name, city, country, lat, lng ),
         concert_bands ( band:bands ( id, name, image_url ) )
       )
     `,
@@ -55,14 +56,13 @@ async function fetchDiary(): Promise<
     status: row.status,
     rating: row.rating,
     notes: row.notes,
+    photo_url: row.photo_url,
     created_at: row.created_at,
     concert: {
       id: row.concert.id,
       event_date: row.concert.event_date,
       venue: row.concert.venue,
-      bands: row.concert.concert_bands.map(
-        (cb: any) => cb.band,
-      ),
+      bands: row.concert.concert_bands.map((cb: any) => cb.band),
     },
   }));
 }

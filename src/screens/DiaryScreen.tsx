@@ -12,6 +12,8 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DiaryEntry, useDiary } from '../hooks/useDiary';
+import { useDiaryStats } from '../hooks/useDiaryStats';
+import { useUpdateConcertStatus } from '../hooks/useUpdateConcertStatus';
 import { DiaryStackParamList } from '../navigation/DiaryStack';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from '../components/ui';
@@ -19,11 +21,14 @@ import BandImage from '../components/BandImage';
 
 type Filter = 'upcoming' | 'past';
 
+const CURRENT_YEAR = new Date().getFullYear();
+
 export default function DiaryScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<DiaryStackParamList>>();
   const { entries, loading, error, reload } = useDiary();
-  const [filter, setFilter] = useState<Filter>('upcoming');
+  const stats = useDiaryStats(entries, CURRENT_YEAR);
+  const [filter, setFilter] = useState<Filter>('past');
 
   useFocusEffect(
     useCallback(() => {
@@ -45,43 +50,67 @@ export default function DiaryScreen() {
 
   const filtered = filter === 'upcoming' ? upcoming : past;
 
+  // ¿Mostrar banner Wrapped? Por ahora siempre, en Fase 3 se condicionará a diciembre
+  const showWrappedBanner = filter === 'past' && stats.shows > 0;
+
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.md }]}>
-      {/* Header */}
       <View style={styles.header}>
-        <View>
-          <Text variant="monoMD" color="muted">
-            TU HISTORIAL
-          </Text>
-          <Text variant="displayLG" style={{ marginTop: 4 }}>
-            Diario
-          </Text>
-        </View>
+        <Text variant="monoMD" color="muted">
+          TU HISTORIAL
+        </Text>
+        <Text variant="displayLG" style={{ marginTop: 4 }}>
+          Diario
+        </Text>
       </View>
 
-      {/* Stats strip */}
+      {/* Stats strip: SHOWS / BANDAS / AÑO */}
       <View style={styles.statsStrip}>
-        <StatCard value={upcoming.length} label="PRÓXIMOS" accent />
-        <StatCard value={past.length} label="ASISTIDOS" />
-        <StatCard
-          value={new Set(entries.map((e) => e.concert.bands[0]?.id).filter(Boolean)).size}
-          label="BANDAS"
-        />
+        <StatCard value={stats.shows.toString()} label="SHOWS" accent />
+        <StatCard value={stats.bands.toString()} label="BANDAS" />
+        <StatCard value={CURRENT_YEAR.toString()} label="AÑO" />
       </View>
 
-      {/* Tabs filtro */}
+      {/* Banner Wrapped */}
+      {showWrappedBanner && (
+        <TouchableOpacity
+          style={styles.wrappedBanner}
+          activeOpacity={0.85}
+          onPress={() => {
+            // TODO Fase 3: navegar a Wrapped
+          }}
+        >
+          <View style={styles.wrappedFlame}>
+            <Ionicons name="flame" size={18} color={colors.bloodBright} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text variant="displaySM">Tu Wrapped {CURRENT_YEAR} está listo</Text>
+            <Text variant="monoSM" color="muted" style={{ marginTop: 2 }}>
+              {stats.km.toLocaleString('es-ES')} km de directo
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.silver} />
+        </TouchableOpacity>
+      )}
+
       <View style={styles.tabsRow}>
-        <TabPill
-          label={`Próximos · ${upcoming.length}`}
-          active={filter === 'upcoming'}
-          onPress={() => setFilter('upcoming')}
-        />
         <TabPill
           label={`Pasados · ${past.length}`}
           active={filter === 'past'}
           onPress={() => setFilter('past')}
         />
+        <TabPill
+          label={`Próximos · ${upcoming.length}`}
+          active={filter === 'upcoming'}
+          onPress={() => setFilter('upcoming')}
+        />
       </View>
+
+      {filter === 'past' && (
+        <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
+          RECIENTES
+        </Text>
+      )}
 
       {error && (
         <View style={styles.errorBox}>
@@ -130,7 +159,7 @@ export default function DiaryScreen() {
   );
 }
 
-function StatCard({ value, label, accent }: { value: number; label: string; accent?: boolean }) {
+function StatCard({ value, label, accent }: { value: string; label: string; accent?: boolean }) {
   return (
     <View style={styles.statCard}>
       <Text
@@ -180,79 +209,109 @@ function TabPill({
   );
 }
 
+function RatingTriangles({ rating }: { rating: number }) {
+  // rating 0-5
+  return (
+    <View style={{ flexDirection: 'row', gap: 2 }}>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <Ionicons
+          key={i}
+          name="triangle"
+          size={9}
+          color={i <= rating ? colors.bloodBright : colors.faint}
+        />
+      ))}
+    </View>
+  );
+}
+
 function DiaryItem({ entry, onPress }: { entry: DiaryEntry; onPress: () => void }) {
   const date = new Date(entry.concert.event_date);
-  const month = date.toLocaleDateString('es-ES', { month: 'short' }).toUpperCase().replace('.', '');
-  const day = date.getDate().toString();
+  const updateStatus = useUpdateConcertStatus();
+  const firstBand = entry.concert.bands[0];
 
-  const statusLabel: Record<DiaryEntry['status'], string> = {
-    interested: 'INTERESADO',
-    going: 'VOY',
-    attended: 'ASISTÍ',
+  const dateLabel = date
+    .toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: 'short',
+      year: '2-digit',
+    })
+    .toUpperCase()
+    .replace(/\./g, '');
+
+  const isPastGoing = entry.status === 'going' && date.getTime() < Date.now();
+
+  const handleConfirmAttended = (e: any) => {
+    e.stopPropagation();
+    updateStatus.mutate({ userConcertId: entry.id, status: 'attended' });
   };
 
-  const isHighlight = entry.status === 'going' || entry.status === 'attended';
-  const firstBand = entry.concert.bands[0];
+  const handleConfirmNotAttended = (e: any) => {
+    e.stopPropagation();
+    updateStatus.mutate({ userConcertId: entry.id, status: 'interested' });
+  };
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
-      {/* Bloque de fecha tipo "calendar tag" */}
-      <View style={[styles.dateBox, isHighlight && styles.dateBoxActive]}>
-        <Text
-          style={{
-            fontFamily: fontFamily.mono,
-            fontSize: 9,
-            letterSpacing: 1,
-            color: isHighlight ? colors.bloodBright : colors.muted,
-          }}
-        >
-          {month}
-        </Text>
-        <Text
-          style={{
-            fontFamily: fontFamily.displayBold,
-            fontSize: 22,
-            lineHeight: 24,
-            color: colors.bright,
-            marginTop: 2,
-          }}
-        >
-          {day}
-        </Text>
-      </View>
-
-      {/* Imagen banda */}
       <BandImage
         url={firstBand?.image_url ?? null}
-        size={56}
-        radiusOverride={radius.md}
+        size={48}
+        radiusOverride={radius.sm}
         showTag={!firstBand?.image_url}
-        style={{ marginLeft: spacing.md }}
       />
 
-      {/* Contenido */}
       <View style={styles.cardContent}>
-        <Text variant="displaySM" numberOfLines={1}>
-          {entry.concert.bands.map((b) => b.name).join(' · ')}
-        </Text>
+        <View style={styles.cardTopRow}>
+          <Text variant="displaySM" numberOfLines={1} style={{ flex: 1 }}>
+            {entry.concert.bands.map((b) => b.name).join(' · ')}
+          </Text>
+          <Text variant="monoSM" color="muted" style={{ marginLeft: spacing.sm }}>
+            {dateLabel}
+          </Text>
+        </View>
+
         <Text variant="monoSM" color="muted" numberOfLines={1} style={{ marginTop: 4 }}>
           {entry.concert.venue.name}
           {entry.concert.venue.city ? ` · ${entry.concert.venue.city.toUpperCase()}` : ''}
         </Text>
-        <View style={styles.statusRow}>
-          <View
-            style={[
-              styles.statusDot,
-              { backgroundColor: isHighlight ? colors.bloodBright : colors.faint },
-            ]}
-          />
-          <Text variant="monoSM" color={isHighlight ? 'bloodBright' : 'muted'}>
-            {statusLabel[entry.status]}
-          </Text>
-        </View>
-      </View>
 
-      <Ionicons name="chevron-forward" size={18} color={colors.faint} />
+        {/* Rating + (placeholder Fase 2 setlist) */}
+        {entry.status === 'attended' && (
+          <View style={styles.metaRow}>
+            <RatingTriangles rating={entry.rating ?? 0} />
+            {/* Fase 2: <Text variant="monoSM" color="muted">19 TEMAS · SETLIST REAL</Text> */}
+          </View>
+        )}
+
+        {/* CTA inline para confirmar asistencia */}
+        {isPastGoing && (
+          <View style={styles.confirmRow}>
+            <Text variant="monoSM" color="silver" style={{ marginRight: spacing.sm }}>
+              ¿FUISTE?
+            </Text>
+            <TouchableOpacity
+              style={[styles.confirmBtn, styles.confirmBtnYes]}
+              onPress={handleConfirmAttended}
+              activeOpacity={0.8}
+              disabled={updateStatus.isPending}
+            >
+              <Text variant="monoSM" style={{ color: colors.ink }}>
+                SÍ
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.confirmBtn}
+              onPress={handleConfirmNotAttended}
+              activeOpacity={0.8}
+              disabled={updateStatus.isPending}
+            >
+              <Text variant="monoSM" color="silver">
+                NO
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
     </TouchableOpacity>
   );
 }
@@ -279,6 +338,25 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderRadius: radius.md,
   },
+  wrappedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    backgroundColor: colors.bloodTint,
+    borderWidth: 1,
+    borderColor: colors.bloodTintBorder,
+    borderRadius: radius.md,
+    marginBottom: spacing.lg,
+    gap: spacing.sm,
+  },
+  wrappedFlame: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.full,
+    backgroundColor: colors.panel,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   tabsRow: {
     flexDirection: 'row',
     gap: spacing.sm,
@@ -295,6 +373,9 @@ const styles = StyleSheet.create({
   tabPillActive: {
     backgroundColor: colors.silver,
     borderColor: colors.silver,
+  },
+  sectionTitle: {
+    marginBottom: spacing.sm,
   },
   errorBox: {
     padding: spacing.md,
@@ -320,41 +401,43 @@ const styles = StyleSheet.create({
   },
   card: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     padding: spacing.md,
     backgroundColor: colors.panel,
     borderWidth: 1,
     borderColor: colors.line,
     borderRadius: radius.md,
   },
-  dateBox: {
-    width: 52,
-    height: 56,
-    borderRadius: radius.md,
-    backgroundColor: colors.panel2,
-    borderWidth: 1,
-    borderColor: colors.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dateBoxActive: {
-    borderColor: colors.bloodTintBorder,
-    backgroundColor: colors.bloodTint,
-  },
   cardContent: {
     flex: 1,
     marginLeft: spacing.md,
     minWidth: 0,
   },
-  statusRow: {
+  cardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 6,
-    gap: 6,
+    gap: 8,
   },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: radius.full,
+  confirmRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  confirmBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.line,
+    marginRight: 6,
+  },
+  confirmBtnYes: {
+    backgroundColor: colors.bloodBright,
+    borderColor: colors.bloodBright,
   },
 });

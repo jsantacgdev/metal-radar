@@ -27,6 +27,13 @@
           "color": "#cf2e24"
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permite a Metal Radar acceder a tus fotos para añadirlas al diario.",
+          "cameraPermission": "Permite a Metal Radar usar la cámara para capturar momentos del concierto."
+        }
+      ],
       "expo-font"
     ],
     "ios": {
