@@ -15,6 +15,9 @@ const TRIBUTE_KEYWORDS =
 
 const VIP_KEYWORDS = /\b(vip packages?|paquetes? vip|hospitality|meet [&y] greet)\b/i;
 
+// NUEVO: detector de "esto no es una banda" para attractions
+const NON_BAND_NAME = /\b(festival|fest|bluesfest|tour|experience|tributo|tribute)\b/i;
+
 const STALE_THRESHOLD_HOURS = 12;
 
 function normalizeName(s: string): string {
@@ -59,6 +62,29 @@ async function forwardGeocode(query: string): Promise<{ lat: number; lng: number
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// NUEVO: helper que decide si una attraction es una banda real
+function isRealBand(attr: any): boolean {
+  if (!attr.name) return false;
+  if (NON_BAND_NAME.test(attr.name)) return false;
+
+  const cls = attr.classifications?.[0];
+  if (!cls) return true; // si no hay info, lo dejamos pasar (era el comportamiento anterior)
+
+  const segment = cls.segment?.name;
+  const type = cls.type?.name;
+
+  // Solo "Music" como segmento
+  if (segment && segment !== 'Music') return false;
+
+  // Si el tipo viene definido, debe ser banda/artista
+  if (type && !['Individual', 'Group', 'Undefined'].includes(type)) return false;
+
+  // Festival explícito en classifications
+  if (type === 'Event Style' || cls.subType?.name === 'Festival') return false;
+
+  return true;
+}
+
 type TmEvent = {
   id: string;
   name: string;
@@ -77,9 +103,17 @@ type TmEvent = {
       id: string;
       name: string;
       images?: { url: string }[];
+      classifications?: {
+        segment?: { name: string };
+        genre?: { name: string };
+        subGenre?: { name: string };
+        type?: { name: string };
+        subType?: { name: string };
+      }[];
     }[];
   };
 };
+
 Deno.serve(async (req) => {
   const authHeader = req.headers.get('Authorization');
   const newConcertIds: string[] = [];
@@ -122,6 +156,7 @@ Deno.serve(async (req) => {
     let totalDiscarded = 0;
     let bandsSkipped = 0;
     let bandsProcessed = 0;
+    let attractionsSkipped = 0; // NUEVO contador
 
     for (const band of uniqueBands.values()) {
       if (band.last_concerts_sync_at && band.last_concerts_sync_at > staleSince) {
@@ -270,18 +305,14 @@ Deno.serve(async (req) => {
 
           if (!concertRow) continue;
 
-          // Si era nuevo, añadirlo a la cola de notificaciones
           if (!existing) {
             newConcertIds.push(concertRow.id);
           }
-
-          if (!concertRow) continue;
 
           // Guardar TODAS las attractions del evento como bandas del cartel
           const attractions = ev._embedded?.attractions ?? [];
 
           if (attractions.length === 0) {
-            // Fallback: si no hay attractions, al menos asociamos la banda que sincronizamos
             await admin
               .from('concert_bands')
               .upsert(
@@ -291,7 +322,15 @@ Deno.serve(async (req) => {
           } else {
             for (let idx = 0; idx < attractions.length; idx++) {
               const attr = attractions[idx];
-              if (!attr.name) continue;
+
+              // NUEVO: filtro - solo crear/asociar attractions que sean bandas reales
+              if (!isRealBand(attr)) {
+                console.log(
+                  `[skip-attraction] "${attr.name}" type=${attr.classifications?.[0]?.type?.name}`,
+                );
+                attractionsSkipped++;
+                continue;
+              }
 
               // Buscar o crear banda en BD
               const { data: existingBand } = await admin
@@ -336,7 +375,6 @@ Deno.serve(async (req) => {
           totalSynced++;
         }
 
-        // Marcar la banda como sincronizada correctamente después de procesar todos sus eventos
         await admin
           .from('bands')
           .update({ last_concerts_sync_at: new Date().toISOString() })
@@ -346,7 +384,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Disparar notificaciones para conciertos nuevos
     let pushResults = null;
     if (newConcertIds.length > 0) {
       try {
@@ -368,6 +405,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         synced: totalSynced,
         discarded: totalDiscarded,
+        attractions_skipped: attractionsSkipped,
         bands_total: uniqueBands.size,
         bands_processed: bandsProcessed,
         bands_skipped: bandsSkipped,

@@ -16,14 +16,18 @@ const HEAVY_GENRE_REGEX =
   /metal|rock|hardcore|punk|metalcore|deathcore|grunge|emo|screamo|thrash|doom|sludge|stoner|industrial|gothic|prog|alternative|nu.?metal|post.?punk|psychedelic|garage|indie/i;
 
 const BATCH_SIZE = 50;
-const SPOTIFY_DELAY_MS = 250; // 4 req/s, conservador
+const SPOTIFY_DELAY_MS = 250;
+
+// NUEVO: detector de imágenes "pobres" (Ticketmaster) que conviene sobreescribir
+function isPoorImage(url: string | null): boolean {
+  if (!url) return true;
+  return /ticketm\.net|s1\.ticketm/i.test(url);
+}
 
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
 async function getSpotifyToken(): Promise<string> {
-  if (cachedToken && cachedToken.expiresAt > Date.now()) {
-    return cachedToken.value;
-  }
+  if (cachedToken && cachedToken.expiresAt > Date.now()) return cachedToken.value;
   const credentials = btoa(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`);
   const res = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
@@ -44,24 +48,16 @@ async function getSpotifyToken(): Promise<string> {
 
 async function searchSpotifyArtist(name: string, token: string) {
   const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(name)}&type=artist&limit=5`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (res.status === 429) {
     const retryAfter = parseInt(res.headers.get('Retry-After') ?? '60', 10);
     throw new Error(`SPOTIFY_RATE_LIMITED:${retryAfter}`);
   }
-
   if (!res.ok) return null;
-
   const data = await res.json();
   const items = data.artists?.items ?? [];
-
-  // Match exacto case-insensitive
   const exact = items.find((a: any) => a.name.toLowerCase() === name.toLowerCase());
   if (!exact) return null;
-
   return {
     spotify_id: exact.id,
     image_url: exact.images?.[0]?.url ?? null,
@@ -87,27 +83,69 @@ async function getLastfmTags(artistName: string): Promise<string[]> {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// NUEVO: query base reutilizable - filtra pendientes (sin imagen O imagen de Ticketmaster)
+// y que no se hayan intentado en los últimos 7 días
+function buildPendingQuery(admin: any, sevenDaysAgo: string) {
+  return admin
+    .from('bands')
+    .select('id, name, spotify_id, genres, image_url')
+    .or('image_url.is.null,image_url.ilike.%ticketm.net%')
+    .or(`enrichment_attempted_at.is.null,enrichment_attempted_at.lt.${sevenDaysAgo}`);
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
 
   try {
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Obtener tamaño de batch del query string (opcional)
     const url = new URL(req.url);
     const batchSize = parseInt(url.searchParams.get('batch') ?? `${BATCH_SIZE}`, 10);
 
-    // 1. Bandas pendientes (sin image_url y sin intento previo o intento hace >7 días)
+    const today = new Date().toISOString().slice(0, 10);
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: pending, error: pendingError } = await admin
-      .from('bands')
-      .select('id, name, spotify_id, genres')
-      .is('image_url', null)
-      .or(`enrichment_attempted_at.is.null,enrichment_attempted_at.lt.${sevenDaysAgo}`)
-      .limit(batchSize);
 
-    if (pendingError) throw pendingError;
-    if (!pending || pending.length === 0) {
+    // NUEVO: 1. IDs de bandas con festivales o conciertos próximos (prioritarias)
+    const [{ data: priorityFest }, { data: priorityConc }] = await Promise.all([
+      admin
+        .from('festival_bands')
+        .select('band_id, festival:festivals!inner(start_date)')
+        .gte('festival.start_date', today),
+      admin
+        .from('concert_bands')
+        .select('band_id, concert:concerts!inner(event_date)')
+        .gte('concert.event_date', today),
+    ]);
+
+    const priorityIds = Array.from(
+      new Set([
+        ...(priorityFest ?? []).map((r: any) => r.band_id),
+        ...(priorityConc ?? []).map((r: any) => r.band_id),
+      ]),
+    );
+
+    // 2. Coger prioritarias primero
+    let pending: any[] = [];
+    if (priorityIds.length > 0) {
+      const { data: priority } = await buildPendingQuery(admin, sevenDaysAgo)
+        .in('id', priorityIds)
+        .limit(batchSize);
+      pending = priority ?? [];
+    }
+
+    // 3. Rellenar con el resto si queda hueco
+    if (pending.length < batchSize) {
+      const fill = batchSize - pending.length;
+      const usedIds = pending.map((b) => b.id);
+      let q = buildPendingQuery(admin, sevenDaysAgo).limit(fill);
+      if (usedIds.length > 0) {
+        q = q.not('id', 'in', `(${usedIds.join(',')})`);
+      }
+      const { data: rest } = await q;
+      pending = [...pending, ...(rest ?? [])];
+    }
+
+    if (pending.length === 0) {
       return new Response(JSON.stringify({ message: 'Sin bandas pendientes', processed: 0 }), {
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
       });
@@ -116,6 +154,8 @@ Deno.serve(async (req) => {
     const token = await getSpotifyToken();
     const results = {
       total: pending.length,
+      priority_count:
+        priorityIds.length > 0 ? pending.filter((b) => priorityIds.includes(b.id)).length : 0,
       enriched: 0,
       not_found: 0,
       rejected_genre: 0,
@@ -134,7 +174,6 @@ Deno.serve(async (req) => {
         const spotifyData = await searchSpotifyArtist(band.name, token);
 
         if (!spotifyData) {
-          // No encontrada en Spotify: marcar como intentada
           await admin
             .from('bands')
             .update({
@@ -147,7 +186,6 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Cross-check con Last.fm si los géneros de Spotify no son heavy o vienen vacíos
         let finalGenres = spotifyData.genres;
         const spotifyIsHeavy =
           finalGenres.length > 0 && finalGenres.some((g) => HEAVY_GENRE_REGEX.test(g));
@@ -158,14 +196,12 @@ Deno.serve(async (req) => {
           const passesGenre = allGenres.some((g) => HEAVY_GENRE_REGEX.test(g));
 
           if (!passesGenre) {
-            // No es heavy: actualizar pero NO subir image_url ni spotify_id
-            // Marcar como intentada y rechazada
             await admin
               .from('bands')
               .update({
                 enrichment_attempted_at: new Date().toISOString(),
                 enrichment_found: false,
-                genres: allGenres, // guardamos info de género para debug
+                genres: allGenres,
               })
               .eq('id', band.id);
             console.log(`Rechazada "${band.name}": ${JSON.stringify(allGenres)}`);
@@ -177,17 +213,21 @@ Deno.serve(async (req) => {
           finalGenres = allGenres;
         }
 
-        // Enriquecer
-        await admin
-          .from('bands')
-          .update({
-            spotify_id: spotifyData.spotify_id,
-            image_url: spotifyData.image_url,
-            genres: finalGenres,
-            enrichment_attempted_at: new Date().toISOString(),
-            enrichment_found: true,
-          })
-          .eq('id', band.id);
+        // NUEVO: decidir si actualizar imagen
+        // Sobreescribimos si la actual era pobre (null o de Ticketmaster) y Spotify trae una
+        const shouldUpdateImage = spotifyData.image_url && isPoorImage(band.image_url);
+
+        const updatePayload: any = {
+          spotify_id: spotifyData.spotify_id,
+          genres: finalGenres,
+          enrichment_attempted_at: new Date().toISOString(),
+          enrichment_found: true,
+        };
+        if (shouldUpdateImage) {
+          updatePayload.image_url = spotifyData.image_url;
+        }
+
+        await admin.from('bands').update(updatePayload).eq('id', band.id);
 
         results.enriched++;
         await sleep(SPOTIFY_DELAY_MS);

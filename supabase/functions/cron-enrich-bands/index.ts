@@ -16,6 +16,16 @@ const SPOTIFY_DELAY_MS = 300;
 
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
+function normalizeName(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // quita diacríticos
+    .replace(/[^\w\s]/g, '') // quita símbolos ($, ', ., etc.)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 async function getSpotifyToken(): Promise<string> {
   if (cachedToken && cachedToken.expiresAt > Date.now()) {
     return cachedToken.value;
@@ -48,7 +58,8 @@ async function searchSpotifyArtist(name: string, token: string) {
   if (!res.ok) return null;
   const data = await res.json();
   const items = data.artists?.items ?? [];
-  const exact = items.find((a: any) => a.name.toLowerCase() === name.toLowerCase());
+  const target = normalizeName(name);
+  const exact = items.find((a: any) => normalizeName(a.name) === target);
   if (!exact) return null;
   return {
     spotify_id: exact.id,
