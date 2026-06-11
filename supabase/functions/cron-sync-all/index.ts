@@ -15,8 +15,8 @@ const TRIBUTE_KEYWORDS =
 
 const VIP_KEYWORDS = /\b(vip packages?|paquetes? vip|hospitality|meet [&y] greet)\b/i;
 
-// NUEVO: detector de "esto no es una banda" para attractions
-const NON_BAND_NAME = /\b(festival|fest|bluesfest|tour|experience|tributo|tribute)\b/i;
+const NON_BAND_NAME =
+  /\b(festival|fest\b|bluesfest|tour|experience|tributo|tribute|concert\s+series|hospitality|vip|stage|ticketmaster\s+suite|ball\s+arena|club\s+level)\b/i;
 
 const STALE_THRESHOLD_HOURS = 12;
 
@@ -62,25 +62,20 @@ async function forwardGeocode(query: string): Promise<{ lat: number; lng: number
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// NUEVO: helper que decide si una attraction es una banda real
 function isRealBand(attr: any): boolean {
   if (!attr.name) return false;
   if (NON_BAND_NAME.test(attr.name)) return false;
 
   const cls = attr.classifications?.[0];
-  if (!cls) return true; // si no hay info, lo dejamos pasar (era el comportamiento anterior)
+  if (!cls) return true;
 
-  const segment = cls.segment?.name;
-  const type = cls.type?.name;
+  if (cls.segment?.name && cls.segment.name !== 'Music') return false;
+  if (cls.subType?.name === 'Festival') return false;
 
-  // Solo "Music" como segmento
-  if (segment && segment !== 'Music') return false;
-
-  // Si el tipo viene definido, debe ser banda/artista
-  if (type && !['Individual', 'Group', 'Undefined'].includes(type)) return false;
-
-  // Festival explícito en classifications
-  if (type === 'Event Style' || cls.subType?.name === 'Festival') return false;
+  if (cls.type?.name === 'Event Style') {
+    const hasMusicGenre = !!cls.genre?.name && cls.genre.name !== 'Undefined';
+    return hasMusicGenre;
+  }
 
   return true;
 }
@@ -156,7 +151,7 @@ Deno.serve(async (req) => {
     let totalDiscarded = 0;
     let bandsSkipped = 0;
     let bandsProcessed = 0;
-    let attractionsSkipped = 0; // NUEVO contador
+    let attractionsSkipped = 0;
 
     for (const band of uniqueBands.values()) {
       if (band.last_concerts_sync_at && band.last_concerts_sync_at > staleSince) {
@@ -309,7 +304,6 @@ Deno.serve(async (req) => {
             newConcertIds.push(concertRow.id);
           }
 
-          // Guardar TODAS las attractions del evento como bandas del cartel
           const attractions = ev._embedded?.attractions ?? [];
 
           if (attractions.length === 0) {
@@ -323,7 +317,6 @@ Deno.serve(async (req) => {
             for (let idx = 0; idx < attractions.length; idx++) {
               const attr = attractions[idx];
 
-              // NUEVO: filtro - solo crear/asociar attractions que sean bandas reales
               if (!isRealBand(attr)) {
                 console.log(
                   `[skip-attraction] "${attr.name}" type=${attr.classifications?.[0]?.type?.name}`,
@@ -332,7 +325,6 @@ Deno.serve(async (req) => {
                 continue;
               }
 
-              // Buscar o crear banda en BD
               const { data: existingBand } = await admin
                 .from('bands')
                 .select('id')

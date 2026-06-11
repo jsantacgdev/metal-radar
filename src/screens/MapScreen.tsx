@@ -69,7 +69,8 @@ export default function MapScreen() {
       const hasFestival = group.concerts.some((c) => c.is_festival);
 
       let color: string;
-      if (isFar) color = colors.faint;
+      if (isFar && !hasFestival) color = colors.faint;
+      else if (isFar && hasFestival) color = '#8b7765';
       else if (hasFestival) color = '#ffa500';
       else if (count > 1) color = colors.bloodBright;
       else color = colors.bloodDeep;
@@ -182,6 +183,7 @@ export default function MapScreen() {
         userLat={location.lat}
         userLng={location.lng}
         onMarkerPress={handleMarkerPress}
+        maptilerKey={process.env.EXPO_PUBLIC_MAPTILER_KEY}
       />
 
       {/* Header flotante */}
