@@ -1,8 +1,10 @@
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
   ScrollView,
   StyleSheet,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -13,12 +15,14 @@ import { MapStackParamList } from '../navigation/MapStack';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from '../components/ui';
 import BandImage from '../components/BandImage';
+import PhotoGallery from '../components/PhotoGallery';
 
 type Props = NativeStackScreenProps<MapStackParamList, 'ConcertDetail'>;
 
 export default function ConcertDetailScreen({ route }: Props) {
   const { concertId } = route.params;
-  const { concert, loading, error, updateStatus } = useConcert(concertId);
+  const { concert, loading, error, updateStatus, updateRating, updateNotes } =
+    useConcert(concertId);
 
   if (loading) {
     return (
@@ -52,6 +56,7 @@ export default function ConcertDetailScreen({ route }: Props) {
   });
   const timeStr = dateObj.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
   const isPast = dateObj.getTime() < Date.now();
+  const isAttended = concert.userStatus === 'attended';
 
   const openTickets = () => {
     if (concert.ticket_url) Linking.openURL(concert.ticket_url);
@@ -59,8 +64,11 @@ export default function ConcertDetailScreen({ route }: Props) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.ink }}>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 140 }}>
-        {/* Hero con banda principal */}
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 140 }}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.hero}>
           <BandImage
             url={concert.bands[0]?.image_url ?? null}
@@ -83,7 +91,6 @@ export default function ConcertDetailScreen({ route }: Props) {
           </View>
         </View>
 
-        {/* Meta strip: fecha, venue, distancia */}
         <View style={styles.metaStrip}>
           <View style={styles.dateBox}>
             <Text
@@ -121,7 +128,6 @@ export default function ConcertDetailScreen({ route }: Props) {
           </View>
         </View>
 
-        {/* Precio */}
         {(concert.price_min ?? concert.price_max) != null && (
           <Section title="PRECIO">
             <Text variant="displaySM">
@@ -132,7 +138,6 @@ export default function ConcertDetailScreen({ route }: Props) {
           </Section>
         )}
 
-        {/* Bandas del cartel */}
         {concert.bands.length > 0 && (
           <Section title="CARTEL">
             {concert.bands.map((b, i) => (
@@ -151,7 +156,6 @@ export default function ConcertDetailScreen({ route }: Props) {
           </Section>
         )}
 
-        {/* Estado del usuario */}
         <Section title={isPast ? 'ASISTENCIA' : 'TU ESTADO'}>
           <View style={styles.actionsRow}>
             {!isPast && (
@@ -180,7 +184,28 @@ export default function ConcertDetailScreen({ route }: Props) {
           </View>
         </Section>
 
-        {/* Banner de status del evento */}
+        {isAttended && concert.userConcertId && (
+          <>
+            <Section title="TU VALORACIÓN">
+              <RatingPicker
+                value={concert.rating ?? 0}
+                onChange={(v) => updateRating(v === concert.rating ? null : v)}
+              />
+            </Section>
+
+            <Section title="NOTAS">
+              <NotesEditor
+                initialValue={concert.notes ?? ''}
+                onSave={(text) => updateNotes(text)}
+              />
+            </Section>
+
+            <View style={styles.gallerySection}>
+              <PhotoGallery userConcertId={concert.userConcertId} />
+            </View>
+          </>
+        )}
+
         {concert.status !== 'onsale' && (
           <View style={styles.statusBanner}>
             <Ionicons name="alert-circle" size={18} color={colors.bloodBright} />
@@ -191,7 +216,6 @@ export default function ConcertDetailScreen({ route }: Props) {
         )}
       </ScrollView>
 
-      {/* CTA flotante de compra */}
       {!isPast && concert.ticket_url && (
         <View style={styles.ctaContainer}>
           <TouchableOpacity style={styles.ctaButton} onPress={openTickets} activeOpacity={0.85}>
@@ -213,6 +237,8 @@ export default function ConcertDetailScreen({ route }: Props) {
     </View>
   );
 }
+
+/* ---------- Subcomponentes ---------- */
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -264,6 +290,81 @@ function ActionPill({
     </TouchableOpacity>
   );
 }
+
+function RatingPicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  return (
+    <View style={styles.ratingRow}>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <TouchableOpacity
+          key={i}
+          onPress={() => onChange(i)}
+          activeOpacity={0.6}
+          hitSlop={8}
+          style={styles.ratingTouch}
+        >
+          <Ionicons
+            name="triangle"
+            size={26}
+            color={i <= value ? colors.bloodBright : colors.faint}
+          />
+        </TouchableOpacity>
+      ))}
+      <View style={{ flex: 1 }} />
+      {value > 0 && (
+        <Text variant="monoSM" color="silver">
+          {value}/5
+        </Text>
+      )}
+    </View>
+  );
+}
+
+function NotesEditor({
+  initialValue,
+  onSave,
+}: {
+  initialValue: string;
+  onSave: (text: string) => void;
+}) {
+  const [text, setText] = useState(initialValue);
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    setText(initialValue);
+  }, [initialValue]);
+
+  useEffect(() => {
+    if (text === initialValue) return;
+    const t = setTimeout(() => onSave(text), 800);
+    return () => clearTimeout(t);
+  }, [text, initialValue, onSave]);
+
+  return (
+    <View>
+      <TextInput
+        value={text}
+        onChangeText={setText}
+        onFocus={() => setFocused(true)}
+        onBlur={() => {
+          setFocused(false);
+          if (text !== initialValue) onSave(text);
+        }}
+        placeholder="Cómo fue el concierto, qué temas tocaron, anécdotas, lo que recuerdes..."
+        placeholderTextColor={colors.muted}
+        multiline
+        scrollEnabled={false}
+        style={[styles.notesInput, focused && { borderColor: colors.bloodBright }]}
+      />
+      {text.length > 0 && (
+        <Text variant="monoSM" color="muted" style={{ marginTop: 6, textAlign: 'right' }}>
+          {text.length} caracteres
+        </Text>
+      )}
+    </View>
+  );
+}
+
+/* ---------- Styles ---------- */
 
 const styles = StyleSheet.create({
   centered: {
@@ -335,6 +436,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 36,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  ratingTouch: {
+    paddingVertical: 4,
+  },
+  notesInput: {
+    minHeight: 100,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.panel,
+    color: colors.bright,
+    fontFamily: fontFamily.body,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlignVertical: 'top',
+  },
+  gallerySection: {
+    paddingHorizontal: spacing.xl,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.line,
   },
   statusBanner: {
     flexDirection: 'row',

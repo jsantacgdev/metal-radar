@@ -1,8 +1,4 @@
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 
 export type ConcertDetail = {
@@ -26,36 +22,29 @@ export type ConcertDetail = {
     name: string;
     image_url: string | null;
   }[];
-  userStatus:
-    | 'interested'
-    | 'going'
-    | 'attended'
-    | null;
+  userStatus: 'interested' | 'going' | 'attended' | null;
   userConcertId: string | null;
   rating: number | null;
   notes: string | null;
 };
 
-async function fetchConcert(
-  concertId: string,
-): Promise<ConcertDetail> {
+async function fetchConcert(concertId: string): Promise<ConcertDetail> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error('Sin sesión');
 
-  const { data: concertData, error: cError } =
-    await supabase
-      .from('concerts')
-      .select(
-        `
+  const { data: concertData, error: cError } = await supabase
+    .from('concerts')
+    .select(
+      `
       id, event_date, ticket_url, price_min, price_max, currency, status,
       venue:venues!inner ( id, name, city, country, lat, lng ),
       concert_bands ( band:bands ( id, name, image_url ) )
     `,
-      )
-      .eq('id', concertId)
-      .single();
+    )
+    .eq('id', concertId)
+    .single();
 
   if (cError) throw cError;
 
@@ -76,9 +65,7 @@ async function fetchConcert(
     currency: c.currency,
     status: c.status,
     venue: c.venue,
-    bands: c.concert_bands.map(
-      (cb: any) => cb.band,
-    ),
+    bands: c.concert_bands.map((cb: any) => cb.band),
     userStatus: ucData?.status ?? null,
     userConcertId: ucData?.id ?? null,
     rating: ucData?.rating ?? null,
@@ -94,14 +81,13 @@ export function useConcert(concertId: string) {
     queryFn: () => fetchConcert(concertId),
   });
 
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ['concert', concertId] });
+    queryClient.invalidateQueries({ queryKey: ['diary'] });
+  };
+
   const updateStatusMutation = useMutation({
-    mutationFn: async (
-      status:
-        | 'interested'
-        | 'going'
-        | 'attended'
-        | null,
-    ) => {
+    mutationFn: async (status: 'interested' | 'going' | 'attended' | null) => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -114,26 +100,77 @@ export function useConcert(concertId: string) {
           .eq('user_id', user.id)
           .eq('concert_id', concertId);
       } else {
-        await supabase
-          .from('user_concerts')
-          .upsert(
-            {
-              user_id: user.id,
-              concert_id: concertId,
-              status,
-            },
-            { onConflict: 'user_id,concert_id' },
-          );
+        await supabase.from('user_concerts').upsert(
+          {
+            user_id: user.id,
+            concert_id: concertId,
+            status,
+          },
+          { onConflict: 'user_id,concert_id' },
+        );
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['concert', concertId],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ['diary'],
-      });
+    onSuccess: invalidateAll,
+  });
+
+  const updateRatingMutation = useMutation({
+    mutationFn: async (rating: number | null) => {
+      const userConcertId = query.data?.userConcertId;
+      if (!userConcertId) throw new Error('Marca primero como asistido');
+      const { error } = await supabase
+        .from('user_concerts')
+        .update({ rating, updated_at: new Date().toISOString() })
+        .eq('id', userConcertId);
+      if (error) throw error;
     },
+
+    onMutate: async (rating) => {
+      await queryClient.cancelQueries({ queryKey: ['concert', concertId] });
+      const prev = queryClient.getQueryData<ConcertDetail>(['concert', concertId]);
+      if (prev) {
+        queryClient.setQueryData<ConcertDetail>(['concert', concertId], {
+          ...prev,
+          rating,
+        });
+      }
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(['concert', concertId], ctx.prev);
+    },
+    onSuccess: invalidateAll,
+  });
+
+  const updateNotesMutation = useMutation({
+    mutationFn: async (notes: string) => {
+      const userConcertId = query.data?.userConcertId;
+      if (!userConcertId) throw new Error('Marca primero como asistido');
+      const trimmed = notes.trim();
+      const { error } = await supabase
+        .from('user_concerts')
+        .update({
+          notes: trimmed.length === 0 ? null : trimmed,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', userConcertId);
+      if (error) throw error;
+    },
+
+    onMutate: async (notes) => {
+      await queryClient.cancelQueries({ queryKey: ['concert', concertId] });
+      const prev = queryClient.getQueryData<ConcertDetail>(['concert', concertId]);
+      if (prev) {
+        queryClient.setQueryData<ConcertDetail>(['concert', concertId], {
+          ...prev,
+          notes: notes.trim() || null,
+        });
+      }
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(['concert', concertId], ctx.prev);
+    },
+    onSuccess: invalidateAll,
   });
 
   return {
@@ -141,12 +178,9 @@ export function useConcert(concertId: string) {
     loading: query.isLoading,
     error: query.error?.message ?? null,
     reload: query.refetch,
-    updateStatus: (
-      status:
-        | 'interested'
-        | 'going'
-        | 'attended'
-        | null,
-    ) => updateStatusMutation.mutateAsync(status),
+    updateStatus: (status: 'interested' | 'going' | 'attended' | null) =>
+      updateStatusMutation.mutateAsync(status),
+    updateRating: (rating: number | null) => updateRatingMutation.mutateAsync(rating),
+    updateNotes: (notes: string) => updateNotesMutation.mutateAsync(notes),
   };
 }
