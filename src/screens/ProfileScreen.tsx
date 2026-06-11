@@ -9,13 +9,17 @@ import { useProfile } from '../hooks/useProfile';
 import { usePreference } from '../hooks/usePreference';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Button, Text } from '../components/ui';
-import { useEffect } from 'react';
 import { registerForPushNotifications, checkNotificationPermissions } from '../lib/notifications';
 import { useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
+import { useLanguage } from '../i18n/useLanguage';
+import { SupportedLanguage } from '../i18n';
 
 export default function ProfileScreen() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
+  const { current: currentLang, changeLanguage } = useLanguage();
 
   const { session } = useAuth();
   const { profile, update } = useProfile();
@@ -24,8 +28,13 @@ export default function ProfileScreen() {
   const [syncing, setSyncing] = useState(false);
   const [savingLocation, setSavingLocation] = useState(false);
   const [pushStatus, setPushStatus] = useState<
-    'granted' | 'denied' | 'undetermined' | 'unsupported' | 'loading'
-  >('loading');
+    | 'granted'
+    | 'denied'
+    | 'undetermined'
+    | 'unsupported'
+    | 'loading'
+    | null
+  >(null);
 
   const { value: skipConfirm, setValue: setSkipConfirm } = usePreference<boolean>(
     'skipUnfollowConfirm',
@@ -56,11 +65,15 @@ export default function ProfileScreen() {
       const json = await res.json();
       if (json.error) throw new Error(json.error);
       Alert.alert(
-        'Sincronización completada',
-        `Conciertos: ${json.synced}\nDescartados: ${json.discarded ?? 0}\nBandas saltadas: ${json.bands_skipped ?? 0}`,
+        t('profile.syncDoneTitle'),
+        t('profile.syncDoneBody', {
+          synced: json.synced,
+          discarded: json.discarded ?? 0,
+          skipped: json.bands_skipped ?? 0,
+        }),
       );
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      Alert.alert(t('common.error'), err.message);
     } finally {
       setSyncing(false);
     }
@@ -71,7 +84,7 @@ export default function ProfileScreen() {
       setSavingLocation(true);
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permiso denegado', 'Necesitamos acceso a la ubicación');
+        Alert.alert(t('profile.permissionDeniedTitle'), t('profile.locationPermissionBody'));
         return;
       }
       const pos = await Location.getCurrentPositionAsync({});
@@ -79,9 +92,9 @@ export default function ProfileScreen() {
         home_lat: pos.coords.latitude,
         home_lng: pos.coords.longitude,
       });
-      Alert.alert('Listo', 'Ubicación de referencia guardada');
+      Alert.alert(t('common.done'), t('profile.locationSaved'));
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      Alert.alert(t('common.error'), err.message);
     } finally {
       setSavingLocation(false);
     }
@@ -92,7 +105,7 @@ export default function ProfileScreen() {
     try {
       await update({ search_radius_km: rounded });
     } catch (err: any) {
-      Alert.alert('Error al guardar radio', err.message);
+      Alert.alert(t('profile.radiusSaveError'), err.message);
     }
   };
 
@@ -104,11 +117,9 @@ export default function ProfileScreen() {
       return;
     }
 
-    // Sistema dice "granted" → verificar que también tenemos token en BD
     if (profile?.push_token) {
       setPushStatus('granted');
     } else {
-      // Permiso concedido pero sin token guardado → tratar como undetermined
       setPushStatus('undetermined');
     }
   };
@@ -117,27 +128,35 @@ export default function ProfileScreen() {
     setPushStatus('loading');
     const ok = await registerForPushNotifications();
     if (ok) {
-      // Invalidar el cache de profile para que se recargue con el nuevo push_token
       await queryClient.invalidateQueries({ queryKey: ['profile'] });
       setPushStatus('granted');
-      Alert.alert('Listo', 'Notificaciones activadas');
+      Alert.alert(t('common.done'), t('profile.notificationsEnabled'));
     } else {
       await refreshPushStatus();
       const status = await checkNotificationPermissions();
       if (status === 'denied') {
-        Alert.alert(
-          'Permisos denegados',
-          'Para activarlas tienes que ir a los ajustes del sistema y dar permiso a Metal Radar',
-        );
+        Alert.alert(t('profile.permissionDeniedTitle'), t('profile.notificationsDeniedBody'));
       }
     }
   };
 
   const handleLogout = () => {
-    Alert.alert('Cerrar sesión', '¿Seguro que quieres salir?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Cerrar sesión', style: 'destructive', onPress: () => supabase.auth.signOut() },
+    Alert.alert(t('auth.signOut'), t('profile.signOutConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('auth.signOut'),
+        style: 'destructive',
+        onPress: () => supabase.auth.signOut(),
+      },
     ]);
+  };
+
+  const handleChangeLanguage = async (lang: SupportedLanguage) => {
+    try {
+      await changeLanguage(lang);
+    } catch (err: any) {
+      Alert.alert(t('common.error'), err.message);
+    }
   };
 
   return (
@@ -152,7 +171,7 @@ export default function ProfileScreen() {
         </View>
         <View style={{ flex: 1, marginLeft: spacing.md, minWidth: 0 }}>
           <Text variant="monoMD" color="bloodBright">
-            CUENTA
+            {t('profile.accountLabel')}
           </Text>
           <Text variant="displaySM" numberOfLines={1} style={{ marginTop: 4 }}>
             {session?.user.email ?? '—'}
@@ -163,10 +182,10 @@ export default function ProfileScreen() {
       {/* Radio de notificaciones */}
       <View style={styles.section}>
         <Text variant="monoMD" color="muted" style={styles.sectionLabel}>
-          RADIO DE NOTIFICACIONES
+          {t('profile.notificationRadiusLabel')}
         </Text>
         <Text variant="bodySM" color="muted" style={styles.sectionDesc}>
-          Distancia máxima para avisarte de conciertos cerca de tu ubicación de referencia
+          {t('profile.notificationRadiusDesc')}
         </Text>
 
         <View style={styles.radiusDisplay}>
@@ -181,7 +200,7 @@ export default function ProfileScreen() {
             {displayRadius}
           </Text>
           <Text variant="monoMD" color="muted" style={{ marginLeft: spacing.sm }}>
-            KM
+            {t('profile.kmLabel')}
           </Text>
         </View>
 
@@ -199,10 +218,10 @@ export default function ProfileScreen() {
         />
         <View style={styles.sliderLabels}>
           <Text variant="monoSM" color="faint">
-            50 KM
+            {t('profile.kmValue', { value: 50 })}
           </Text>
           <Text variant="monoSM" color="faint">
-            2000 KM
+            {t('profile.kmValue', { value: 2000 })}
           </Text>
         </View>
       </View>
@@ -210,10 +229,10 @@ export default function ProfileScreen() {
       {/* Ubicación de referencia */}
       <View style={styles.section}>
         <Text variant="monoMD" color="muted" style={styles.sectionLabel}>
-          UBICACIÓN DE REFERENCIA
+          {t('profile.homeLocationLabel')}
         </Text>
         <Text variant="bodySM" color="muted" style={styles.sectionDesc}>
-          Solo para notificaciones. El mapa usa siempre tu ubicación actual.
+          {t('profile.homeLocationDesc')}
         </Text>
 
         <View style={styles.locationCard}>
@@ -230,12 +249,12 @@ export default function ProfileScreen() {
           >
             {profile?.home_lat && profile?.home_lng
               ? `${profile.home_lat.toFixed(3)}, ${profile.home_lng.toFixed(3)}`
-              : 'Sin establecer'}
+              : t('profile.locationNotSet')}
           </Text>
         </View>
 
         <Button
-          label={profile?.home_lat ? 'Actualizar ubicación' : 'Usar mi ubicación actual'}
+          label={profile?.home_lat ? t('profile.updateLocation') : t('profile.useCurrentLocation')}
           variant="secondary"
           onPress={handleSetHomeLocation}
           loading={savingLocation}
@@ -246,14 +265,14 @@ export default function ProfileScreen() {
       {/* Preferencias */}
       <View style={styles.section}>
         <Text variant="monoMD" color="muted" style={styles.sectionLabel}>
-          PREFERENCIAS
+          {t('profile.preferencesLabel')}
         </Text>
 
         <View style={styles.toggleRow}>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text variant="bodyLG">Confirmar al quitar bandas</Text>
+            <Text variant="bodyLG">{t('profile.confirmUnfollowTitle')}</Text>
             <Text variant="bodySM" color="muted" style={{ marginTop: 2 }}>
-              Pregunta antes de dejar de seguir
+              {t('profile.confirmUnfollowDesc')}
             </Text>
           </View>
           <TouchableOpacity
@@ -266,10 +285,34 @@ export default function ProfileScreen() {
         </View>
       </View>
 
+      {/* Idioma */}
+      <View style={styles.section}>
+        <Text variant="monoMD" color="muted" style={styles.sectionLabel}>
+          {t('profile.languageLabel')}
+        </Text>
+        <Text variant="bodySM" color="muted" style={styles.sectionDesc}>
+          {t('profile.languageDesc')}
+        </Text>
+
+        <View style={styles.langGroup}>
+          <LanguageOption
+            label={t('profile.languageEs')}
+            selected={currentLang === 'es'}
+            onPress={() => handleChangeLanguage('es')}
+          />
+          <View style={styles.langDivider} />
+          <LanguageOption
+            label={t('profile.languageEn')}
+            selected={currentLang === 'en'}
+            onPress={() => handleChangeLanguage('en')}
+          />
+        </View>
+      </View>
+
       {/* Notificaciones */}
       <View style={styles.section}>
         <Text variant="monoMD" color="muted" style={styles.sectionLabel}>
-          NOTIFICACIONES
+          {t('profile.notificationsLabel')}
         </Text>
 
         <View style={styles.pushCard}>
@@ -280,16 +323,16 @@ export default function ProfileScreen() {
           />
           <View style={{ flex: 1, marginLeft: spacing.md, minWidth: 0 }}>
             <Text variant="body">
-              {pushStatus === 'granted' && 'Notificaciones activadas'}
-              {pushStatus === 'denied' && 'Notificaciones bloqueadas'}
-              {pushStatus === 'undetermined' && 'Notificaciones desactivadas'}
-              {pushStatus === 'unsupported' && 'No disponibles en Expo Go'}
-              {pushStatus === 'loading' && 'Comprobando…'}
+              {pushStatus === 'granted' && t('profile.pushGranted')}
+              {pushStatus === 'denied' && t('profile.pushDenied')}
+              {pushStatus === 'undetermined' && t('profile.pushUndetermined')}
+              {pushStatus === 'unsupported' && t('profile.pushUnsupported')}
+              {pushStatus === 'loading' && t('profile.pushLoading')}
             </Text>
             <Text variant="bodySM" color="muted" style={{ marginTop: 2 }}>
               {pushStatus === 'granted'
-                ? 'Recibirás avisos de nuevos conciertos cerca'
-                : 'Activa para no perderte fechas cerca de ti'}
+                ? t('profile.pushGrantedDesc')
+                : t('profile.pushDisabledDesc')}
             </Text>
           </View>
         </View>
@@ -297,7 +340,11 @@ export default function ProfileScreen() {
         {pushStatus !== 'granted' && pushStatus !== 'unsupported' && pushStatus !== 'loading' && (
           <View style={{ marginTop: spacing.md }}>
             <Button
-              label={pushStatus === 'denied' ? 'Abrir ajustes' : 'Activar notificaciones'}
+              label={
+                pushStatus === 'denied'
+                  ? t('profile.openSettings')
+                  : t('profile.enableNotifications')
+              }
               onPress={
                 pushStatus === 'denied' ? () => Linking.openSettings() : handleEnableNotifications
               }
@@ -310,11 +357,11 @@ export default function ProfileScreen() {
       {/* Acciones */}
       <View style={styles.section}>
         <Text variant="monoMD" color="muted" style={styles.sectionLabel}>
-          MANTENIMIENTO
+          {t('profile.maintenanceLabel')}
         </Text>
 
         <Button
-          label="Sincronizar conciertos"
+          label={t('profile.syncConcerts')}
           onPress={handleSyncConcerts}
           loading={syncing}
           icon={<Ionicons name="sync" size={18} color="#fff" />}
@@ -323,7 +370,7 @@ export default function ProfileScreen() {
         <View style={{ height: spacing.sm }} />
 
         <Button
-          label="Cerrar sesión"
+          label={t('auth.signOut')}
           variant="ghost"
           onPress={handleLogout}
           icon={<Ionicons name="log-out-outline" size={18} color={colors.silver} />}
@@ -333,10 +380,34 @@ export default function ProfileScreen() {
       {/* Footer */}
       <View style={styles.footer}>
         <Text variant="monoSM" color="faint" style={{ textAlign: 'center' }}>
-          METAL RADAR · MVP
+          {t('profile.footerTagline')}
         </Text>
       </View>
     </ScrollView>
+  );
+}
+
+// Componente auxiliar para opciones de idioma
+function LanguageOption({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.langRow, selected && styles.langRowSelected]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <Text variant="body" color={selected ? 'bloodBright' : 'silver'} style={{ flex: 1 }}>
+        {label}
+      </Text>
+      {selected && <Ionicons name="checkmark" size={20} color={colors.bloodBright} />}
+    </TouchableOpacity>
   );
 }
 
@@ -429,5 +500,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.line,
     borderRadius: radius.md,
+  },
+  langGroup: {
+    backgroundColor: colors.panel,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+  },
+  langRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  langRowSelected: {
+    backgroundColor: colors.panel2,
+  },
+  langDivider: {
+    height: 1,
+    backgroundColor: colors.line,
   },
 });

@@ -13,6 +13,8 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './src/lib/queryClient';
 import { colors } from './src/theme';
 import RootNavigator from './src/navigation/RootNavigator';
+import { initI18n } from './src/i18n';
+import { useEffect, useState } from 'react';
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -25,7 +27,13 @@ export default function App() {
     SpaceMono_700Bold,
   });
 
-  if (!fontsLoaded) {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    initI18n().then(() => setReady(true));
+  }, []);
+
+  if (!fontsLoaded || !ready) {
     return (
       <View
         style={{

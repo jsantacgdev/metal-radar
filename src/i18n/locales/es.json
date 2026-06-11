@@ -1,0 +1,131 @@
+{
+  "common": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "loading": "Cargando...",
+    "error": "Algo ha ido mal",
+    "retry": "Reintentar",
+    "back": "Atrás",
+    "search": "Buscar",
+    "follow": "Seguir",
+    "unfollow": "Dejar de seguir",
+    "share": "Compartir",
+    "done": "Listo"
+  },
+  "auth": {
+    "signIn": "Iniciar sesión",
+    "signUp": "Crear cuenta",
+    "signOut": "Cerrar sesión",
+    "email": "Email",
+    "password": "Contraseña",
+    "forgotPassword": "¿Olvidaste tu contraseña?"
+  },
+  "tabs": {
+    "home": "Inicio",
+    "concerts": "Conciertos",
+    "map": "Mapa",
+    "diary": "Diario",
+    "profile": "Perfil"
+  },
+  "home": {
+    "title": "Inicio",
+    "nearbyConcerts": "Conciertos cerca",
+    "upcomingFromBands": "Tus bandas seguidas",
+    "noConcerts": "No hay conciertos por aquí todavía",
+    "festivals": "Festivales"
+  },
+  "concerts": {
+    "title": "Conciertos",
+    "today": "Hoy",
+    "thisWeek": "Esta semana",
+    "thisMonth": "Este mes",
+    "later": "Más adelante",
+    "headliner": "Cabeza de cartel",
+    "buyTickets": "Comprar entradas",
+    "from": "Desde {{price}}€",
+    "soldOut": "Agotado",
+    "festival": "Festival"
+  },
+  "concertDetail": {
+    "lineup": "Cartel",
+    "venue": "Recinto",
+    "date": "Fecha",
+    "price": "Precio",
+    "tickets": "Entradas",
+    "setlist": "Setlist",
+    "iWillGo": "Voy a ir",
+    "iWent": "Asistí",
+    "notInterested": "No me interesa",
+    "addPhoto": "Añadir foto",
+    "rateThisShow": "Puntúa este concierto",
+    "yourNotes": "Tus notas"
+  },
+  "map": {
+    "title": "Mapa",
+    "centerOnMe": "Centrar en mí",
+    "noPermission": "Necesitamos acceso a tu ubicación para mostrar el mapa"
+  },
+  "bands": {
+    "title": "Bandas",
+    "search": "Buscar bandas",
+    "followed": "Siguiendo",
+    "noResults": "Sin resultados",
+    "genre": "Género",
+    "noFollowedBands": "Aún no sigues ninguna banda"
+  },
+  "diary": {
+    "title": "Mi diario",
+    "concertsAttended": "Conciertos asistidos",
+    "noEntries": "Aún no has marcado ningún concierto como asistido",
+    "photos": "Fotos",
+    "rating": "Puntuación",
+    "notes": "Notas"
+  },
+  "profile": {
+    "accountLabel": "CUENTA",
+    "notificationRadiusLabel": "RADIO DE NOTIFICACIONES",
+    "notificationRadiusDesc": "Distancia máxima para avisarte de conciertos cerca de tu ubicación de referencia",
+    "kmLabel": "KM",
+    "kmValue": "{{value}} KM",
+    "homeLocationLabel": "UBICACIÓN DE REFERENCIA",
+    "homeLocationDesc": "Solo para notificaciones. El mapa usa siempre tu ubicación actual.",
+    "locationNotSet": "Sin establecer",
+    "updateLocation": "Actualizar ubicación",
+    "useCurrentLocation": "Usar mi ubicación actual",
+    "preferencesLabel": "PREFERENCIAS",
+    "confirmUnfollowTitle": "Confirmar al quitar bandas",
+    "confirmUnfollowDesc": "Pregunta antes de dejar de seguir",
+    "languageLabel": "IDIOMA",
+    "languageDesc": "Elige el idioma de la aplicación",
+    "languageEs": "Español",
+    "languageEn": "English",
+    "notificationsLabel": "NOTIFICACIONES",
+    "pushGranted": "Notificaciones activadas",
+    "pushDenied": "Notificaciones bloqueadas",
+    "pushUndetermined": "Notificaciones desactivadas",
+    "pushUnsupported": "No disponibles en Expo Go",
+    "pushLoading": "Comprobando…",
+    "pushGrantedDesc": "Recibirás avisos de nuevos conciertos cerca",
+    "pushDisabledDesc": "Activa para no perderte fechas cerca de ti",
+    "enableNotifications": "Activar notificaciones",
+    "openSettings": "Abrir ajustes",
+    "maintenanceLabel": "MANTENIMIENTO",
+    "syncConcerts": "Sincronizar conciertos",
+    "footerTagline": "METAL RADAR · MVP",
+    "syncDoneTitle": "Sincronización completada",
+    "syncDoneBody": "Conciertos: {{synced}}\nDescartados: {{discarded}}\nBandas saltadas: {{skipped}}",
+    "permissionDeniedTitle": "Permiso denegado",
+    "locationPermissionBody": "Necesitamos acceso a la ubicación",
+    "locationSaved": "Ubicación de referencia guardada",
+    "radiusSaveError": "Error al guardar radio",
+    "notificationsEnabled": "Notificaciones activadas",
+    "notificationsDeniedBody": "Para activarlas tienes que ir a los ajustes del sistema y dar permiso a Metal Radar",
+    "signOutConfirm": "¿Seguro que quieres salir?"
+  },
+  "notifications": {
+    "newConcertTitle": "¡Concierto nuevo!",
+    "newConcertBody": "{{band}} toca en {{city}} el {{date}}"
+  }
+}

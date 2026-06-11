@@ -1,0 +1,131 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "retry": "Retry",
+    "back": "Back",
+    "search": "Search",
+    "follow": "Follow",
+    "unfollow": "Unfollow",
+    "share": "Share",
+    "done": "Done"
+  },
+  "auth": {
+    "signIn": "Sign in",
+    "signUp": "Sign up",
+    "signOut": "Sign out",
+    "email": "Email",
+    "password": "Password",
+    "forgotPassword": "Forgot your password?"
+  },
+  "tabs": {
+    "home": "Home",
+    "concerts": "Concerts",
+    "map": "Map",
+    "diary": "Diary",
+    "profile": "Profile"
+  },
+  "home": {
+    "title": "Home",
+    "nearbyConcerts": "Concerts near you",
+    "upcomingFromBands": "From bands you follow",
+    "noConcerts": "No concerts around here yet",
+    "festivals": "Festivals"
+  },
+  "concerts": {
+    "title": "Concerts",
+    "today": "Today",
+    "thisWeek": "This week",
+    "thisMonth": "This month",
+    "later": "Later",
+    "headliner": "Headliner",
+    "buyTickets": "Buy tickets",
+    "from": "From €{{price}}",
+    "soldOut": "Sold out",
+    "festival": "Festival"
+  },
+  "concertDetail": {
+    "lineup": "Lineup",
+    "venue": "Venue",
+    "date": "Date",
+    "price": "Price",
+    "tickets": "Tickets",
+    "setlist": "Setlist",
+    "iWillGo": "I'll go",
+    "iWent": "I attended",
+    "notInterested": "Not interested",
+    "addPhoto": "Add photo",
+    "rateThisShow": "Rate this show",
+    "yourNotes": "Your notes"
+  },
+  "map": {
+    "title": "Map",
+    "centerOnMe": "Center on me",
+    "noPermission": "We need access to your location to show the map"
+  },
+  "bands": {
+    "title": "Bands",
+    "search": "Search bands",
+    "followed": "Following",
+    "noResults": "No results",
+    "genre": "Genre",
+    "noFollowedBands": "You're not following any bands yet"
+  },
+  "diary": {
+    "title": "My diary",
+    "concertsAttended": "Concerts attended",
+    "noEntries": "You haven't marked any concert as attended yet",
+    "photos": "Photos",
+    "rating": "Rating",
+    "notes": "Notes"
+  },
+  "profile": {
+    "accountLabel": "ACCOUNT",
+    "notificationRadiusLabel": "NOTIFICATION RADIUS",
+    "notificationRadiusDesc": "Maximum distance to notify you about concerts near your home location",
+    "kmLabel": "KM",
+    "kmValue": "{{value}} KM",
+    "homeLocationLabel": "HOME LOCATION",
+    "homeLocationDesc": "Only for notifications. The map always uses your current location.",
+    "locationNotSet": "Not set",
+    "updateLocation": "Update location",
+    "useCurrentLocation": "Use my current location",
+    "preferencesLabel": "PREFERENCES",
+    "confirmUnfollowTitle": "Confirm when unfollowing bands",
+    "confirmUnfollowDesc": "Ask before unfollowing",
+    "languageLabel": "LANGUAGE",
+    "languageDesc": "Choose the app language",
+    "languageEs": "Español",
+    "languageEn": "English",
+    "notificationsLabel": "NOTIFICATIONS",
+    "pushGranted": "Notifications enabled",
+    "pushDenied": "Notifications blocked",
+    "pushUndetermined": "Notifications disabled",
+    "pushUnsupported": "Not available in Expo Go",
+    "pushLoading": "Checking…",
+    "pushGrantedDesc": "You'll get alerts for new concerts nearby",
+    "pushDisabledDesc": "Enable to never miss a show near you",
+    "enableNotifications": "Enable notifications",
+    "openSettings": "Open settings",
+    "maintenanceLabel": "MAINTENANCE",
+    "syncConcerts": "Sync concerts",
+    "footerTagline": "METAL RADAR · MVP",
+    "syncDoneTitle": "Sync completed",
+    "syncDoneBody": "Concerts: {{synced}}\nDiscarded: {{discarded}}\nBands skipped: {{skipped}}",
+    "permissionDeniedTitle": "Permission denied",
+    "locationPermissionBody": "We need access to your location",
+    "locationSaved": "Home location saved",
+    "radiusSaveError": "Error saving radius",
+    "notificationsEnabled": "Notifications enabled",
+    "notificationsDeniedBody": "To enable them you need to go to system settings and grant permission to Metal Radar",
+    "signOutConfirm": "Are you sure you want to sign out?"
+  },
+  "notifications": {
+    "newConcertTitle": "New concert!",
+    "newConcertBody": "{{band}} plays in {{city}} on {{date}}"
+  }
+}
