@@ -108,6 +108,13 @@ export function useConcert(concertId: string) {
           },
           { onConflict: 'user_id,concert_id' },
         );
+
+        // Fire-and-forget: si marca como attended, dispara fetch de setlists
+        if (status === 'attended') {
+          supabase.functions
+            .invoke('fetch-setlist', { body: { concertId } })
+            .catch((e) => console.warn('Setlist fetch failed:', e.message));
+        }
       }
     },
     onSuccess: invalidateAll,

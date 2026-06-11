@@ -16,6 +16,8 @@ import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from '../components/ui';
 import BandImage from '../components/BandImage';
 import PhotoGallery from '../components/PhotoGallery';
+import SetlistView from '../components/Setlist';
+import { useSetlists } from '../hooks/useSetlist';
 
 type Props = NativeStackScreenProps<MapStackParamList, 'ConcertDetail'>;
 
@@ -41,6 +43,8 @@ export default function ConcertDetailScreen({ route }: Props) {
       </View>
     );
   }
+  const isAttended = concert.userStatus === 'attended';
+  const { data: setlists = [] } = useSetlists(isAttended ? concert.id : null);
 
   const dateObj = new Date(concert.event_date);
   const month = dateObj
@@ -56,7 +60,6 @@ export default function ConcertDetailScreen({ route }: Props) {
   });
   const timeStr = dateObj.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
   const isPast = dateObj.getTime() < Date.now();
-  const isAttended = concert.userStatus === 'attended';
 
   const openTickets = () => {
     if (concert.ticket_url) Linking.openURL(concert.ticket_url);
@@ -186,6 +189,21 @@ export default function ConcertDetailScreen({ route }: Props) {
 
         {isAttended && concert.userConcertId && (
           <>
+            {/* Setlists - uno por banda */}
+            <View style={{ paddingHorizontal: spacing.xl }}>
+              {concert.bands.map((band) => {
+                const setlist = setlists.find((s) => s.band_id === band.id) ?? null;
+                return (
+                  <SetlistView
+                    key={band.id}
+                    concertId={concert.id}
+                    setlist={setlist}
+                    bandId={band.id}
+                    bandName={band.name}
+                  />
+                );
+              })}
+            </View>
             <Section title="TU VALORACIÓN">
               <RatingPicker
                 value={concert.rating ?? 0}
