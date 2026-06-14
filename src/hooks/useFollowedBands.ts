@@ -1,9 +1,6 @@
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import i18n from '../i18n';
 
 export type FollowedBand = {
   id: string;
@@ -12,9 +9,7 @@ export type FollowedBand = {
   genres: string[];
 };
 
-async function fetchFollowedBands(): Promise<
-  FollowedBand[]
-> {
+async function fetchFollowedBands(): Promise<FollowedBand[]> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -22,16 +17,12 @@ async function fetchFollowedBands(): Promise<
 
   const { data, error } = await supabase
     .from('user_bands')
-    .select(
-      'band:bands ( id, name, image_url, genres )',
-    )
+    .select('band:bands ( id, name, image_url, genres )')
     .eq('user_id', user.id)
     .order('followed_at', { ascending: false });
 
   if (error) throw error;
-  return (data ?? [])
-    .map((row: any) => row.band)
-    .filter(Boolean);
+  return (data ?? []).map((row: any) => row.band).filter(Boolean);
 }
 
 export function useFollowedBands() {
@@ -47,7 +38,7 @@ export function useFollowedBands() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) throw new Error('Sin sesión');
+      if (!user) throw new Error(i18n.t('errors.noSession'));
       const { error } = await supabase
         .from('user_bands')
         .delete()
@@ -70,7 +61,6 @@ export function useFollowedBands() {
     loading: query.isLoading,
     error: query.error?.message ?? null,
     reload: query.refetch,
-    unfollow: (bandId: string) =>
-      unfollowMutation.mutateAsync(bandId),
+    unfollow: (bandId: string) => unfollowMutation.mutateAsync(bandId),
   };
 }

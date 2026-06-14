@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Button, Text } from '../components/ui';
@@ -28,6 +29,7 @@ type Step = 'bands' | 'notifications';
 
 export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [step, setStep] = useState<Step>('bands');
 
   // Estado paso bandas
@@ -67,7 +69,7 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
       if (json.error) throw new Error(json.error);
       setResults(json.bands ?? []);
     } catch (err: any) {
-      Alert.alert('Error de búsqueda', err.message);
+      Alert.alert(t('onboarding.searchErrorTitle'), err.message);
     } finally {
       setSearching(false);
     }
@@ -82,7 +84,6 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
 
   const canContinue = selected.size >= 3;
 
-  // Paso 1 → Paso 2: guardar bandas y avanzar a notificaciones
   const handleBandsContinue = async () => {
     if (!canContinue) return;
     try {
@@ -98,19 +99,18 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
 
       setStep('notifications');
     } catch (err: any) {
-      Alert.alert('Error al guardar', err.message);
+      Alert.alert(t('onboarding.saveErrorTitle'), err.message);
     } finally {
       setSaving(false);
     }
   };
 
-  // Paso 2: activar push
   const handleEnableNotifications = async () => {
     try {
       setEnablingPush(true);
       const ok = await registerForPushNotifications();
       if (!ok) {
-        Alert.alert('Notificaciones desactivadas', 'Puedes activarlas más tarde desde el perfil');
+        Alert.alert(t('onboarding.pushDisabledTitle'), t('onboarding.pushDisabledBody'));
       }
     } catch (err: any) {
       console.warn('Error activando notificaciones:', err);
@@ -120,7 +120,6 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
     }
   };
 
-  // Paso 2: saltar
   const handleSkipNotifications = () => {
     onDone();
   };
@@ -133,13 +132,13 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
       <View style={styles.container}>
         <View style={styles.header}>
           <Text variant="monoMD" color="bloodBright">
-            PASO 1 DE 2 · TU PERFIL
+            {t('onboarding.step1Eyebrow')}
           </Text>
           <Text variant="displayLG" style={styles.title}>
-            Elige tus{'\n'}bandas
+            {t('onboarding.step1Title')}
           </Text>
           <Text variant="body" color="muted" style={styles.subtitle}>
-            Mínimo 3 para empezar a descubrir conciertos
+            {t('onboarding.step1Subtitle')}
           </Text>
 
           <View style={styles.counter}>
@@ -147,7 +146,7 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
               {selected.size}
             </Text>
             <Text variant="monoSM" color="muted" style={{ marginLeft: 6 }}>
-              SELECCIONADAS
+              {t('onboarding.selectedLabel')}
             </Text>
           </View>
         </View>
@@ -156,7 +155,7 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
           <Ionicons name="search" size={18} color={colors.muted} style={styles.searchIcon} />
           <TextInput
             style={styles.input}
-            placeholder="Buscar banda..."
+            placeholder={t('onboarding.searchPlaceholder')}
             placeholderTextColor={colors.faint}
             value={query}
             onChangeText={setQuery}
@@ -213,7 +212,7 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
                 color="muted"
                 style={{ textAlign: 'center', marginTop: spacing.xl }}
               >
-                SIN RESULTADOS
+                {t('onboarding.noResults')}
               </Text>
             ) : null
           }
@@ -221,7 +220,11 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
 
         <View style={styles.footer}>
           <Button
-            label={canContinue ? 'Continuar' : `Faltan ${3 - selected.size} bandas`}
+            label={
+              canContinue
+                ? t('onboarding.continueButton')
+                : t('onboarding.missingBands', { count: 3 - selected.size })
+            }
             onPress={handleBandsContinue}
             loading={saving}
             disabled={!canContinue}
@@ -238,10 +241,10 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
     <View style={[styles.container, { justifyContent: 'space-between' }]}>
       <View style={styles.notifHeader}>
         <Text variant="monoMD" color="bloodBright">
-          PASO 2 DE 2 · NOTIFICACIONES
+          {t('onboarding.step2Eyebrow')}
         </Text>
         <Text variant="displayLG" style={styles.title}>
-          Nunca te{'\n'}pierdas un{'\n'}concierto
+          {t('onboarding.step2Title')}
         </Text>
       </View>
 
@@ -256,21 +259,21 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
           <View style={styles.featureRow}>
             <Ionicons name="radio" size={18} color={colors.bloodBright} />
             <Text variant="body" style={{ marginLeft: spacing.md, flex: 1 }}>
-              Te avisamos cuando una banda que sigues anuncie fecha cerca de ti
+              {t('onboarding.feature1')}
             </Text>
           </View>
 
           <View style={styles.featureRow}>
             <Ionicons name="location" size={18} color={colors.bloodBright} />
             <Text variant="body" style={{ marginLeft: spacing.md, flex: 1 }}>
-              Solo conciertos dentro de tu radio configurable
+              {t('onboarding.feature2')}
             </Text>
           </View>
 
           <View style={styles.featureRow}>
             <Ionicons name="moon-outline" size={18} color={colors.bloodBright} />
             <Text variant="body" style={{ marginLeft: spacing.md, flex: 1 }}>
-              Sin spam, solo cuando hay algo que te interesa
+              {t('onboarding.feature3')}
             </Text>
           </View>
         </View>
@@ -278,14 +281,14 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
 
       <View style={styles.footer}>
         <Button
-          label="Activar notificaciones"
+          label={t('onboarding.enableNotifications')}
           onPress={handleEnableNotifications}
           loading={enablingPush}
           icon={<Ionicons name="notifications" size={18} color="#fff" />}
         />
         <View style={{ height: spacing.sm }} />
         <Button
-          label="Ahora no"
+          label={t('onboarding.notNow')}
           variant="ghost"
           onPress={handleSkipNotifications}
           disabled={enablingPush}

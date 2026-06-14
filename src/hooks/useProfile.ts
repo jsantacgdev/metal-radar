@@ -44,7 +44,7 @@ export function useProfile() {
 
   const updateMutation = useMutation({
     mutationFn: async (patch: Partial<Profile>) => {
-      if (!query.data) throw new Error('Perfil no cargado');
+      if (!query.data) throw new Error(i18n.t('errors.profileNotLoaded'));
       const { error } = await supabase.from('profiles').update(patch).eq('id', query.data.id);
       if (error) throw error;
       return patch;

@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../../lib/supabase';
 import { AuthStackParamList } from '../../navigation/AuthNavigator';
 import { colors, fontFamily, radius, spacing } from '../../theme';
@@ -21,6 +22,7 @@ import { Button, Text } from '../../components/ui';
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
 export default function RegisterScreen({ navigation }: Props) {
+  const { t } = useTranslation();
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,13 +30,13 @@ export default function RegisterScreen({ navigation }: Props) {
 
   const handleRegister = async () => {
     if (!displayName.trim()) {
-      return Alert.alert('Faltan datos', 'Introduce tu nombre o nick');
+      return Alert.alert(t('register.missingDataTitle'), t('register.missingNameBody'));
     }
     if (!email || !password) {
-      return Alert.alert('Faltan datos', 'Introduce email y contraseña');
+      return Alert.alert(t('register.missingDataTitle'), t('register.missingEmailPasswordBody'));
     }
     if (password.length < 6) {
-      return Alert.alert('Contraseña corta', 'Mínimo 6 caracteres');
+      return Alert.alert(t('register.shortPasswordTitle'), t('register.shortPasswordBody'));
     }
     try {
       setLoading(true);
@@ -49,7 +51,7 @@ export default function RegisterScreen({ navigation }: Props) {
       });
       if (error) throw error;
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      Alert.alert(t('common.error'), err.message);
     } finally {
       setLoading(false);
     }
@@ -73,21 +75,21 @@ export default function RegisterScreen({ navigation }: Props) {
           <View style={styles.brand}>
             <Ionicons name="radio" size={28} color={colors.bloodBright} />
             <Text variant="monoMD" color="bloodBright" style={{ marginTop: spacing.md }}>
-              METAL RADAR
+              {t('register.brand')}
             </Text>
             <Text variant="displayXL" style={styles.title}>
-              Crea{'\n'}tu cuenta
+              {t('register.title')}
             </Text>
           </View>
 
           <View style={styles.form}>
             <View style={styles.fieldGroup}>
               <Text variant="monoSM" color="muted" style={styles.label}>
-                NOMBRE O NICK
+                {t('register.nameLabel')}
               </Text>
               <TextInput
                 style={styles.input}
-                placeholder="Cómo te llamamos"
+                placeholder={t('register.namePlaceholder')}
                 placeholderTextColor={colors.faint}
                 value={displayName}
                 onChangeText={setDisplayName}
@@ -99,11 +101,11 @@ export default function RegisterScreen({ navigation }: Props) {
 
             <View style={styles.fieldGroup}>
               <Text variant="monoSM" color="muted" style={styles.label}>
-                EMAIL
+                {t('register.emailLabel')}
               </Text>
               <TextInput
                 style={styles.input}
-                placeholder="tu@correo.com"
+                placeholder={t('register.emailPlaceholder')}
                 placeholderTextColor={colors.faint}
                 value={email}
                 onChangeText={setEmail}
@@ -116,7 +118,7 @@ export default function RegisterScreen({ navigation }: Props) {
 
             <View style={styles.fieldGroup}>
               <Text variant="monoSM" color="muted" style={styles.label}>
-                CONTRASEÑA · MÍN. 6 CARACTERES
+                {t('register.passwordLabel')}
               </Text>
               <TextInput
                 style={styles.input}
@@ -131,14 +133,14 @@ export default function RegisterScreen({ navigation }: Props) {
               />
             </View>
 
-            <Button label="Crear cuenta" onPress={handleRegister} loading={loading} />
+            <Button label={t('register.submit')} onPress={handleRegister} loading={loading} />
 
             <TouchableOpacity style={styles.switchLink} onPress={() => navigation.goBack()}>
               <Text variant="monoMD" color="muted">
-                ¿YA TIENES CUENTA?{' '}
+                {t('register.alreadyHaveAccount')}{' '}
               </Text>
               <Text variant="monoMD" color="bloodBright">
-                INICIA SESIÓN
+                {t('register.signInCta')}
               </Text>
             </TouchableOpacity>
           </View>

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import i18n from '../i18n';
 
 export type ConcertDetail = {
   id: string;
@@ -32,7 +33,7 @@ async function fetchConcert(concertId: string): Promise<ConcertDetail> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error('Sin sesión');
+  if (!user) throw new Error(i18n.t('errors.noSession'));
 
   const { data: concertData, error: cError } = await supabase
     .from('concerts')
@@ -91,7 +92,7 @@ export function useConcert(concertId: string) {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) throw new Error('Sin sesión');
+      if (!user) throw new Error(i18n.t('errors.noSession'));
 
       if (status === null) {
         await supabase
@@ -123,7 +124,7 @@ export function useConcert(concertId: string) {
   const updateRatingMutation = useMutation({
     mutationFn: async (rating: number | null) => {
       const userConcertId = query.data?.userConcertId;
-      if (!userConcertId) throw new Error('Marca primero como asistido');
+      if (!userConcertId) throw new Error(i18n.t('errors.markAttendedFirst'));
       const { error } = await supabase
         .from('user_concerts')
         .update({ rating, updated_at: new Date().toISOString() })
@@ -151,7 +152,7 @@ export function useConcert(concertId: string) {
   const updateNotesMutation = useMutation({
     mutationFn: async (notes: string) => {
       const userConcertId = query.data?.userConcertId;
-      if (!userConcertId) throw new Error('Marca primero como asistido');
+      if (!userConcertId) throw new Error(i18n.t('errors.markAttendedFirst'));
       const trimmed = notes.trim();
       const { error } = await supabase
         .from('user_concerts')

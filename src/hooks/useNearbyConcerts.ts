@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import i18n from '../i18n';
 
 export type ConcertWithDetails = {
   id: string;
@@ -37,7 +38,7 @@ async function fetchNearbyConcerts(userLat: number, userLng: number) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error('Sin sesión');
+  if (!user) throw new Error(i18n.t('errors.noSession'));
 
   // 1. Conciertos normales
   const { data: concertsData, error: cError } = await supabase

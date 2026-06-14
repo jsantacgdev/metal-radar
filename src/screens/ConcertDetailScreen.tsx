@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 import { useConcert } from '../hooks/useConcert';
 import { MapStackParamList } from '../navigation/MapStack';
 import { colors, fontFamily, radius, spacing } from '../theme';
@@ -21,7 +22,14 @@ import { useSetlists } from '../hooks/useSetlist';
 
 type Props = NativeStackScreenProps<MapStackParamList, 'ConcertDetail'>;
 
+// Mapea el lng de i18n al locale BCP-47 que usa Intl/toLocaleDateString
+function localeFromI18n(lng: string): string {
+  if (lng.startsWith('en')) return 'en-US';
+  return 'es-ES';
+}
+
 export default function ConcertDetailScreen({ route }: Props) {
+  const { t, i18n } = useTranslation();
   const { concertId } = route.params;
   const { concert, loading, error, updateStatus, updateRating, updateNotes } =
     useConcert(concertId);
@@ -38,7 +46,7 @@ export default function ConcertDetailScreen({ route }: Props) {
     return (
       <View style={styles.centered}>
         <Text variant="body" color="bloodBright" style={{ textAlign: 'center' }}>
-          {error ?? 'Concierto no encontrado'}
+          {error ?? t('concertDetail.notFound')}
         </Text>
       </View>
     );
@@ -46,19 +54,20 @@ export default function ConcertDetailScreen({ route }: Props) {
   const isAttended = concert.userStatus === 'attended';
   const { data: setlists = [] } = useSetlists(isAttended ? concert.id : null);
 
+  const locale = localeFromI18n(i18n.language);
   const dateObj = new Date(concert.event_date);
   const month = dateObj
-    .toLocaleDateString('es-ES', { month: 'short' })
+    .toLocaleDateString(locale, { month: 'short' })
     .toUpperCase()
     .replace('.', '');
   const day = dateObj.getDate().toString();
-  const weekday = dateObj.toLocaleDateString('es-ES', { weekday: 'long' }).toUpperCase();
-  const fullDate = dateObj.toLocaleDateString('es-ES', {
+  const weekday = dateObj.toLocaleDateString(locale, { weekday: 'long' }).toUpperCase();
+  const fullDate = dateObj.toLocaleDateString(locale, {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
   });
-  const timeStr = dateObj.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  const timeStr = dateObj.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
   const isPast = dateObj.getTime() < Date.now();
 
   const openTickets = () => {
@@ -81,14 +90,14 @@ export default function ConcertDetailScreen({ route }: Props) {
           />
           <View style={styles.heroText}>
             <Text variant="monoMD" color="bloodBright">
-              {isPast ? 'CONCIERTO PASADO' : 'PRÓXIMO CONCIERTO'}
+              {isPast ? t('concertDetail.pastConcert') : t('concertDetail.upcomingConcert')}
             </Text>
             <Text variant="displayLG" style={{ marginTop: spacing.sm }} numberOfLines={2}>
-              {concert.bands[0]?.name ?? 'Sin banda'}
+              {concert.bands[0]?.name ?? t('concertDetail.noBand')}
             </Text>
             {concert.bands.length > 1 && (
               <Text variant="monoSM" color="silver" style={{ marginTop: 6 }} numberOfLines={1}>
-                +{concert.bands.length - 1} BANDA{concert.bands.length > 2 ? 'S' : ''}
+                {t('concertDetail.moreBands', { count: concert.bands.length - 1 })}
               </Text>
             )}
           </View>
@@ -123,7 +132,7 @@ export default function ConcertDetailScreen({ route }: Props) {
             </Text>
             <Text variant="monoSM" color="muted" style={{ marginTop: 4 }} numberOfLines={1}>
               {concert.venue.city ? `${concert.venue.city.toUpperCase()} · ` : ''}
-              {timeStr}H
+              {t('concertDetail.timeFormat', { time: timeStr })}
             </Text>
             <Text variant="monoSM" color="silver" style={{ marginTop: 4 }} numberOfLines={1}>
               {weekday} · {fullDate}
@@ -132,7 +141,7 @@ export default function ConcertDetailScreen({ route }: Props) {
         </View>
 
         {(concert.price_min ?? concert.price_max) != null && (
-          <Section title="PRECIO">
+          <Section title={t('concertDetail.priceTitle')}>
             <Text variant="displaySM">
               {concert.price_min === concert.price_max
                 ? `${concert.price_min} ${concert.currency}`
@@ -142,7 +151,7 @@ export default function ConcertDetailScreen({ route }: Props) {
         )}
 
         {concert.bands.length > 0 && (
-          <Section title="CARTEL">
+          <Section title={t('concertDetail.lineupTitle')}>
             {concert.bands.map((b, i) => (
               <View
                 key={b.id}
@@ -159,19 +168,21 @@ export default function ConcertDetailScreen({ route }: Props) {
           </Section>
         )}
 
-        <Section title={isPast ? 'ASISTENCIA' : 'TU ESTADO'}>
+        <Section
+          title={isPast ? t('concertDetail.attendanceTitle') : t('concertDetail.statusTitle')}
+        >
           <View style={styles.actionsRow}>
             {!isPast && (
               <>
                 <ActionPill
-                  label="Me interesa"
+                  label={t('concertDetail.statusInterested')}
                   active={concert.userStatus === 'interested'}
                   onPress={() =>
                     updateStatus(concert.userStatus === 'interested' ? null : 'interested')
                   }
                 />
                 <ActionPill
-                  label="Voy"
+                  label={t('concertDetail.statusGoing')}
                   active={concert.userStatus === 'going'}
                   highlight
                   onPress={() => updateStatus(concert.userStatus === 'going' ? null : 'going')}
@@ -179,7 +190,7 @@ export default function ConcertDetailScreen({ route }: Props) {
               </>
             )}
             <ActionPill
-              label="Ya fui"
+              label={t('concertDetail.statusAttended')}
               active={concert.userStatus === 'attended'}
               highlight
               onPress={() => updateStatus(concert.userStatus === 'attended' ? null : 'attended')}
@@ -204,14 +215,14 @@ export default function ConcertDetailScreen({ route }: Props) {
                 );
               })}
             </View>
-            <Section title="TU VALORACIÓN">
+            <Section title={t('concertDetail.ratingTitle')}>
               <RatingPicker
                 value={concert.rating ?? 0}
                 onChange={(v) => updateRating(v === concert.rating ? null : v)}
               />
             </Section>
 
-            <Section title="NOTAS">
+            <Section title={t('concertDetail.notesTitle')}>
               <NotesEditor
                 initialValue={concert.notes ?? ''}
                 onSave={(text) => updateNotes(text)}
@@ -228,7 +239,7 @@ export default function ConcertDetailScreen({ route }: Props) {
           <View style={styles.statusBanner}>
             <Ionicons name="alert-circle" size={18} color={colors.bloodBright} />
             <Text variant="monoSM" color="bloodBright" style={{ marginLeft: 8 }}>
-              ESTADO: {concert.status.toUpperCase()}
+              {t('concertDetail.statusBanner', { status: concert.status.toUpperCase() })}
             </Text>
           </View>
         )}
@@ -247,7 +258,7 @@ export default function ConcertDetailScreen({ route }: Props) {
                 marginLeft: spacing.sm,
               }}
             >
-              Comprar entradas
+              {t('concertDetail.buyTickets')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -344,6 +355,7 @@ function NotesEditor({
   initialValue: string;
   onSave: (text: string) => void;
 }) {
+  const { t } = useTranslation();
   const [text, setText] = useState(initialValue);
   const [focused, setFocused] = useState(false);
 
@@ -353,8 +365,8 @@ function NotesEditor({
 
   useEffect(() => {
     if (text === initialValue) return;
-    const t = setTimeout(() => onSave(text), 800);
-    return () => clearTimeout(t);
+    const tm = setTimeout(() => onSave(text), 800);
+    return () => clearTimeout(tm);
   }, [text, initialValue, onSave]);
 
   return (
@@ -367,7 +379,7 @@ function NotesEditor({
           setFocused(false);
           if (text !== initialValue) onSave(text);
         }}
-        placeholder="Cómo fue el concierto, qué temas tocaron, anécdotas, lo que recuerdes..."
+        placeholder={t('concertDetail.notesPlaceholder')}
         placeholderTextColor={colors.muted}
         multiline
         scrollEnabled={false}
@@ -375,7 +387,7 @@ function NotesEditor({
       />
       {text.length > 0 && (
         <Text variant="monoSM" color="muted" style={{ marginTop: 6, textAlign: 'right' }}>
-          {text.length} caracteres
+          {t('concertDetail.charactersCount', { count: text.length })}
         </Text>
       )}
     </View>

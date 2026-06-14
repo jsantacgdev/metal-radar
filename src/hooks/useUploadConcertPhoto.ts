@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { supabase } from '../lib/supabase';
+import i18n from '../i18n';
 
 type Args = {
   userConcertId: string;
@@ -11,7 +12,7 @@ type Args = {
 async function pickImage(source: 'camera' | 'library') {
   if (source === 'camera') {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) throw new Error('Permiso de cámara denegado');
+    if (!perm.granted) throw new Error(i18n.t('errors.cameraPermissionDenied'));
     return ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
       quality: 0.9,
@@ -19,7 +20,7 @@ async function pickImage(source: 'camera' | 'library') {
     });
   } else {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) throw new Error('Permiso de galería denegado');
+    if (!perm.granted) throw new Error(i18n.t('errors.libraryPermissionDenied'));
     return ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       quality: 0.9,
@@ -38,27 +39,22 @@ export function useUploadConcertPhoto() {
 
       const asset = result.assets[0];
 
-      // Resize a 1600px max + jpeg 80%
       const manipulated = await ImageManipulator.manipulateAsync(
         asset.uri,
         [{ resize: { width: 1600 } }],
         { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG },
       );
 
-      // Leer bytes
       const arrayBuffer = await fetch(manipulated.uri).then((res) => res.arrayBuffer());
 
-      // Sesión actual
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) throw new Error('Sin sesión');
+      if (!user) throw new Error(i18n.t('errors.noSession'));
 
-      // Path: {user_id}/{user_concert_id}/{timestamp}.jpg
       const filename = `${Date.now()}.jpg`;
       const storagePath = `${user.id}/${userConcertId}/${filename}`;
 
-      // Subir a Storage
       const { error: uploadError } = await supabase.storage
         .from('concert-photos')
         .upload(storagePath, arrayBuffer, {
@@ -67,7 +63,6 @@ export function useUploadConcertPhoto() {
         });
       if (uploadError) throw uploadError;
 
-      // Registrar en BD
       const takenAt = asset.exif?.DateTimeOriginal
         ? new Date(asset.exif.DateTimeOriginal.replace(/:/, '-').replace(/:/, '-'))
         : null;
@@ -80,7 +75,6 @@ export function useUploadConcertPhoto() {
       });
 
       if (insertError) {
-        // Rollback del archivo si falla la inserción
         await supabase.storage.from('concert-photos').remove([storagePath]);
         throw insertError;
       }

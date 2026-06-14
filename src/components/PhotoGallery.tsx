@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { ConcertPhoto, useConcertPhotos } from '../hooks/useConcertPhotos';
 import { useUploadConcertPhoto } from '../hooks/useUploadConcertPhoto';
 import { useDeleteConcertPhoto } from '../hooks/useDeleteConcertPhoto';
@@ -25,6 +26,7 @@ const PHOTO_SIZE = 100;
 const MAX_PHOTOS = 10;
 
 export default function PhotoGallery({ userConcertId }: Props) {
+  const { t } = useTranslation();
   const { data: photos = [], isLoading } = useConcertPhotos(userConcertId);
   const upload = useUploadConcertPhoto();
   const remove = useDeleteConcertPhoto();
@@ -33,32 +35,32 @@ export default function PhotoGallery({ userConcertId }: Props) {
   const canAddMore = photos.length < MAX_PHOTOS;
 
   const handleAdd = () => {
-    Alert.alert('Añadir foto', '¿Cómo quieres añadirla?', [
+    Alert.alert(t('photoGallery.addTitle'), t('photoGallery.addBody'), [
       {
-        text: 'Cámara',
+        text: t('photoGallery.camera'),
         onPress: () =>
           upload.mutate(
             { userConcertId, source: 'camera' },
-            { onError: (e: Error) => Alert.alert('Error', e.message) },
+            { onError: (e: Error) => Alert.alert(t('common.error'), e.message) },
           ),
       },
       {
-        text: 'Galería',
+        text: t('photoGallery.library'),
         onPress: () =>
           upload.mutate(
             { userConcertId, source: 'library' },
-            { onError: (e: Error) => Alert.alert('Error', e.message) },
+            { onError: (e: Error) => Alert.alert(t('common.error'), e.message) },
           ),
       },
-      { text: 'Cancelar', style: 'cancel' },
+      { text: t('common.cancel'), style: 'cancel' },
     ]);
   };
 
   const handleDelete = (photo: ConcertPhoto) => {
-    Alert.alert('Borrar foto', '¿Seguro que quieres borrarla?', [
-      { text: 'Cancelar', style: 'cancel' },
+    Alert.alert(t('photoGallery.deleteTitle'), t('photoGallery.deleteBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Borrar',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: () => {
           setViewing(null);
@@ -76,7 +78,7 @@ export default function PhotoGallery({ userConcertId }: Props) {
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <Text variant="monoMD" color="muted">
-          FOTOS · {photos.length}/{MAX_PHOTOS}
+          {t('photoGallery.headerLabel', { count: photos.length, max: MAX_PHOTOS })}
         </Text>
         {upload.isPending && <ActivityIndicator size="small" color={colors.bloodBright} />}
       </View>
@@ -89,7 +91,7 @@ export default function PhotoGallery({ userConcertId }: Props) {
         <TouchableOpacity style={styles.emptyBox} onPress={handleAdd} activeOpacity={0.7}>
           <Ionicons name="camera-outline" size={28} color={colors.silver} />
           <Text variant="bodySM" color="silver" style={{ marginTop: spacing.sm }}>
-            Añade fotos del concierto
+            {t('photoGallery.emptyHint')}
           </Text>
         </TouchableOpacity>
       ) : (
@@ -119,7 +121,6 @@ export default function PhotoGallery({ userConcertId }: Props) {
         />
       )}
 
-      {/* Modal viewer */}
       <Modal
         visible={!!viewing}
         transparent

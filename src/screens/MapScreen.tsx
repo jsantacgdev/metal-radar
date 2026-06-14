@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { useNearbyConcerts, ConcertWithDetails } from '../hooks/useNearbyConcerts';
 import { MapStackParamList } from '../navigation/MapStack';
 import { useProfile } from '../hooks/useProfile';
@@ -18,10 +19,18 @@ import { useFocusEffect } from '@react-navigation/native';
 const LOCATION_CACHE_KEY = 'last_known_location';
 const LOCATION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
+function localeFromI18n(lng: string): string {
+  if (lng.startsWith('en')) return 'en-US';
+  return 'es-ES';
+}
+
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<MapStackParamList>>();
   const { profile } = useProfile();
+  const { t, i18n } = useTranslation();
+
+  const locale = localeFromI18n(i18n.language);
 
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
@@ -61,7 +70,6 @@ export default function MapScreen() {
     return Array.from(map.values());
   }, [visible]);
 
-  // Convertir grupos a markers de Leaflet
   const markers = useMemo<LeafletMarker[]>(() => {
     return byVenue.map((group) => {
       const isFar = group.concerts.every((c) => c.distance_km > radiusKm);
@@ -93,12 +101,10 @@ export default function MapScreen() {
   const lastFreshRef = useRef<number>(0);
 
   const loadLocation = useCallback(async (forceFresh = false) => {
-    // Throttle: si pedimos fresh y ya hemos pedido hace <30s, ignoramos
     if (forceFresh && Date.now() - lastFreshRef.current < 30_000) {
       return;
     }
 
-    // Si no se fuerza fresh, intentamos cache primero
     if (!forceFresh) {
       try {
         const cached = await AsyncStorage.getItem(LOCATION_CACHE_KEY);
@@ -136,12 +142,10 @@ export default function MapScreen() {
     }
   }, []);
 
-  // Carga inicial al montar
   useEffect(() => {
     loadLocation();
   }, [loadLocation]);
 
-  // Refrescar cada vez que se enfoca el tab (con throttle de 30s dentro de loadLocation)
   useFocusEffect(
     useCallback(() => {
       loadLocation(true);
@@ -153,10 +157,10 @@ export default function MapScreen() {
       <View style={styles.centered}>
         <Ionicons name="location-outline" size={48} color={colors.bloodBright} />
         <Text variant="displaySM" style={{ marginTop: spacing.lg, textAlign: 'center' }}>
-          Permiso de ubicación necesario
+          {t('map.permissionTitle')}
         </Text>
         <Text variant="body" color="muted" style={{ marginTop: spacing.sm, textAlign: 'center' }}>
-          Actívalo en los ajustes del sistema para ver conciertos cerca
+          {t('map.permissionDesc')}
         </Text>
       </View>
     );
@@ -167,7 +171,7 @@ export default function MapScreen() {
       <View style={styles.centered}>
         <ActivityIndicator color={colors.bloodBright} size="large" />
         <Text variant="monoMD" color="muted" style={{ marginTop: spacing.lg }}>
-          OBTENIENDO UBICACIÓN...
+          {t('map.gettingLocation')}
         </Text>
       </View>
     );
@@ -200,10 +204,10 @@ export default function MapScreen() {
                 textTransform: 'uppercase',
               }}
             >
-              Mapa
+              {t('map.title')}
             </Text>
             <Text variant="monoSM" color="muted">
-              {visible.length} CONCIERTOS · {concerts.length} CERCA
+              {t('map.headerSummary', { total: visible.length, near: concerts.length })}
             </Text>
           </View>
         </View>
@@ -213,7 +217,7 @@ export default function MapScreen() {
         <View style={[styles.loadingBanner, { top: insets.top + 80 }]}>
           <ActivityIndicator color={colors.bloodBright} size="small" />
           <Text variant="monoSM" color="silver" style={{ marginLeft: spacing.sm }}>
-            CARGANDO CONCIERTOS...
+            {t('map.loadingConcerts')}
           </Text>
         </View>
       )}
@@ -221,10 +225,10 @@ export default function MapScreen() {
       {!loading && visible.length === 0 && (
         <View style={styles.emptyCard}>
           <Text variant="displaySM" style={{ textAlign: 'center' }}>
-            Sin conciertos disponibles
+            {t('map.emptyTitle')}
           </Text>
           <Text variant="bodySM" color="muted" style={styles.emptyText}>
-            Sigue más bandas en el Radar o vuelve más tarde
+            {t('map.emptyDesc')}
           </Text>
         </View>
       )}
@@ -234,10 +238,10 @@ export default function MapScreen() {
           <View style={styles.cardHeader}>
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text variant="monoSM" color="bloodBright">
-                {selectedVenue.concerts[0].distance_km.toFixed(0)} KM ·{' '}
-                {selectedVenue.concerts.length === 1
-                  ? '1 CONCIERTO'
-                  : `${selectedVenue.concerts.length} CONCIERTOS`}
+                {t('map.venueSummary', {
+                  km: selectedVenue.concerts[0].distance_km.toFixed(0),
+                  count: selectedVenue.concerts.length,
+                })}
               </Text>
               <Text variant="displaySM" numberOfLines={1} style={{ marginTop: 4 }}>
                 {selectedVenue.venue.name}
@@ -262,7 +266,7 @@ export default function MapScreen() {
             {selectedVenue.concerts.map((c, i) => {
               const date = new Date(c.event_date);
               const month = date
-                .toLocaleDateString('es-ES', { month: 'short' })
+                .toLocaleDateString(locale, { month: 'short' })
                 .toUpperCase()
                 .replace('.', '');
               const day = date.getDate().toString();
@@ -286,7 +290,6 @@ export default function MapScreen() {
                   }}
                   activeOpacity={0.7}
                 >
-                  {/* Contenedor de Fecha */}
                   <View style={styles.dateBox}>
                     <Text
                       style={{
@@ -310,7 +313,6 @@ export default function MapScreen() {
                     </Text>
                   </View>
 
-                  {/* Imagen de la banda principal o del festival */}
                   {!c.is_festival && (
                     <BandImage
                       url={firstBand?.image_url ?? null}
@@ -331,7 +333,7 @@ export default function MapScreen() {
                           style={{ marginTop: 2 }}
                           numberOfLines={1}
                         >
-                          Bandas:{' '}
+                          {t('map.bandsPrefix')}{' '}
                           {c.bands
                             .map((b) => b.name)
                             .join(' · ')

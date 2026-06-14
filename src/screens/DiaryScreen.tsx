@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { DiaryEntry, useDiary } from '../hooks/useDiary';
 import { useDiaryStats } from '../hooks/useDiaryStats';
 import { useUpdateConcertStatus } from '../hooks/useUpdateConcertStatus';
@@ -23,12 +24,20 @@ type Filter = 'upcoming' | 'past';
 
 const CURRENT_YEAR = new Date().getFullYear();
 
+function localeFromI18n(lng: string): string {
+  if (lng.startsWith('en')) return 'en-US';
+  return 'es-ES';
+}
+
 export default function DiaryScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<DiaryStackParamList>>();
+  const { t, i18n } = useTranslation();
   const { entries, loading, error, reload } = useDiary();
   const stats = useDiaryStats(entries, CURRENT_YEAR);
   const [filter, setFilter] = useState<Filter>('past');
+
+  const locale = localeFromI18n(i18n.language);
 
   useFocusEffect(
     useCallback(() => {
@@ -50,25 +59,24 @@ export default function DiaryScreen() {
 
   const filtered = filter === 'upcoming' ? upcoming : past;
 
-  // ¿Mostrar banner Wrapped? Por ahora siempre, en Fase 3 se condicionará a diciembre
   const showWrappedBanner = filter === 'past' && stats.shows > 0;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.md }]}>
       <View style={styles.header}>
         <Text variant="monoMD" color="muted">
-          TU HISTORIAL
+          {t('diary.headerEyebrow')}
         </Text>
         <Text variant="displayLG" style={{ marginTop: 4 }}>
-          Diario
+          {t('diary.title')}
         </Text>
       </View>
 
-      {/* Stats strip: SHOWS / BANDAS / AÑO */}
+      {/* Stats strip */}
       <View style={styles.statsStrip}>
-        <StatCard value={stats.shows.toString()} label="SHOWS" accent />
-        <StatCard value={stats.bands.toString()} label="BANDAS" />
-        <StatCard value={CURRENT_YEAR.toString()} label="AÑO" />
+        <StatCard value={stats.shows.toString()} label={t('diary.statShows')} accent />
+        <StatCard value={stats.bands.toString()} label={t('diary.statBands')} />
+        <StatCard value={CURRENT_YEAR.toString()} label={t('diary.statYear')} />
       </View>
 
       {/* Banner Wrapped */}
@@ -84,9 +92,9 @@ export default function DiaryScreen() {
             <Ionicons name="flame" size={18} color={colors.bloodBright} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text variant="displaySM">Tu Wrapped {CURRENT_YEAR} está listo</Text>
+            <Text variant="displaySM">{t('diary.wrappedTitle', { year: CURRENT_YEAR })}</Text>
             <Text variant="monoSM" color="muted" style={{ marginTop: 2 }}>
-              {stats.km.toLocaleString('es-ES')} km de directo
+              {t('diary.wrappedKm', { km: stats.km.toLocaleString(locale) })}
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.silver} />
@@ -95,12 +103,12 @@ export default function DiaryScreen() {
 
       <View style={styles.tabsRow}>
         <TabPill
-          label={`Pasados · ${past.length}`}
+          label={`${t('diary.tabPast')} · ${past.length}`}
           active={filter === 'past'}
           onPress={() => setFilter('past')}
         />
         <TabPill
-          label={`Próximos · ${upcoming.length}`}
+          label={`${t('diary.tabUpcoming')} · ${upcoming.length}`}
           active={filter === 'upcoming'}
           onPress={() => setFilter('upcoming')}
         />
@@ -108,7 +116,7 @@ export default function DiaryScreen() {
 
       {filter === 'past' && (
         <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
-          RECIENTES
+          {t('diary.recent')}
         </Text>
       )}
 
@@ -127,12 +135,10 @@ export default function DiaryScreen() {
       ) : filtered.length === 0 ? (
         <View style={styles.centered}>
           <Text variant="displaySM" color="silver" style={{ textAlign: 'center' }}>
-            {filter === 'upcoming' ? 'Sin próximos conciertos' : 'Sin conciertos pasados'}
+            {filter === 'upcoming' ? t('diary.emptyUpcomingTitle') : t('diary.emptyPastTitle')}
           </Text>
           <Text variant="bodySM" color="muted" style={styles.emptySub}>
-            {filter === 'upcoming'
-              ? 'Marca conciertos como "Voy" desde el mapa'
-              : 'Aquí aparecerán los conciertos a los que asistas'}
+            {filter === 'upcoming' ? t('diary.emptyUpcomingDesc') : t('diary.emptyPastDesc')}
           </Text>
         </View>
       ) : (
@@ -150,6 +156,7 @@ export default function DiaryScreen() {
           renderItem={({ item }) => (
             <DiaryItem
               entry={item}
+              locale={locale}
               onPress={() => navigation.navigate('ConcertDetail', { concertId: item.concert_id })}
             />
           )}
@@ -210,7 +217,6 @@ function TabPill({
 }
 
 function RatingTriangles({ rating }: { rating: number }) {
-  // rating 0-5
   return (
     <View style={{ flexDirection: 'row', gap: 2 }}>
       {[1, 2, 3, 4, 5].map((i) => (
@@ -225,13 +231,22 @@ function RatingTriangles({ rating }: { rating: number }) {
   );
 }
 
-function DiaryItem({ entry, onPress }: { entry: DiaryEntry; onPress: () => void }) {
+function DiaryItem({
+  entry,
+  locale,
+  onPress,
+}: {
+  entry: DiaryEntry;
+  locale: string;
+  onPress: () => void;
+}) {
+  const { t } = useTranslation();
   const date = new Date(entry.concert.event_date);
   const updateStatus = useUpdateConcertStatus();
   const firstBand = entry.concert.bands[0];
 
   const dateLabel = date
-    .toLocaleDateString('es-ES', {
+    .toLocaleDateString(locale, {
       day: '2-digit',
       month: 'short',
       year: '2-digit',
@@ -275,19 +290,16 @@ function DiaryItem({ entry, onPress }: { entry: DiaryEntry; onPress: () => void 
           {entry.concert.venue.city ? ` · ${entry.concert.venue.city.toUpperCase()}` : ''}
         </Text>
 
-        {/* Rating + (placeholder Fase 2 setlist) */}
         {entry.status === 'attended' && (
           <View style={styles.metaRow}>
             <RatingTriangles rating={entry.rating ?? 0} />
-            {/* Fase 2: <Text variant="monoSM" color="muted">19 TEMAS · SETLIST REAL</Text> */}
           </View>
         )}
 
-        {/* CTA inline para confirmar asistencia */}
         {isPastGoing && (
           <View style={styles.confirmRow}>
             <Text variant="monoSM" color="silver" style={{ marginRight: spacing.sm }}>
-              ¿FUISTE?
+              {t('diary.didYouGo')}
             </Text>
             <TouchableOpacity
               style={[styles.confirmBtn, styles.confirmBtnYes]}
@@ -296,7 +308,7 @@ function DiaryItem({ entry, onPress }: { entry: DiaryEntry; onPress: () => void 
               disabled={updateStatus.isPending}
             >
               <Text variant="monoSM" style={{ color: colors.ink }}>
-                SÍ
+                {t('diary.confirmYes')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -306,7 +318,7 @@ function DiaryItem({ entry, onPress }: { entry: DiaryEntry; onPress: () => void 
               disabled={updateStatus.isPending}
             >
               <Text variant="monoSM" color="silver">
-                NO
+                {t('diary.confirmNo')}
               </Text>
             </TouchableOpacity>
           </View>

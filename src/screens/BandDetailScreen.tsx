@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { useBandInfo, BandMember } from '../hooks/useBandInfo';
 import { colors, fontFamily, radius, spacing } from '../theme';
@@ -22,6 +23,7 @@ async function fetchBandBasics(bandId: string) {
 }
 
 export default function BandDetailScreen({ route }: Props) {
+  const { t } = useTranslation();
   const { bandId } = route.params;
 
   const { data: basics } = useQuery({
@@ -55,7 +57,7 @@ export default function BandDetailScreen({ route }: Props) {
         />
         <View style={styles.heroText}>
           <Text variant="monoMD" color="bloodBright">
-            FICHA DE BANDA
+            {t('bandDetail.heroLabel')}
           </Text>
           <Text variant="displayMD" style={{ marginTop: spacing.sm }}>
             {basics?.name ?? '...'}
@@ -75,7 +77,7 @@ export default function BandDetailScreen({ route }: Props) {
         <View style={styles.centered}>
           <ActivityIndicator color={colors.bloodBright} />
           <Text variant="monoSM" color="muted" style={{ marginTop: spacing.md }}>
-            CARGANDO INFO...
+            {t('bandDetail.loadingInfo')}
           </Text>
         </View>
       )}
@@ -93,18 +95,23 @@ export default function BandDetailScreen({ route }: Props) {
           {/* Meta strip */}
           <View style={styles.metaStrip}>
             {info.formed_year && (
-              <MetaItem label="DESDE" value={info.formed_year.toString()} accent center />
+              <MetaItem
+                label={t('bandDetail.metaSince')}
+                value={info.formed_year.toString()}
+                accent
+                center
+              />
             )}
             {info.members && info.members.length > 0 && (
               <MetaItem
-                label="MIEMBROS"
+                label={t('bandDetail.metaMembers')}
                 value={info.members.filter((m) => m.current).length.toString()}
                 center
               />
             )}
             {info.genres && info.genres.length > 0 && (
               <MetaItem
-                label="GÉNERO"
+                label={t('bandDetail.metaGenre')}
                 // Si solo hay 1 género, lo mostramos. Si hay más, cogemos el segundo (índice 1)
                 value={info.genres.length > 1 ? info.genres[1] : info.genres[0]}
                 smallValue
@@ -115,7 +122,7 @@ export default function BandDetailScreen({ route }: Props) {
 
           {/* Bio */}
           {info.bio && (
-            <Section title="BIOGRAFÍA">
+            <Section title={t('bandDetail.bioTitle')}>
               <Text variant="body" color="silver" style={{ lineHeight: 22 }}>
                 {info.bio.length > 1000 ? info.bio.slice(0, 1000) + '…' : info.bio}
               </Text>
@@ -124,7 +131,7 @@ export default function BandDetailScreen({ route }: Props) {
 
           {/* Géneros */}
           {info.genres && info.genres.length > 1 && (
-            <Section title="ESTILO">
+            <Section title={t('bandDetail.styleTitle')}>
               <View style={styles.tagsRow}>
                 {info.genres.map((g, i) => (
                   <Tag key={i} tone={i === 0 ? 'blood' : 'steel'}>
@@ -137,7 +144,7 @@ export default function BandDetailScreen({ route }: Props) {
 
           {/* Miembros */}
           {info.members && info.members.length > 0 && (
-            <Section title="FORMACIÓN">
+            <Section title={t('bandDetail.lineupTitle')}>
               {info.members.map((m: BandMember, i: number) => (
                 <View key={i} style={styles.memberRow}>
                   <View style={styles.memberDot}>
@@ -153,13 +160,13 @@ export default function BandDetailScreen({ route }: Props) {
                     {(m.begin || m.end || m.current) && (
                       <Text variant="monoSM" color="muted" style={{ marginTop: 4 }}>
                         {m.begin ? m.begin.substring(0, 4) : '?'} —{' '}
-                        {m.current ? 'PRESENTE' : m.end ? m.end.substring(0, 4) : '?'}
+                        {m.current ? t('bandDetail.present') : m.end ? m.end.substring(0, 4) : '?'}
                       </Text>
                     )}
                   </View>
                   {m.current && (
                     <Text variant="monoSM" color="bloodBright">
-                      ACTUAL
+                      {t('bandDetail.current')}
                     </Text>
                   )}
                 </View>
@@ -190,11 +197,11 @@ function MetaItem({
       <Text
         style={{
           fontFamily: fontFamily.displayBold,
-          fontSize: smallValue ? 12 : 22, // <-- Texto más pequeño si smallValue es true
+          fontSize: smallValue ? 12 : 22,
           letterSpacing: -0.4,
           color: accent ? colors.bloodBright : colors.bright,
           textTransform: smallValue ? 'capitalize' : 'uppercase',
-          textAlign: center ? 'center' : 'left', // <-- Centrado
+          textAlign: center ? 'center' : 'left',
         }}
         numberOfLines={1}
       >

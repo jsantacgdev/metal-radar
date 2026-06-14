@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import i18n from '../i18n';
 
 export type DiaryEntry = {
   id: string;
@@ -31,7 +32,7 @@ async function fetchDiary(): Promise<DiaryEntry[]> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error('Sin sesión');
+  if (!user) throw new Error(i18n.t('errors.noSession'));
 
   const { data, error } = await supabase
     .from('user_concerts')

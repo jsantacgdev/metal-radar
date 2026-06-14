@@ -1,524 +1,799 @@
-import { useCallback, useState } from 'react';
-import { Alert, Linking, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  LayoutAnimation,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Slider from '@react-native-community/slider';
-import * as Location from 'expo-location';
-import { supabase } from '../lib/supabase';
-import { useAuth } from '../hooks/useAuth';
-import { useProfile } from '../hooks/useProfile';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useQueryClient } from '@tanstack/react-query';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
+import PulsingBadge from '../components/PulsingBadge';
+import BandImage from '../components/BandImage';
+import { useFollowedBands, FollowedBand } from '../hooks/useFollowedBands';
+import { useRecommendations, RecommendedBand } from '../hooks/useRecommendations';
+import { followBand, getOrCreateBandId, syncBandConcerts } from '../lib/bands';
 import { usePreference } from '../hooks/usePreference';
 import { colors, fontFamily, radius, spacing } from '../theme';
-import { Button, Text } from '../components/ui';
-import { registerForPushNotifications, checkNotificationPermissions } from '../lib/notifications';
-import { useQueryClient } from '@tanstack/react-query';
-import { useFocusEffect } from '@react-navigation/native';
-import { useTranslation } from 'react-i18next';
-import { useLanguage } from '../i18n/useLanguage';
-import { SupportedLanguage } from '../i18n';
+import { Text } from '../components/ui';
+import { supabase } from '../lib/supabase';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RadarStackParamList } from '../navigation/RadarStack';
 
-export default function ProfileScreen() {
+type Tab = 'foryou' | 'mybands';
+
+function localeFromI18n(lng: string): string {
+  if (lng.startsWith('en')) return 'en-US';
+  return 'es-ES';
+}
+
+export default function RadarScreen() {
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation<NativeStackNavigationProp<RadarStackParamList>>();
   const queryClient = useQueryClient();
-  const { t } = useTranslation();
-  const { current: currentLang, changeLanguage } = useLanguage();
+  const { t, i18n } = useTranslation();
 
-  const { session } = useAuth();
-  const { profile, update } = useProfile();
+  const locale = localeFromI18n(i18n.language);
 
-  const [radius, setRadius] = useState<number | null>(null);
-  const [syncing, setSyncing] = useState(false);
-  const [savingLocation, setSavingLocation] = useState(false);
-  const [pushStatus, setPushStatus] = useState<
-    | 'granted'
-    | 'denied'
-    | 'undetermined'
-    | 'unsupported'
-    | 'loading'
-    | null
-  >(null);
+  const {
+    bands: followedBands,
+    loading: loadingFollowed,
+    reload: reloadFollowed,
+    unfollow,
+  } = useFollowedBands();
+  const { recommendations, loading: loadingRecs, reload: reloadRecs } = useRecommendations();
+
+  const [activeTab, setActiveTab] = useState<Tab>('foryou');
+  const [followingId, setFollowingId] = useState<string | null>(null);
+  const [newBandIds, setNewBandIds] = useState<Set<string>>(new Set());
+  const previousIdsRef = useRef<Set<string> | null>(null);
+  const followedPositionRef = useRef<number | null>(null);
+  const [insertSlot, setInsertSlot] = useState<{
+    position: number;
+    bandIds: string[];
+  } | null>(null);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
 
   const { value: skipConfirm, setValue: setSkipConfirm } = usePreference<boolean>(
     'skipUnfollowConfirm',
     false,
   );
 
-  useFocusEffect(
-    useCallback(() => {
-      refreshPushStatus();
-    }, [profile?.push_token]),
-  );
-
-  const displayRadius = radius ?? profile?.search_radius_km ?? 500;
-
-  const handleSyncConcerts = async () => {
+  const openBandDetail = async (band: {
+    spotify_id?: string;
+    id?: string;
+    name: string;
+    image_url: string | null;
+    genres: string[];
+  }) => {
     try {
-      setSyncing(true);
-      const {
-        data: { session: s },
-      } = await supabase.auth.getSession();
-      const res = await fetch(
-        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/sync-concerts`,
-        {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${s?.access_token}` },
-        },
-      );
-      const json = await res.json();
-      if (json.error) throw new Error(json.error);
-      Alert.alert(
-        t('profile.syncDoneTitle'),
-        t('profile.syncDoneBody', {
-          synced: json.synced,
-          discarded: json.discarded ?? 0,
-          skipped: json.bands_skipped ?? 0,
-        }),
-      );
-    } catch (err: any) {
-      Alert.alert(t('common.error'), err.message);
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  const handleSetHomeLocation = async () => {
-    try {
-      setSavingLocation(true);
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(t('profile.permissionDeniedTitle'), t('profile.locationPermissionBody'));
+      let bandId: string;
+      if (band.id) {
+        bandId = band.id;
+      } else if (band.spotify_id) {
+        bandId = await getOrCreateBandId({
+          spotify_id: band.spotify_id,
+          name: band.name,
+          image_url: band.image_url,
+          genres: band.genres,
+        });
+      } else {
         return;
       }
-      const pos = await Location.getCurrentPositionAsync({});
-      await update({
-        home_lat: pos.coords.latitude,
-        home_lng: pos.coords.longitude,
-      });
-      Alert.alert(t('common.done'), t('profile.locationSaved'));
+      navigation.navigate('BandDetail', { bandId });
     } catch (err: any) {
       Alert.alert(t('common.error'), err.message);
-    } finally {
-      setSavingLocation(false);
     }
   };
 
-  const handleRadiusComplete = async (value: number) => {
-    const rounded = Math.round(value / 10) * 10;
-    try {
-      await update({ search_radius_km: rounded });
-    } catch (err: any) {
-      Alert.alert(t('profile.radiusSaveError'), err.message);
+  useFocusEffect(
+    useCallback(() => {
+      reloadFollowed();
+    }, [reloadFollowed]),
+  );
+
+  const followedNames = useMemo(
+    () => new Set(followedBands.map((b: FollowedBand) => b.name.toLowerCase())),
+    [followedBands],
+  );
+
+  const visibleRecs = useMemo(() => {
+    const filtered = recommendations.filter((r) => !followedNames.has(r.name.toLowerCase()));
+    if (!insertSlot || insertSlot.bandIds.length === 0) return filtered;
+    const insertSet = new Set(insertSlot.bandIds);
+    const newOnes: RecommendedBand[] = [];
+    const others: RecommendedBand[] = [];
+    for (const rec of filtered) {
+      if (insertSet.has(rec.spotify_id)) newOnes.push(rec);
+      else others.push(rec);
     }
-  };
+    const result = [...others];
+    const insertAt = Math.min(insertSlot.position, result.length);
+    result.splice(insertAt, 0, ...newOnes);
+    return result;
+  }, [recommendations, followedNames, insertSlot]);
 
-  const refreshPushStatus = async () => {
-    const sysStatus = await checkNotificationPermissions();
+  useEffect(() => {
+    if (recommendations.length === 0) return;
+    const currentIds = new Set(recommendations.map((r) => r.spotify_id));
 
-    if (sysStatus !== 'granted') {
-      setPushStatus(sysStatus);
+    if (previousIdsRef.current === null) {
+      previousIdsRef.current = currentIds;
       return;
     }
 
-    if (profile?.push_token) {
-      setPushStatus('granted');
-    } else {
-      setPushStatus('undetermined');
+    const fresh = new Set<string>();
+    for (const id of currentIds) {
+      if (!previousIdsRef.current.has(id)) fresh.add(id);
     }
-  };
+    previousIdsRef.current = currentIds;
 
-  const handleEnableNotifications = async () => {
-    setPushStatus('loading');
-    const ok = await registerForPushNotifications();
-    if (ok) {
-      await queryClient.invalidateQueries({ queryKey: ['profile'] });
-      setPushStatus('granted');
-      Alert.alert(t('common.done'), t('profile.notificationsEnabled'));
-    } else {
-      await refreshPushStatus();
-      const status = await checkNotificationPermissions();
-      if (status === 'denied') {
-        Alert.alert(t('profile.permissionDeniedTitle'), t('profile.notificationsDeniedBody'));
+    if (fresh.size > 0) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setNewBandIds((prev) => new Set([...prev, ...fresh]));
+
+      if (followedPositionRef.current !== null) {
+        setInsertSlot({
+          position: followedPositionRef.current,
+          bandIds: Array.from(fresh),
+        });
+        followedPositionRef.current = null;
       }
+
+      setTimeout(() => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setNewBandIds((prev) => {
+          const next = new Set(prev);
+          for (const id of fresh) next.delete(id);
+          return next;
+        });
+        setInsertSlot(null);
+      }, 8000);
+    }
+  }, [recommendations]);
+
+  useEffect(() => {
+    if (searchQuery.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        setSearching(true);
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const res = await fetch(
+          `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/search-bands?q=${encodeURIComponent(searchQuery.trim())}`,
+          {
+            headers: {
+              Authorization: `Bearer ${session?.access_token ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
+            },
+          },
+        );
+        const json = await res.json();
+        setSearchResults(json.bands ?? []);
+      } catch (err: any) {
+        Alert.alert(t('common.error'), err.message);
+      } finally {
+        setSearching(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery, t]);
+
+  const handleFollowRec = async (band: RecommendedBand) => {
+    if (followingId) return;
+    try {
+      setFollowingId(band.spotify_id);
+      const position = visibleRecs.findIndex((r) => r.spotify_id === band.spotify_id);
+      followedPositionRef.current = position;
+      const bandId = await followBand(band);
+      queryClient.invalidateQueries({ queryKey: ['followedBands'] });
+      queryClient.invalidateQueries({ queryKey: ['recommendations'] });
+      syncBandConcerts(bandId).then((result) => {
+        if (result && result.synced > 0) {
+          queryClient.invalidateQueries({ queryKey: ['nearbyConcerts'] });
+        }
+      });
+    } catch (err: any) {
+      Alert.alert(t('common.error'), err.message);
+    } finally {
+      setFollowingId(null);
     }
   };
 
-  const handleLogout = () => {
-    Alert.alert(t('auth.signOut'), t('profile.signOutConfirm'), [
+  const handleFollowFromSearch = async (band: any) => {
+    try {
+      setFollowingId(band.spotify_id);
+      const bandId = await followBand(band);
+      setSearchQuery('');
+      setSearchResults([]);
+      queryClient.invalidateQueries({ queryKey: ['followedBands'] });
+      queryClient.invalidateQueries({ queryKey: ['recommendations'] });
+      syncBandConcerts(bandId).then((result) => {
+        if (result && result.synced > 0) {
+          queryClient.invalidateQueries({ queryKey: ['nearbyConcerts'] });
+        }
+      });
+    } catch (err: any) {
+      Alert.alert(t('common.error'), err.message);
+    } finally {
+      setFollowingId(null);
+    }
+  };
+
+  const handleUnfollow = (bandId: string, bandName: string) => {
+    if (skipConfirm) {
+      unfollow(bandId);
+      return;
+    }
+    Alert.alert(t('radar.unfollowTitle'), t('radar.unfollowBody', { name: bandName }), [
       { text: t('common.cancel'), style: 'cancel' },
       {
-        text: t('auth.signOut'),
+        text: t('radar.unfollowDontAsk'),
         style: 'destructive',
-        onPress: () => supabase.auth.signOut(),
+        onPress: () => {
+          setSkipConfirm(true);
+          unfollow(bandId);
+        },
       },
+      { text: t('radar.unfollowConfirm'), style: 'destructive', onPress: () => unfollow(bandId) },
     ]);
   };
 
-  const handleChangeLanguage = async (lang: SupportedLanguage) => {
-    try {
-      await changeLanguage(lang);
-    } catch (err: any) {
-      Alert.alert(t('common.error'), err.message);
-    }
-  };
+  const dateStr = new Date()
+    .toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' })
+    .replace('.', '')
+    .toUpperCase();
+
+  const newForYou = visibleRecs.slice(0, 5);
+  const emerging = visibleRecs.slice(5);
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.ink }}
-      contentContainerStyle={{ paddingBottom: spacing.xxxl, paddingTop: spacing.xxxl }}
-    >
-      {/* Avatar + email */}
-      <View style={styles.userBlock}>
-        <View style={styles.avatar}>
-          <Ionicons name="person" size={28} color={colors.silver} />
-        </View>
-        <View style={{ flex: 1, marginLeft: spacing.md, minWidth: 0 }}>
-          <Text variant="monoMD" color="bloodBright">
-            {t('profile.accountLabel')}
+    <View style={[styles.container, { paddingTop: insets.top + spacing.md }]}>
+      <View style={styles.header}>
+        <View>
+          <Text variant="monoMD" color="muted">
+            {dateStr}
           </Text>
-          <Text variant="displaySM" numberOfLines={1} style={{ marginTop: 4 }}>
-            {session?.user.email ?? '—'}
+          <Text variant="displayLG" style={{ marginTop: 4 }}>
+            {t('radar.title')}
           </Text>
         </View>
+        <TouchableOpacity
+          style={styles.avatarBtn}
+          onPress={() => navigation.getParent()?.navigate('Profile' as never)}
+        >
+          <Ionicons name="person" size={18} color={colors.silver} />
+        </TouchableOpacity>
       </View>
 
-      {/* Radio de notificaciones */}
-      <View style={styles.section}>
-        <Text variant="monoMD" color="muted" style={styles.sectionLabel}>
-          {t('profile.notificationRadiusLabel')}
-        </Text>
-        <Text variant="bodySM" color="muted" style={styles.sectionDesc}>
-          {t('profile.notificationRadiusDesc')}
-        </Text>
-
-        <View style={styles.radiusDisplay}>
-          <Text
-            style={{
-              fontFamily: fontFamily.displayBold,
-              fontSize: 28,
-              letterSpacing: -1,
-              color: colors.bloodBright,
-            }}
-          >
-            {displayRadius}
-          </Text>
-          <Text variant="monoMD" color="muted" style={{ marginLeft: spacing.sm }}>
-            {t('profile.kmLabel')}
-          </Text>
-        </View>
-
-        <Slider
-          style={{ width: '100%', height: 40 }}
-          minimumValue={50}
-          maximumValue={2000}
-          step={50}
-          value={profile?.search_radius_km ?? 500}
-          minimumTrackTintColor={colors.bloodBright}
-          maximumTrackTintColor={colors.line}
-          thumbTintColor={colors.bloodBright}
-          onValueChange={setRadius}
-          onSlidingComplete={handleRadiusComplete}
+      <View style={styles.tabsRow}>
+        <TabPill
+          label={t('radar.tabForYou')}
+          active={activeTab === 'foryou'}
+          onPress={() => setActiveTab('foryou')}
         />
-        <View style={styles.sliderLabels}>
-          <Text variant="monoSM" color="faint">
-            {t('profile.kmValue', { value: 50 })}
-          </Text>
-          <Text variant="monoSM" color="faint">
-            {t('profile.kmValue', { value: 2000 })}
-          </Text>
-        </View>
-      </View>
-
-      {/* Ubicación de referencia */}
-      <View style={styles.section}>
-        <Text variant="monoMD" color="muted" style={styles.sectionLabel}>
-          {t('profile.homeLocationLabel')}
-        </Text>
-        <Text variant="bodySM" color="muted" style={styles.sectionDesc}>
-          {t('profile.homeLocationDesc')}
-        </Text>
-
-        <View style={styles.locationCard}>
-          <Ionicons
-            name="location"
-            size={18}
-            color={profile?.home_lat ? colors.bloodBright : colors.faint}
-          />
-          <Text
-            variant="body"
-            color={profile?.home_lat ? 'silver' : 'faint'}
-            style={{ marginLeft: spacing.sm, flex: 1 }}
-            numberOfLines={1}
-          >
-            {profile?.home_lat && profile?.home_lng
-              ? `${profile.home_lat.toFixed(3)}, ${profile.home_lng.toFixed(3)}`
-              : t('profile.locationNotSet')}
-          </Text>
-        </View>
-
-        <Button
-          label={profile?.home_lat ? t('profile.updateLocation') : t('profile.useCurrentLocation')}
-          variant="secondary"
-          onPress={handleSetHomeLocation}
-          loading={savingLocation}
-          icon={<Ionicons name="locate" size={18} color={colors.bright} />}
+        <TabPill
+          label={t('radar.tabMyBands')}
+          active={activeTab === 'mybands'}
+          onPress={() => setActiveTab('mybands')}
         />
       </View>
 
-      {/* Preferencias */}
-      <View style={styles.section}>
-        <Text variant="monoMD" color="muted" style={styles.sectionLabel}>
-          {t('profile.preferencesLabel')}
-        </Text>
-
-        <View style={styles.toggleRow}>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text variant="bodyLG">{t('profile.confirmUnfollowTitle')}</Text>
-            <Text variant="bodySM" color="muted" style={{ marginTop: 2 }}>
-              {t('profile.confirmUnfollowDesc')}
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={[styles.toggle, !skipConfirm && styles.toggleActive]}
-            onPress={() => setSkipConfirm(!skipConfirm)}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.toggleKnob, !skipConfirm && styles.toggleKnobActive]} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Idioma */}
-      <View style={styles.section}>
-        <Text variant="monoMD" color="muted" style={styles.sectionLabel}>
-          {t('profile.languageLabel')}
-        </Text>
-        <Text variant="bodySM" color="muted" style={styles.sectionDesc}>
-          {t('profile.languageDesc')}
-        </Text>
-
-        <View style={styles.langGroup}>
-          <LanguageOption
-            label={t('profile.languageEs')}
-            selected={currentLang === 'es'}
-            onPress={() => handleChangeLanguage('es')}
-          />
-          <View style={styles.langDivider} />
-          <LanguageOption
-            label={t('profile.languageEn')}
-            selected={currentLang === 'en'}
-            onPress={() => handleChangeLanguage('en')}
-          />
-        </View>
-      </View>
-
-      {/* Notificaciones */}
-      <View style={styles.section}>
-        <Text variant="monoMD" color="muted" style={styles.sectionLabel}>
-          {t('profile.notificationsLabel')}
-        </Text>
-
-        <View style={styles.pushCard}>
-          <Ionicons
-            name={pushStatus === 'granted' ? 'notifications' : 'notifications-off-outline'}
-            size={20}
-            color={pushStatus === 'granted' ? colors.bloodBright : colors.faint}
-          />
-          <View style={{ flex: 1, marginLeft: spacing.md, minWidth: 0 }}>
-            <Text variant="body">
-              {pushStatus === 'granted' && t('profile.pushGranted')}
-              {pushStatus === 'denied' && t('profile.pushDenied')}
-              {pushStatus === 'undetermined' && t('profile.pushUndetermined')}
-              {pushStatus === 'unsupported' && t('profile.pushUnsupported')}
-              {pushStatus === 'loading' && t('profile.pushLoading')}
-            </Text>
-            <Text variant="bodySM" color="muted" style={{ marginTop: 2 }}>
-              {pushStatus === 'granted'
-                ? t('profile.pushGrantedDesc')
-                : t('profile.pushDisabledDesc')}
-            </Text>
-          </View>
-        </View>
-
-        {pushStatus !== 'granted' && pushStatus !== 'unsupported' && pushStatus !== 'loading' && (
-          <View style={{ marginTop: spacing.md }}>
-            <Button
-              label={
-                pushStatus === 'denied'
-                  ? t('profile.openSettings')
-                  : t('profile.enableNotifications')
-              }
-              onPress={
-                pushStatus === 'denied' ? () => Linking.openSettings() : handleEnableNotifications
-              }
-              icon={<Ionicons name="notifications" size={18} color="#fff" />}
+      {activeTab === 'foryou' ? (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={loadingRecs}
+              onRefresh={reloadRecs}
+              tintColor={colors.bloodBright}
             />
+          }
+        >
+          <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
+            {t('radar.newForYouTitle')}
+          </Text>
+          {loadingRecs && newForYou.length === 0 ? (
+            <ActivityIndicator color={colors.bloodBright} style={{ marginVertical: spacing.xl }} />
+          ) : newForYou.length === 0 ? (
+            <Text variant="body" color="muted" style={styles.emptyText}>
+              {t('radar.followToGetRecs')}
+            </Text>
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.carouselContent}
+            >
+              {newForYou.map((rec) => {
+                const isNew = newBandIds.has(rec.spotify_id);
+                const isFollowing = followingId === rec.spotify_id;
+                return (
+                  <TouchableOpacity
+                    key={rec.spotify_id}
+                    style={styles.carouselCard}
+                    onPress={() =>
+                      openBandDetail({
+                        spotify_id: rec.spotify_id,
+                        name: rec.name,
+                        image_url: rec.image_url,
+                        genres: rec.genres,
+                      })
+                    }
+                    activeOpacity={0.85}
+                  >
+                    <View style={styles.carouselImageWrapper}>
+                      <BandImage
+                        url={rec.image_url}
+                        size={138}
+                        radiusOverride={radius.lg}
+                        showTag={!rec.image_url}
+                      />
+
+                      {isNew && (
+                        <View style={styles.topLeftBadge}>
+                          <PulsingBadge label={t('radar.newBadge')} />
+                        </View>
+                      )}
+
+                      <TouchableOpacity style={styles.carouselAddBtn}>
+                        {isFollowing ? (
+                          <ActivityIndicator color="#fff" size="small" />
+                        ) : (
+                          <Ionicons name="add" size={18} color="#fff" />
+                        )}
+                      </TouchableOpacity>
+                    </View>
+
+                    <View style={{ marginTop: spacing.sm, width: 138 }}>
+                      <View style={styles.cardNameRow}>
+                        <Text
+                          variant="displaySM"
+                          numberOfLines={1}
+                          style={{ flexShrink: 1, paddingVertical: 2 }}
+                        >
+                          {rec.name}
+                        </Text>
+                      </View>
+
+                      {rec.genres.length > 0 && (
+                        <Text
+                          variant="monoSM"
+                          color="bloodBright"
+                          numberOfLines={1}
+                          style={{ marginTop: 6 }}
+                        >
+                          {rec.genres[0]}
+                        </Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          )}
+
+          {emerging.length > 0 && (
+            <>
+              <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
+                {t('radar.emergingTitle')}
+              </Text>
+              <View style={styles.listSection}>
+                {emerging.map((rec, i) => {
+                  const isNew = newBandIds.has(rec.spotify_id);
+                  return (
+                    <TouchableOpacity
+                      key={rec.spotify_id}
+                      style={[styles.row, i === emerging.length - 1 && { borderBottomWidth: 0 }]}
+                      onPress={() =>
+                        openBandDetail({
+                          spotify_id: rec.spotify_id,
+                          name: rec.name,
+                          image_url: rec.image_url,
+                          genres: rec.genres,
+                        })
+                      }
+                      activeOpacity={0.7}
+                    >
+                      <BandImage url={rec.image_url} size={50} showTag={!rec.image_url} />
+                      <View style={styles.rowContent}>
+                        <View style={styles.nameRow}>
+                          <Text
+                            variant="displaySM"
+                            numberOfLines={1}
+                            style={{ flexShrink: 1, paddingVertical: 2 }}
+                          >
+                            {rec.name}
+                          </Text>
+                          {isNew && <PulsingBadge />}
+                        </View>
+                        {rec.genres.length > 0 && (
+                          <Text
+                            variant="monoSM"
+                            color="muted"
+                            numberOfLines={1}
+                            style={{ marginTop: 4 }}
+                          >
+                            {rec.genres.slice(0, 2).join(' · ')}
+                          </Text>
+                        )}
+                      </View>
+                      <View style={styles.rowEnd}>
+                        <Text
+                          style={{
+                            fontFamily: fontFamily.mono,
+                            fontSize: 12,
+                            color: colors.bloodBright,
+                          }}
+                        >
+                          {rec.affinity}%
+                        </Text>
+                        <TouchableOpacity
+                          style={[
+                            styles.addBtn,
+                            followingId === rec.spotify_id && { opacity: 0.5 },
+                          ]}
+                          onPress={() => handleFollowRec(rec)}
+                          disabled={followingId !== null}
+                          activeOpacity={0.7}
+                        >
+                          {followingId === rec.spotify_id ? (
+                            <ActivityIndicator color={colors.silver} size="small" />
+                          ) : (
+                            <Ionicons name="add" size={18} color={colors.silver} />
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </>
+          )}
+
+          <View style={{ height: spacing.xxxl }} />
+        </ScrollView>
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl
+              refreshing={loadingFollowed}
+              onRefresh={reloadFollowed}
+              tintColor={colors.bloodBright}
+            />
+          }
+        >
+          <View style={styles.searchWrapper}>
+            <Ionicons name="search" size={18} color={colors.muted} style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder={t('radar.searchPlaceholder')}
+              placeholderTextColor={colors.faint}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCapitalize="words"
+            />
+            {searching && (
+              <ActivityIndicator color={colors.bloodBright} style={{ marginLeft: spacing.sm }} />
+            )}
           </View>
-        )}
-      </View>
 
-      {/* Acciones */}
-      <View style={styles.section}>
-        <Text variant="monoMD" color="muted" style={styles.sectionLabel}>
-          {t('profile.maintenanceLabel')}
-        </Text>
+          {searchResults.length > 0 && (
+            <View style={styles.listSection}>
+              {searchResults.map((b: any, i) => {
+                const isFollowed = followedNames.has(b.name.toLowerCase());
+                return (
+                  <TouchableOpacity
+                    key={b.spotify_id}
+                    style={[styles.row, i === searchResults.length - 1 && { borderBottomWidth: 0 }]}
+                    onPress={() =>
+                      openBandDetail({
+                        spotify_id: b.spotify_id,
+                        name: b.name,
+                        image_url: b.image_url,
+                        genres: b.genres ?? [],
+                      })
+                    }
+                    activeOpacity={0.7}
+                  >
+                    <BandImage url={b.image_url} size={50} showTag={!b.image_url} />
+                    <View style={styles.rowContent}>
+                      <Text variant="displaySM" numberOfLines={1} style={{ paddingVertical: 2 }}>
+                        {b.name}
+                      </Text>
+                      {b.genres?.length > 0 && (
+                        <Text
+                          variant="monoSM"
+                          color="muted"
+                          numberOfLines={1}
+                          style={{ marginTop: 4 }}
+                        >
+                          {b.genres.slice(0, 2).join(' · ')}
+                        </Text>
+                      )}
+                    </View>
+                    {isFollowed ? (
+                      <Text variant="monoSM" color="muted" style={{ marginRight: 4 }}>
+                        {t('radar.followingBadge')}
+                      </Text>
+                    ) : (
+                      <TouchableOpacity
+                        style={[styles.addBtn, followingId === b.spotify_id && { opacity: 0.5 }]}
+                        onPress={() => handleFollowFromSearch(b)}
+                        disabled={followingId !== null}
+                      >
+                        {followingId === b.spotify_id ? (
+                          <ActivityIndicator color={colors.silver} size="small" />
+                        ) : (
+                          <Ionicons name="add" size={18} color={colors.silver} />
+                        )}
+                      </TouchableOpacity>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
 
-        <Button
-          label={t('profile.syncConcerts')}
-          onPress={handleSyncConcerts}
-          loading={syncing}
-          icon={<Ionicons name="sync" size={18} color="#fff" />}
-        />
+          {searchResults.length === 0 && (
+            <>
+              <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
+                {t('radar.followingTitle', { count: followedBands.length })}
+              </Text>
+              {loadingFollowed ? (
+                <ActivityIndicator color={colors.bloodBright} style={{ marginTop: spacing.lg }} />
+              ) : followedBands.length === 0 ? (
+                <Text variant="body" color="muted" style={styles.emptyText}>
+                  {t('radar.emptyFollowed')}
+                </Text>
+              ) : (
+                <View style={styles.listSection}>
+                  {followedBands.map((b: FollowedBand, i) => (
+                    <TouchableOpacity
+                      key={b.id}
+                      style={[
+                        styles.row,
+                        i === followedBands.length - 1 && { borderBottomWidth: 0 },
+                      ]}
+                      onPress={() =>
+                        openBandDetail({
+                          id: b.id,
+                          name: b.name,
+                          image_url: b.image_url,
+                          genres: b.genres ?? [],
+                        })
+                      }
+                      activeOpacity={0.7}
+                    >
+                      <BandImage url={b.image_url} size={50} showTag={!b.image_url} />
+                      <View style={styles.rowContent}>
+                        <Text variant="displaySM" numberOfLines={1} style={{ paddingVertical: 2 }}>
+                          {b.name}
+                        </Text>
+                        {b.genres && b.genres.length > 0 && (
+                          <Text
+                            variant="monoSM"
+                            color="muted"
+                            numberOfLines={1}
+                            style={{ marginTop: 4 }}
+                          >
+                            {b.genres.slice(0, 2).join(' · ')}
+                          </Text>
+                        )}
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => handleUnfollow(b.id, b.name)}
+                        style={styles.removeBtn}
+                        hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                      >
+                        <Ionicons name="close" size={18} color={colors.muted} />
+                      </TouchableOpacity>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </>
+          )}
 
-        <View style={{ height: spacing.sm }} />
-
-        <Button
-          label={t('auth.signOut')}
-          variant="ghost"
-          onPress={handleLogout}
-          icon={<Ionicons name="log-out-outline" size={18} color={colors.silver} />}
-        />
-      </View>
-
-      {/* Footer */}
-      <View style={styles.footer}>
-        <Text variant="monoSM" color="faint" style={{ textAlign: 'center' }}>
-          {t('profile.footerTagline')}
-        </Text>
-      </View>
-    </ScrollView>
+          <View style={{ height: spacing.xxxl }} />
+        </ScrollView>
+      )}
+    </View>
   );
 }
 
-// Componente auxiliar para opciones de idioma
-function LanguageOption({
+function TabPill({
   label,
-  selected,
+  active,
   onPress,
 }: {
   label: string;
-  selected: boolean;
+  active: boolean;
   onPress: () => void;
 }) {
   return (
     <TouchableOpacity
-      style={[styles.langRow, selected && styles.langRowSelected]}
+      style={[styles.tabPill, active && styles.tabPillActive]}
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <Text variant="body" color={selected ? 'bloodBright' : 'silver'} style={{ flex: 1 }}>
+      <Text
+        style={{
+          fontFamily: fontFamily.mono,
+          fontSize: 10,
+          letterSpacing: 0.8,
+          textTransform: 'uppercase',
+          color: active ? colors.ink : colors.silver,
+        }}
+      >
         {label}
       </Text>
-      {selected && <Ionicons name="checkmark" size={20} color={colors.bloodBright} />}
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  userBlock: {
+  container: {
+    flex: 1,
+    backgroundColor: colors.ink,
+    paddingHorizontal: spacing.xl,
+  },
+  header: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.xl,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.line,
-  },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.full,
-    backgroundColor: colors.panel2,
-    borderWidth: 1,
-    borderColor: colors.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  section: {
-    padding: spacing.xl,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.line,
-  },
-  sectionLabel: {
-    marginBottom: spacing.sm,
-  },
-  sectionDesc: {
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
     marginBottom: spacing.lg,
   },
-  radiusDisplay: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginBottom: spacing.sm,
-  },
-  sliderLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: spacing.xs,
-    paddingHorizontal: 4,
-  },
-  locationCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    backgroundColor: colors.panel,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: radius.md,
-    marginBottom: spacing.md,
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  toggle: {
-    width: 48,
-    height: 28,
+  avatarBtn: {
+    width: 38,
+    height: 38,
     borderRadius: radius.full,
     backgroundColor: colors.panel2,
     borderWidth: 1,
     borderColor: colors.line,
-    padding: 2,
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  toggleActive: {
-    backgroundColor: colors.blood,
-    borderColor: colors.bloodBright,
-  },
-  toggleKnob: {
-    width: 22,
-    height: 22,
-    borderRadius: radius.full,
-    backgroundColor: colors.faint,
-  },
-  toggleKnobActive: {
-    backgroundColor: '#fff',
-    alignSelf: 'flex-end',
-  },
-  footer: {
-    marginTop: spacing.xxxl,
-  },
-  pushCard: {
+  tabsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    backgroundColor: colors.panel,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: radius.md,
+    gap: spacing.sm,
+    marginBottom: spacing.xl,
   },
-  langGroup: {
-    backgroundColor: colors.panel,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: radius.md,
-    overflow: 'hidden',
-  },
-  langRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  tabPill: {
     paddingHorizontal: spacing.md,
+    paddingVertical: 7,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: 'transparent',
+  },
+  tabPillActive: {
+    backgroundColor: colors.silver,
+    borderColor: colors.silver,
+  },
+  sectionTitle: {
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
+  },
+  emptyText: {
+    fontStyle: 'italic',
+    marginVertical: spacing.lg,
+  },
+  carouselContent: {
+    gap: spacing.md,
+    paddingRight: spacing.md,
+  },
+  carouselCard: {
+    width: 138,
+  },
+  cardNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  listSection: {
+    marginTop: spacing.xs,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.lineSoft,
   },
-  langRowSelected: {
+  rowContent: {
+    flex: 1,
+    marginLeft: spacing.md,
+    minWidth: 0,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  rowEnd: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  addBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.full,
     backgroundColor: colors.panel2,
+    borderWidth: 1,
+    borderColor: colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  langDivider: {
-    height: 1,
-    backgroundColor: colors.line,
+  searchWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.panel,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
+  },
+  searchIcon: {
+    marginRight: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: spacing.md + 2,
+    fontSize: 15,
+    color: colors.bright,
+    fontFamily: fontFamily.body,
+  },
+  carouselImageWrapper: {
+    position: 'relative',
+  },
+  topLeftBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 5,
+    zIndex: 10,
+  },
+  carouselAddBtn: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    width: 32,
+    height: 32,
+    borderRadius: radius.full,
+    backgroundColor: colors.blood,
+    borderWidth: 1.5,
+    borderColor: colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.blood,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 4,
   },
 });

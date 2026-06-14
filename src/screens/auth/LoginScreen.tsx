@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../../lib/supabase';
 import { AuthStackParamList } from '../../navigation/AuthNavigator';
 import { colors, fontFamily, radius, spacing } from '../../theme';
@@ -21,20 +22,21 @@ import { Button, Text } from '../../components/ui';
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
 export default function LoginScreen({ navigation }: Props) {
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!email || !password) {
-      return Alert.alert('Faltan datos', 'Introduce email y contraseña');
+      return Alert.alert(t('login.missingDataTitle'), t('login.missingDataBody'));
     }
     try {
       setLoading(true);
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      Alert.alert(t('common.error'), err.message);
     } finally {
       setLoading(false);
     }
@@ -54,21 +56,21 @@ export default function LoginScreen({ navigation }: Props) {
           <View style={styles.brand}>
             <Ionicons name="radio" size={28} color={colors.bloodBright} />
             <Text variant="monoMD" color="bloodBright" style={{ marginTop: spacing.md }}>
-              METAL RADAR
+              {t('login.brand')}
             </Text>
             <Text variant="displayXL" style={styles.title}>
-              Inicia{'\n'}sesión
+              {t('login.title')}
             </Text>
           </View>
 
           <View style={styles.form}>
             <View style={styles.fieldGroup}>
               <Text variant="monoSM" color="muted" style={styles.label}>
-                EMAIL
+                {t('login.emailLabel')}
               </Text>
               <TextInput
                 style={styles.input}
-                placeholder="tu@correo.com"
+                placeholder={t('login.emailPlaceholder')}
                 placeholderTextColor={colors.faint}
                 value={email}
                 onChangeText={setEmail}
@@ -81,7 +83,7 @@ export default function LoginScreen({ navigation }: Props) {
 
             <View style={styles.fieldGroup}>
               <Text variant="monoSM" color="muted" style={styles.label}>
-                CONTRASEÑA
+                {t('login.passwordLabel')}
               </Text>
               <TextInput
                 style={styles.input}
@@ -96,17 +98,17 @@ export default function LoginScreen({ navigation }: Props) {
               />
             </View>
 
-            <Button label="Entrar" onPress={handleLogin} loading={loading} />
+            <Button label={t('login.submit')} onPress={handleLogin} loading={loading} />
 
             <TouchableOpacity
               style={styles.switchLink}
               onPress={() => navigation.navigate('Register')}
             >
               <Text variant="monoMD" color="muted">
-                ¿NO TIENES CUENTA?{' '}
+                {t('login.noAccount')}{' '}
               </Text>
               <Text variant="monoMD" color="bloodBright">
-                REGÍSTRATE
+                {t('login.signUpCta')}
               </Text>
             </TouchableOpacity>
           </View>

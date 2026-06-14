@@ -1,7 +1,8 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Text as RNText } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import DiaryScreen from '../screens/DiaryScreen';
 import ConcertDetailScreen from '../screens/ConcertDetailScreen';
-import { Text as RNText } from 'react-native';
 import { colors, fontFamily } from '../theme';
 
 export type DiaryStackParamList = {
@@ -12,6 +13,8 @@ export type DiaryStackParamList = {
 const Stack = createNativeStackNavigator<DiaryStackParamList>();
 
 export default function DiaryStack() {
+  const { t } = useTranslation();
+
   return (
     <Stack.Navigator
       screenOptions={{
@@ -34,11 +37,15 @@ export default function DiaryStack() {
         contentStyle: { backgroundColor: colors.ink },
       }}
     >
-      <Stack.Screen name="DiaryHome" component={DiaryScreen} options={{ title: 'Diario' }} />
+      <Stack.Screen
+        name="DiaryHome"
+        component={DiaryScreen}
+        options={{ title: t('navigation.diary') }}
+      />
       <Stack.Screen
         name="ConcertDetail"
         component={ConcertDetailScreen}
-        options={{ title: 'Concierto' }}
+        options={{ title: t('navigation.concert') }}
       />
     </Stack.Navigator>
   );

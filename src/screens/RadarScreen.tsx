@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import PulsingBadge from '../components/PulsingBadge';
 import BandImage from '../components/BandImage';
 import { useFollowedBands, FollowedBand } from '../hooks/useFollowedBands';
@@ -28,10 +29,18 @@ import { RadarStackParamList } from '../navigation/RadarStack';
 
 type Tab = 'foryou' | 'mybands';
 
+function localeFromI18n(lng: string): string {
+  if (lng.startsWith('en')) return 'en-US';
+  return 'es-ES';
+}
+
 export default function RadarScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RadarStackParamList>>();
   const queryClient = useQueryClient();
+  const { t, i18n } = useTranslation();
+
+  const locale = localeFromI18n(i18n.language);
 
   const {
     bands: followedBands,
@@ -83,7 +92,7 @@ export default function RadarScreen() {
       }
       navigation.navigate('BandDetail', { bandId });
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      Alert.alert(t('common.error'), err.message);
     }
   };
 
@@ -175,13 +184,13 @@ export default function RadarScreen() {
         const json = await res.json();
         setSearchResults(json.bands ?? []);
       } catch (err: any) {
-        Alert.alert('Error', err.message);
+        Alert.alert(t('common.error'), err.message);
       } finally {
         setSearching(false);
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, t]);
 
   const handleFollowRec = async (band: RecommendedBand) => {
     if (followingId) return;
@@ -198,7 +207,7 @@ export default function RadarScreen() {
         }
       });
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      Alert.alert(t('common.error'), err.message);
     } finally {
       setFollowingId(null);
     }
@@ -218,7 +227,7 @@ export default function RadarScreen() {
         }
       });
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      Alert.alert(t('common.error'), err.message);
     } finally {
       setFollowingId(null);
     }
@@ -229,22 +238,22 @@ export default function RadarScreen() {
       unfollow(bandId);
       return;
     }
-    Alert.alert('Dejar de seguir', `¿Quitar a ${bandName}?`, [
-      { text: 'Cancelar', style: 'cancel' },
+    Alert.alert(t('radar.unfollowTitle'), t('radar.unfollowBody', { name: bandName }), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Quitar y no preguntar más',
+        text: t('radar.unfollowDontAsk'),
         style: 'destructive',
         onPress: () => {
           setSkipConfirm(true);
           unfollow(bandId);
         },
       },
-      { text: 'Quitar', style: 'destructive', onPress: () => unfollow(bandId) },
+      { text: t('radar.unfollowConfirm'), style: 'destructive', onPress: () => unfollow(bandId) },
     ]);
   };
 
   const dateStr = new Date()
-    .toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })
+    .toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' })
     .replace('.', '')
     .toUpperCase();
 
@@ -259,7 +268,7 @@ export default function RadarScreen() {
             {dateStr}
           </Text>
           <Text variant="displayLG" style={{ marginTop: 4 }}>
-            Radar
+            {t('radar.title')}
           </Text>
         </View>
         <TouchableOpacity
@@ -272,12 +281,12 @@ export default function RadarScreen() {
 
       <View style={styles.tabsRow}>
         <TabPill
-          label="Para ti"
+          label={t('radar.tabForYou')}
           active={activeTab === 'foryou'}
           onPress={() => setActiveTab('foryou')}
         />
         <TabPill
-          label="Mis bandas"
+          label={t('radar.tabMyBands')}
           active={activeTab === 'mybands'}
           onPress={() => setActiveTab('mybands')}
         />
@@ -295,13 +304,13 @@ export default function RadarScreen() {
           }
         >
           <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
-            NUEVO PARA TI
+            {t('radar.newForYouTitle')}
           </Text>
           {loadingRecs && newForYou.length === 0 ? (
             <ActivityIndicator color={colors.bloodBright} style={{ marginVertical: spacing.xl }} />
           ) : newForYou.length === 0 ? (
             <Text variant="body" color="muted" style={styles.emptyText}>
-              Sigue bandas para recibir recomendaciones
+              {t('radar.followToGetRecs')}
             </Text>
           ) : (
             <ScrollView
@@ -326,7 +335,6 @@ export default function RadarScreen() {
                     }
                     activeOpacity={0.85}
                   >
-                    {/* Contenedor de la imagen */}
                     <View style={styles.carouselImageWrapper}>
                       <BandImage
                         url={rec.image_url}
@@ -335,14 +343,12 @@ export default function RadarScreen() {
                         showTag={!rec.image_url}
                       />
 
-                      {/* Etiqueta arriba a la izquierda */}
                       {isNew && (
                         <View style={styles.topLeftBadge}>
-                          <PulsingBadge label="NUEVO" />
+                          <PulsingBadge label={t('radar.newBadge')} />
                         </View>
                       )}
 
-                      {/* El botón de añadir (+) se queda abajo a la derecha como estaba */}
                       <TouchableOpacity style={styles.carouselAddBtn}>
                         {isFollowing ? (
                           <ActivityIndicator color="#fff" size="small" />
@@ -352,7 +358,6 @@ export default function RadarScreen() {
                       </TouchableOpacity>
                     </View>
 
-                    {/* Info de la banda debajo de la imagen */}
                     <View style={{ marginTop: spacing.sm, width: 138 }}>
                       <View style={styles.cardNameRow}>
                         <Text
@@ -362,7 +367,6 @@ export default function RadarScreen() {
                         >
                           {rec.name}
                         </Text>
-                        {/* ◄--- CAMBIO 2: ELIMINADO EL ANTERIOR PULSINGBADGE DE AQUÍ */}
                       </View>
 
                       {rec.genres.length > 0 && (
@@ -385,7 +389,7 @@ export default function RadarScreen() {
           {emerging.length > 0 && (
             <>
               <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
-                EMERGENTES · AFINIDAD
+                {t('radar.emergingTitle')}
               </Text>
               <View style={styles.listSection}>
                 {emerging.map((rec, i) => {
@@ -414,7 +418,7 @@ export default function RadarScreen() {
                           >
                             {rec.name}
                           </Text>
-                          {isNew && <PulsingBadge />}
+                          {isNew && <PulsingBadge label={t('radar.newBadge')} />}
                         </View>
                         {rec.genres.length > 0 && (
                           <Text
@@ -478,7 +482,7 @@ export default function RadarScreen() {
             <Ionicons name="search" size={18} color={colors.muted} style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Añadir banda..."
+              placeholder={t('radar.searchPlaceholder')}
               placeholderTextColor={colors.faint}
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -525,7 +529,7 @@ export default function RadarScreen() {
                     </View>
                     {isFollowed ? (
                       <Text variant="monoSM" color="muted" style={{ marginRight: 4 }}>
-                        SIGUES
+                        {t('radar.followingBadge')}
                       </Text>
                     ) : (
                       <TouchableOpacity
@@ -549,13 +553,13 @@ export default function RadarScreen() {
           {searchResults.length === 0 && (
             <>
               <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
-                SIGUES · {followedBands.length}
+                {t('radar.followingTitle', { count: followedBands.length })}
               </Text>
               {loadingFollowed ? (
                 <ActivityIndicator color={colors.bloodBright} style={{ marginTop: spacing.lg }} />
               ) : followedBands.length === 0 ? (
                 <Text variant="body" color="muted" style={styles.emptyText}>
-                  No sigues ninguna banda todavía
+                  {t('radar.emptyFollowed')}
                 </Text>
               ) : (
                 <View style={styles.listSection}>
@@ -771,7 +775,7 @@ const styles = StyleSheet.create({
   topLeftBadge: {
     position: 'absolute',
     top: 10,
-    right: 5, // Un poco separado del borde del radio de la imagen
+    right: 5,
     zIndex: 10,
   },
   carouselAddBtn: {

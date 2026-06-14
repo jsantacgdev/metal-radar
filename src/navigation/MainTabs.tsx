@@ -2,6 +2,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import RadarStack from './RadarStack';
 import MapStack from './MapStack';
 import DiaryStack from './DiaryStack';
@@ -18,21 +19,11 @@ export type MainTabsParamList = {
 
 const Tab = createBottomTabNavigator<MainTabsParamList>();
 
-const sharedHeader = {
-  headerStyle: { backgroundColor: colors.ink },
-  headerTitleStyle: {
-    color: colors.bright,
-    fontFamily: fontFamily.displayBold,
-    fontSize: 18,
-    letterSpacing: 1,
-    textTransform: 'uppercase' as const,
-  },
-  headerShadowVisible: false,
-};
-
 export default function MainTabs() {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   useNotificationResponse();
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -54,7 +45,7 @@ export default function MainTabs() {
         name="Radar"
         component={RadarStack}
         options={{
-          title: 'Radar',
+          title: t('navigation.tabRadar'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'radio' : 'radio-outline'} size={22} color={color} />
           ),
@@ -64,7 +55,7 @@ export default function MainTabs() {
         name="MapTab"
         component={MapStack}
         options={{
-          title: 'Mapa',
+          title: t('navigation.tabMap'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'location' : 'location-outline'} size={22} color={color} />
           ),
@@ -74,7 +65,7 @@ export default function MainTabs() {
         name="DiaryTab"
         component={DiaryStack}
         options={{
-          title: 'Diario',
+          title: t('navigation.tabDiary'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'book' : 'book-outline'} size={22} color={color} />
           ),
@@ -84,7 +75,7 @@ export default function MainTabs() {
         name="Profile"
         component={ProfileScreen}
         options={{
-          title: 'Perfil',
+          title: t('navigation.tabProfile'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'person' : 'person-outline'} size={22} color={color} />
           ),

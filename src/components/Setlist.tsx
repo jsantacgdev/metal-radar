@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { Setlist, useRefreshSetlist } from '../hooks/useSetlist';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from './ui';
@@ -12,30 +13,34 @@ type Props = {
   bandName: string;
 };
 
-function formatDuration(min: number | null): string {
-  if (!min || min <= 0) return '';
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  if (h === 0) return `${m} min`;
-  if (m === 0) return `${h}h`;
-  return `${h}h ${m}m`;
+function useFormatDuration() {
+  const { t } = useTranslation();
+  return (min: number | null): string => {
+    if (!min || min <= 0) return '';
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    if (h === 0) return t('setlist.durationMin', { min: m });
+    if (m === 0) return t('setlist.durationH', { h });
+    return t('setlist.durationHM', { h, m });
+  };
 }
 
 export default function SetlistView({ concertId, setlist, bandId, bandName }: Props) {
+  const { t } = useTranslation();
   const refresh = useRefreshSetlist();
   const [expanded, setExpanded] = useState(false);
+  const formatDuration = useFormatDuration();
 
   const handleRefresh = () => {
     refresh.mutate({ concertId, bandId, force: true });
   };
 
-  // No hay setlist todavía o explícitamente not_found
   if (!setlist || setlist.not_found || setlist.song_count === 0) {
     return (
       <View style={styles.container}>
         <View style={styles.headerRow}>
           <Text variant="monoMD" color="muted">
-            SETLIST · {bandName.toUpperCase()}
+            {t('setlist.headerLabel', { band: bandName.toUpperCase() })}
           </Text>
         </View>
         <View style={styles.emptyBox}>
@@ -45,7 +50,7 @@ export default function SetlistView({ concertId, setlist, bandId, bandName }: Pr
             color="silver"
             style={{ marginTop: spacing.sm, textAlign: 'center' }}
           >
-            {setlist?.not_found ? 'No encontramos setlist en setlist.fm' : 'Aún no se ha buscado'}
+            {setlist?.not_found ? t('setlist.notFound') : t('setlist.notSearchedYet')}
           </Text>
           <TouchableOpacity
             style={styles.refreshBtn}
@@ -59,7 +64,7 @@ export default function SetlistView({ concertId, setlist, bandId, bandName }: Pr
               <>
                 <Ionicons name="refresh" size={14} color={colors.bloodBright} />
                 <Text variant="monoSM" color="bloodBright" style={{ marginLeft: 6 }}>
-                  BUSCAR
+                  {t('setlist.searchButton')}
                 </Text>
               </>
             )}
@@ -69,8 +74,6 @@ export default function SetlistView({ concertId, setlist, bandId, bandName }: Pr
     );
   }
 
-  // Hay setlist con canciones
-  const songsToShow = expanded ? setlist.songs : setlist.songs.slice(0, 8);
   const hasMore = setlist.songs.length > 8;
   const mainSongs = setlist.songs.filter((s) => !s.encore);
   const encoreSongs = setlist.songs.filter((s) => s.encore);
@@ -80,16 +83,16 @@ export default function SetlistView({ concertId, setlist, bandId, bandName }: Pr
       <View style={styles.headerRow}>
         <View style={{ flex: 1 }}>
           <Text variant="monoMD" color="muted">
-            SETLIST · {bandName.toUpperCase()}
+            {t('setlist.headerLabel', { band: bandName.toUpperCase() })}
           </Text>
           <View style={styles.statsRow}>
             <View style={styles.badge}>
               <Text variant="monoSM" color="bloodBright">
-                ✓ SETLIST REAL
+                {t('setlist.realSetlist')}
               </Text>
             </View>
             <Text variant="monoSM" color="silver">
-              {setlist.song_count} TEMAS
+              {t('setlist.songsCount', { count: setlist.song_count })}
             </Text>
             {setlist.total_duration_minutes != null && (
               <Text variant="monoSM" color="silver">
@@ -108,27 +111,24 @@ export default function SetlistView({ concertId, setlist, bandId, bandName }: Pr
       </View>
 
       <View style={styles.songsBox}>
-        {/* Set principal */}
         {(expanded ? mainSongs : mainSongs.slice(0, 8)).map((song) => (
           <SongRow key={song.position} song={song} />
         ))}
 
-        {/* Si no expandido y hay más, mostrar contador */}
         {!expanded && hasMore && (
           <TouchableOpacity onPress={() => setExpanded(true)} style={styles.moreBtn}>
             <Text variant="monoSM" color="bloodBright">
-              VER {setlist.songs.length - 8} MÁS ↓
+              {t('setlist.showMore', { count: setlist.songs.length - 8 })} ↓
             </Text>
           </TouchableOpacity>
         )}
 
-        {/* Encore */}
         {expanded && encoreSongs.length > 0 && (
           <>
             <View style={styles.encoreDivider}>
               <View style={styles.dividerLine} />
               <Text variant="monoSM" color="bloodBright" style={{ marginHorizontal: spacing.sm }}>
-                ENCORE
+                {t('setlist.encoreLabel')}
               </Text>
               <View style={styles.dividerLine} />
             </View>
@@ -141,7 +141,7 @@ export default function SetlistView({ concertId, setlist, bandId, bandName }: Pr
         {expanded && hasMore && (
           <TouchableOpacity onPress={() => setExpanded(false)} style={styles.moreBtn}>
             <Text variant="monoSM" color="silver">
-              VER MENOS ↑
+              {t('setlist.showLess')} ↑
             </Text>
           </TouchableOpacity>
         )}
@@ -161,6 +161,7 @@ function SongRow({
     duration_ms: number | null;
   };
 }) {
+  const { t } = useTranslation();
   const durationStr =
     song.duration_ms && song.duration_ms > 0
       ? `${Math.floor(song.duration_ms / 60000)}:${String(
@@ -188,7 +189,7 @@ function SongRow({
                   color: colors.bloodBright,
                 }}
               >
-                COVER · {song.cover_of.toUpperCase()}
+                {t('setlist.coverTag', { artist: song.cover_of.toUpperCase() })}
               </Text>
             </View>
           )}
@@ -202,7 +203,7 @@ function SongRow({
                 marginLeft: 8,
               }}
             >
-              TAPE
+              {t('setlist.tapeTag')}
             </Text>
           )}
         </View>

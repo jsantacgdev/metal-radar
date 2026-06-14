@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from './ui';
@@ -27,15 +28,14 @@ type Props = {
   placeholder?: string;
 };
 
-export default function BandSearch({
-  onFollow,
-  followedSpotifyIds,
-  placeholder = 'Buscar banda...',
-}: Props) {
+export default function BandSearch({ onFollow, followedSpotifyIds, placeholder }: Props) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchedBand[]>([]);
   const [searching, setSearching] = useState(false);
   const [followingId, setFollowingId] = useState<string | null>(null);
+
+  const resolvedPlaceholder = placeholder ?? t('bandSearch.defaultPlaceholder');
 
   useEffect(() => {
     if (query.trim().length < 2) {
@@ -64,7 +64,7 @@ export default function BandSearch({
       if (json.error) throw new Error(json.error);
       setResults(json.bands ?? []);
     } catch (err: any) {
-      Alert.alert('Error de búsqueda', err.message);
+      Alert.alert(t('bandSearch.searchErrorTitle'), err.message);
     } finally {
       setSearching(false);
     }
@@ -75,7 +75,7 @@ export default function BandSearch({
       setFollowingId(band.spotify_id);
       await onFollow(band);
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      Alert.alert(t('common.error'), err.message);
     } finally {
       setFollowingId(null);
     }
@@ -87,7 +87,7 @@ export default function BandSearch({
         <Ionicons name="search" size={18} color={colors.muted} style={styles.searchIcon} />
         <TextInput
           style={styles.input}
-          placeholder={placeholder}
+          placeholder={resolvedPlaceholder}
           placeholderTextColor={colors.faint}
           value={query}
           onChangeText={setQuery}
@@ -127,7 +127,7 @@ export default function BandSearch({
                   <View style={styles.followedBadge}>
                     <Ionicons name="checkmark" size={14} color={colors.muted} />
                     <Text variant="monoSM" color="muted">
-                      SIGUES
+                      {t('bandSearch.followingBadge')}
                     </Text>
                   </View>
                 ) : (

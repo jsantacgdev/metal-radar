@@ -1,3 +1,4 @@
+import i18n from '../i18n';
 import { supabase } from './supabase';
 
 export type BandToFollow = {
@@ -11,9 +12,8 @@ export async function followBand(band: BandToFollow): Promise<string> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error('Sin sesión');
+  if (!user) throw new Error(i18n.t('errors.noSession'));
 
-  // 1. Buscar banda existente por nombre (case-insensitive)
   const { data: existing } = await supabase
     .from('bands')
     .select('id, spotify_id, image_url, genres')
@@ -23,7 +23,6 @@ export async function followBand(band: BandToFollow): Promise<string> {
   let bandId: string;
 
   if (existing) {
-    // Banda ya existe: actualizamos enriqueciendo datos que falten
     const mergedGenres = Array.from(new Set([...(existing.genres ?? []), ...(band.genres ?? [])]));
 
     const { error: updateError } = await supabase
@@ -38,7 +37,6 @@ export async function followBand(band: BandToFollow): Promise<string> {
     if (updateError) throw updateError;
     bandId = existing.id;
   } else {
-    // Banda no existe: insertamos
     const { data: newBand, error: insertError } = await supabase
       .from('bands')
       .insert({
@@ -50,11 +48,10 @@ export async function followBand(band: BandToFollow): Promise<string> {
       .select('id')
       .single();
 
-    if (insertError || !newBand) throw insertError ?? new Error('Error al guardar banda');
+    if (insertError || !newBand) throw insertError ?? new Error(i18n.t('errors.bandSaveFailed'));
     bandId = newBand.id;
   }
 
-  // 2. Crear relación user_bands (idempotente)
   const { error: followError } = await supabase
     .from('user_bands')
     .insert({ user_id: user.id, band_id: bandId });
@@ -115,6 +112,6 @@ export async function getOrCreateBandId(spotify: {
     )
     .select('id')
     .single();
-  if (error || !data) throw error ?? new Error('Error al obtener banda');
+  if (error || !data) throw error ?? new Error(i18n.t('errors.bandFetchFailed'));
   return data.id;
 }

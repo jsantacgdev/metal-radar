@@ -9,7 +9,8 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { RouteProp, useRoute } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { useFestival } from '../hooks/useFestival';
 import { MapStackParamList } from '../navigation/MapStack';
 import { colors, fontFamily, radius, spacing } from '../theme';
@@ -18,46 +19,47 @@ import BandImage from '../components/BandImage';
 
 type RouteParams = RouteProp<MapStackParamList, 'FestivalDetail'>;
 
-const MONTHS_SHORT = [
-  'ENE',
-  'FEB',
-  'MAR',
-  'ABR',
-  'MAY',
-  'JUN',
-  'JUL',
-  'AGO',
-  'SEP',
-  'OCT',
-  'NOV',
-  'DIC',
-];
+function localeFromI18n(lng: string): string {
+  if (lng.startsWith('en')) return 'en-US';
+  return 'es-ES';
+}
 
-function formatDateRange(start: string, end: string): { range: string; year: string } {
+function formatDateRange(
+  start: string,
+  end: string,
+  locale: string,
+): { range: string; year: string } {
   const s = new Date(start + 'T00:00:00');
   const e = new Date(end + 'T00:00:00');
   const sameMonth = s.getMonth() === e.getMonth();
 
+  const monthFmt = new Intl.DateTimeFormat(locale, { month: 'short' });
+  const sMonth = monthFmt.format(s).toUpperCase().replace(/\./g, '');
+  const eMonth = monthFmt.format(e).toUpperCase().replace(/\./g, '');
+
   if (sameMonth) {
     return {
-      range: `${s.getDate()} – ${e.getDate()} ${MONTHS_SHORT[s.getMonth()]}`,
+      range: `${s.getDate()} – ${e.getDate()} ${sMonth}`,
       year: `${s.getFullYear()}`,
     };
   }
   return {
-    range: `${s.getDate()} ${MONTHS_SHORT[s.getMonth()]} – ${e.getDate()} ${MONTHS_SHORT[e.getMonth()]}`,
+    range: `${s.getDate()} ${sMonth} – ${e.getDate()} ${eMonth}`,
     year: `${s.getFullYear()}`,
   };
 }
 
 export default function FestivalDetailScreen() {
   const route = useRoute<RouteParams>();
+  const { t, i18n } = useTranslation();
   const { festival, loading, error } = useFestival(route.params.festivalId);
+
+  const locale = localeFromI18n(i18n.language);
 
   const dateInfo = useMemo(() => {
     if (!festival) return null;
-    return formatDateRange(festival.start_date, festival.end_date);
-  }, [festival]);
+    return formatDateRange(festival.start_date, festival.end_date, locale);
+  }, [festival, locale]);
 
   const headliners = useMemo(() => {
     if (!festival) return [];
@@ -86,7 +88,7 @@ export default function FestivalDetailScreen() {
     return (
       <View style={styles.centered}>
         <Text variant="bodyLG" color="muted" style={{ textAlign: 'center' }}>
-          {error ?? 'Festival no encontrado'}
+          {error ?? t('festivalDetail.notFound')}
         </Text>
       </View>
     );
@@ -114,7 +116,7 @@ export default function FestivalDetailScreen() {
           <View style={styles.festivalBadge}>
             <Ionicons name="flame" size={12} color={colors.bloodBright} />
             <Text variant="monoSM" color="bloodBright" style={{ marginLeft: 4 }}>
-              FESTIVAL · {isPast ? 'PASADO' : 'PRÓXIMO'}
+              {isPast ? t('festivalDetail.badgePast') : t('festivalDetail.badgeUpcoming')}
             </Text>
           </View>
         </View>
@@ -150,7 +152,7 @@ export default function FestivalDetailScreen() {
               </View>
               <View style={styles.venueInfo}>
                 <Text variant="monoSM" color="muted">
-                  UBICACIÓN
+                  {t('festivalDetail.locationLabel')}
                 </Text>
                 <Text variant="body" numberOfLines={1} style={{ marginTop: 2 }}>
                   {festival.venue.name}
@@ -175,9 +177,7 @@ export default function FestivalDetailScreen() {
             <View style={styles.followedSummary}>
               <Ionicons name="heart" size={18} color={colors.bloodBright} />
               <Text variant="body" style={{ marginLeft: spacing.sm }}>
-                {followedBands.length === 1
-                  ? 'Sigues 1 banda del cartel'
-                  : `Sigues ${followedBands.length} bandas del cartel`}
+                {t('festivalDetail.followedSummary', { count: followedBands.length })}
               </Text>
             </View>
           )}
@@ -185,7 +185,7 @@ export default function FestivalDetailScreen() {
           {followedBands.length > 0 && (
             <View style={styles.section}>
               <Text variant="monoMD" color="bloodBright" style={styles.sectionTitle}>
-                TUS BANDAS
+                {t('festivalDetail.yourBandsTitle')}
               </Text>
               {followedBands.map((b) => (
                 <View key={b.id} style={styles.bandRow}>
@@ -196,7 +196,7 @@ export default function FestivalDetailScreen() {
                     </Text>
                     {b.is_headliner && (
                       <Text variant="monoSM" color="bloodBright" style={{ marginTop: 2 }}>
-                        HEADLINER
+                        {t('festivalDetail.headlinerTag')}
                       </Text>
                     )}
                   </View>
@@ -209,7 +209,7 @@ export default function FestivalDetailScreen() {
           {headliners.filter((h) => !h.is_followed).length > 0 && (
             <View style={styles.section}>
               <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
-                HEADLINERS
+                {t('festivalDetail.headlinersTitle')}
               </Text>
               {headliners
                 .filter((h) => !h.is_followed)
@@ -221,7 +221,7 @@ export default function FestivalDetailScreen() {
                         {b.name}
                       </Text>
                       <Text variant="monoSM" color="bloodBright" style={{ marginTop: 2 }}>
-                        HEADLINER
+                        {t('festivalDetail.headlinerTag')}
                       </Text>
                     </View>
                   </View>
@@ -232,7 +232,7 @@ export default function FestivalDetailScreen() {
           {otherBands.length > 0 && (
             <View style={styles.section}>
               <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
-                CARTEL COMPLETO · {otherBands.length}
+                {t('festivalDetail.fullLineupTitle', { count: otherBands.length })}
               </Text>
               <View style={styles.tagWrap}>
                 {otherBands.map((b) => (
@@ -254,7 +254,7 @@ export default function FestivalDetailScreen() {
             >
               <Ionicons name="globe-outline" size={18} color={colors.silver} />
               <Text variant="body" color="silver" style={{ marginLeft: spacing.sm, flex: 1 }}>
-                Web oficial
+                {t('festivalDetail.officialWebsite')}
               </Text>
               <Ionicons name="open-outline" size={16} color={colors.muted} />
             </TouchableOpacity>
@@ -280,7 +280,7 @@ export default function FestivalDetailScreen() {
                 marginLeft: spacing.sm,
               }}
             >
-              Comprar entradas
+              {t('festivalDetail.buyTickets')}
             </Text>
           </TouchableOpacity>
         </View>

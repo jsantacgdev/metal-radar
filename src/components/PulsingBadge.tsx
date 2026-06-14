@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet } from 'react-native';
 import { colors, fontFamily, radius } from '../theme';
 
-export default function PulsingBadge({ label = 'NUEVO' }: { label?: string }) {
+export default function PulsingBadge({ label }: { label?: string }) {
   const scale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -16,6 +16,8 @@ export default function PulsingBadge({ label = 'NUEVO' }: { label?: string }) {
     return () => loop.stop();
   }, [scale]);
 
+  if (!label) return null;
+
   return (
     <Animated.View style={[styles.badge, { transform: [{ scale }] }]}>
       <Animated.Text style={styles.text}>{label}</Animated.Text>
@@ -23,14 +25,12 @@ export default function PulsingBadge({ label = 'NUEVO' }: { label?: string }) {
   );
 }
 
-// Modifica el estilo en PulsingBadge.tsx
 const styles = StyleSheet.create({
   badge: {
-    backgroundColor: colors.bloodBright, // Fondo sólido más brillante
+    backgroundColor: colors.bloodBright,
     paddingHorizontal: 7,
     paddingVertical: 3,
-    borderRadius: radius.sm, // Un poco más cuadrado para que parezca una etiqueta
-    // Sombra para que se separe de la imagen de fondo
+    borderRadius: radius.sm,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   text: {
-    color: '#fff', // Texto blanco puro para máximo contraste
+    color: '#fff',
     fontSize: 9,
     fontFamily: fontFamily.monoBold,
     letterSpacing: 1.2,
