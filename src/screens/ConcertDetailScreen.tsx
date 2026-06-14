@@ -198,7 +198,7 @@ export default function ConcertDetailScreen({ route }: Props) {
           </View>
         </Section>
 
-        {isAttended && concert.userConcertId && (
+        {concert.userConcertId && (
           <>
             {/* Setlists - uno por banda */}
             <View style={{ paddingHorizontal: spacing.xl }}>
@@ -215,6 +215,10 @@ export default function ConcertDetailScreen({ route }: Props) {
                 );
               })}
             </View>
+          </>
+        )}
+        {isAttended && concert.userConcertId && (
+          <>
             <Section title={t('concertDetail.ratingTitle')}>
               <RatingPicker
                 value={concert.rating ?? 0}
