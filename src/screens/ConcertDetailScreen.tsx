@@ -34,6 +34,9 @@ export default function ConcertDetailScreen({ route }: Props) {
   const { concert, loading, error, updateStatus, updateRating, updateNotes } =
     useConcert(concertId);
 
+  const isAttended = concert?.userStatus === 'attended';
+  const { data: setlists = [] } = useSetlists(isAttended ? concert.id : null);
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -51,8 +54,6 @@ export default function ConcertDetailScreen({ route }: Props) {
       </View>
     );
   }
-  const isAttended = concert.userStatus === 'attended';
-  const { data: setlists = [] } = useSetlists(isAttended ? concert.id : null);
 
   const locale = localeFromI18n(i18n.language);
   const dateObj = new Date(concert.event_date);
@@ -217,6 +218,7 @@ export default function ConcertDetailScreen({ route }: Props) {
             </View>
           </>
         )}
+
         {isAttended && concert.userConcertId && (
           <>
             <Section title={t('concertDetail.ratingTitle')}>
@@ -335,11 +337,7 @@ function RatingPicker({ value, onChange }: { value: number; onChange: (v: number
           hitSlop={8}
           style={styles.ratingTouch}
         >
-          <Ionicons
-            name="triangle"
-            size={26}
-            color={i <= value ? colors.bloodBright : colors.faint}
-          />
+          <Ionicons name="star" size={26} color={i <= value ? colors.bloodBright : colors.faint} />
         </TouchableOpacity>
       ))}
       <View style={{ flex: 1 }} />
