@@ -34,7 +34,15 @@
           "cameraPermission": "Permite a Metal Radar usar la cámara para capturar momentos del concierto."
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "react-native",
+          "organization": "metal-radar-i0"
+        }
+      ]
     ],
     "ios": {
       "supportsTablet": true,

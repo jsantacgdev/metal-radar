@@ -42,3 +42,5 @@ yarn-error.*
 /android
 *firebase-adminsdk*.json
 metal-radar-*.json
+
+.env.local

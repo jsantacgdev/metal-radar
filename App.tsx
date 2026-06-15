@@ -15,8 +15,43 @@ import { colors } from './src/theme';
 import RootNavigator from './src/navigation/RootNavigator';
 import { initI18n } from './src/i18n';
 import { useEffect, useState } from 'react';
+import * as Sentry from '@sentry/react-native';
+import { supabase } from './src/lib/supabase';
 
-export default function App() {
+Sentry.init({
+  dsn: 'https://0aefe0af13aade1127859877797d6beb@o4511571709984768.ingest.de.sentry.io/4511571712999504',
+
+  // No enviar PII (IP, cookies, datos personales)
+  sendDefaultPii: false,
+
+  // Solo enviar errores en producción para no consumir cuota durante desarrollo
+  enabled: !__DEV__,
+
+  // Sanitización extra: eliminamos cualquier email, token o dato sensible
+  // que se haya colado en breadcrumbs o en el contexto del error
+  beforeSend(event) {
+    // Borra IP por si acaso
+    if (event.user) {
+      delete event.user.ip_address;
+      delete event.user.email;
+      delete event.user.username;
+    }
+    return event;
+  },
+
+  beforeBreadcrumb(breadcrumb) {
+    // No registrar el body de las peticiones HTTP (puede contener tokens/datos)
+    if (breadcrumb.category === 'fetch' || breadcrumb.category === 'xhr') {
+      if (breadcrumb.data) {
+        delete breadcrumb.data.request_body;
+        delete breadcrumb.data.response_body;
+      }
+    }
+    return breadcrumb;
+  },
+});
+
+export default Sentry.wrap(function App() {
   const [fontsLoaded] = useFonts({
     Archivo_700Bold,
     Archivo_800ExtraBold,
@@ -31,6 +66,35 @@ export default function App() {
 
   useEffect(() => {
     initI18n().then(() => setReady(true));
+  }, []);
+
+  // Asociar el user.id (UUID anónimo de Supabase) a cada error para poder
+  // correlacionar fallos del mismo usuario. No enviamos email ni nombre.
+  useEffect(() => {
+    const updateSentryUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        Sentry.setUser({ id: user.id });
+      } else {
+        Sentry.setUser(null);
+      }
+    };
+
+    updateSentryUser();
+
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        Sentry.setUser({ id: session.user.id });
+      } else {
+        Sentry.setUser(null);
+      }
+    });
+
+    return () => {
+      subscription.subscription.unsubscribe();
+    };
   }, []);
 
   if (!fontsLoaded || !ready) {
@@ -56,4 +120,4 @@ export default function App() {
       </SafeAreaProvider>
     </QueryClientProvider>
   );
-}
+});
