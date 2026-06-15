@@ -18,6 +18,7 @@ import { useFocusEffect } from '@react-navigation/native';
 
 const LOCATION_CACHE_KEY = 'last_known_location';
 const LOCATION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const LOCATION_TIMEOUT_MS = 8000;
 
 function localeFromI18n(lng: string): string {
   if (lng.startsWith('en')) return 'en-US';
@@ -32,8 +33,16 @@ export default function MapScreen() {
 
   const locale = localeFromI18n(i18n.language);
 
+  const homeLocation = useMemo(() => {
+    if (profile?.home_lat != null && profile?.home_lng != null) {
+      return { lat: profile.home_lat, lng: profile.home_lng };
+    }
+    return null;
+  }, [profile?.home_lat, profile?.home_lng]);
+
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [permissionDenied, setPermissionDenied] = useState(false);
+  const [usingHomeFallback, setUsingHomeFallback] = useState(false);
+  const [noLocationAvailable, setNoLocationAvailable] = useState(false);
   const [selectedVenue, setSelectedVenue] = useState<{
     venue: ConcertWithDetails['venue'];
     concerts: ConcertWithDetails[];
@@ -100,47 +109,70 @@ export default function MapScreen() {
 
   const lastFreshRef = useRef<number>(0);
 
-  const loadLocation = useCallback(async (forceFresh = false) => {
-    if (forceFresh && Date.now() - lastFreshRef.current < 30_000) {
-      return;
+  const fallbackToHomeOrFail = useCallback(() => {
+    if (homeLocation) {
+      setLocation(homeLocation);
+      setUsingHomeFallback(true);
+      setNoLocationAvailable(false);
+    } else {
+      setNoLocationAvailable(true);
     }
+  }, [homeLocation]);
 
-    if (!forceFresh) {
-      try {
-        const cached = await AsyncStorage.getItem(LOCATION_CACHE_KEY);
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Date.now() - parsed.timestamp < LOCATION_MAX_AGE_MS) {
-            setLocation({ lat: parsed.lat, lng: parsed.lng });
-          }
-        }
-      } catch {
-        // ignore
+  const loadLocation = useCallback(
+    async (forceFresh = false) => {
+      if (forceFresh && Date.now() - lastFreshRef.current < 30_000) {
+        return;
       }
-    }
 
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
-      setPermissionDenied(true);
-      return;
-    }
+      // Cache: solo úsalo si no hay nada en pantalla aún
+      if (!forceFresh) {
+        try {
+          const cached = await AsyncStorage.getItem(LOCATION_CACHE_KEY);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Date.now() - parsed.timestamp < LOCATION_MAX_AGE_MS) {
+              setLocation({ lat: parsed.lat, lng: parsed.lng });
+              setUsingHomeFallback(false);
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
 
-    try {
-      const pos = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-      const fresh = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      setLocation(fresh);
-      lastFreshRef.current = Date.now();
+      // Permisos
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        fallbackToHomeOrFail();
+        return;
+      }
 
-      await AsyncStorage.setItem(
-        LOCATION_CACHE_KEY,
-        JSON.stringify({ ...fresh, timestamp: Date.now() }),
-      );
-    } catch (err) {
-      console.warn('Error obteniendo ubicación:', err);
-    }
-  }, []);
+      // GPS con timeout para no quedarnos colgados
+      try {
+        const pos = await Promise.race([
+          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Location timeout')), LOCATION_TIMEOUT_MS),
+          ),
+        ]);
+        const fresh = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setLocation(fresh);
+        setUsingHomeFallback(false);
+        setNoLocationAvailable(false);
+        lastFreshRef.current = Date.now();
+
+        await AsyncStorage.setItem(
+          LOCATION_CACHE_KEY,
+          JSON.stringify({ ...fresh, timestamp: Date.now() }),
+        );
+      } catch (err) {
+        console.warn('Error obteniendo ubicación:', err);
+        fallbackToHomeOrFail();
+      }
+    },
+    [fallbackToHomeOrFail],
+  );
 
   useEffect(() => {
     loadLocation();
@@ -152,15 +184,15 @@ export default function MapScreen() {
     }, [loadLocation]),
   );
 
-  if (permissionDenied) {
+  if (noLocationAvailable) {
     return (
       <View style={styles.centered}>
         <Ionicons name="location-outline" size={48} color={colors.bloodBright} />
         <Text variant="displaySM" style={{ marginTop: spacing.lg, textAlign: 'center' }}>
-          {t('map.permissionTitle')}
+          {t('map.noLocationTitle')}
         </Text>
         <Text variant="body" color="muted" style={{ marginTop: spacing.sm, textAlign: 'center' }}>
-          {t('map.permissionDesc')}
+          {t('map.noLocationDesc')}
         </Text>
       </View>
     );
@@ -193,8 +225,12 @@ export default function MapScreen() {
       {/* Header flotante */}
       <View style={[styles.headerOverlay, { paddingTop: insets.top + spacing.xs }]}>
         <View style={styles.headerCard}>
-          <Ionicons name="radio" size={18} color={colors.bloodBright} />
-          <View style={{ marginLeft: spacing.sm }}>
+          <Ionicons
+            name={usingHomeFallback ? 'home' : 'radio'}
+            size={18}
+            color={colors.bloodBright}
+          />
+          <View style={{ marginLeft: spacing.sm, flex: 1 }}>
             <Text
               style={{
                 fontFamily: fontFamily.displayBold,
@@ -206,8 +242,10 @@ export default function MapScreen() {
             >
               {t('map.title')}
             </Text>
-            <Text variant="monoSM" color="muted">
-              {t('map.headerSummary', { total: visible.length, near: concerts.length })}
+            <Text variant="monoSM" color="muted" numberOfLines={1}>
+              {usingHomeFallback
+                ? t('map.headerSummaryHome', { total: visible.length })
+                : t('map.headerSummary', { total: visible.length, near: concerts.length })}
             </Text>
           </View>
         </View>

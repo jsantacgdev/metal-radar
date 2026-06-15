@@ -10,6 +10,8 @@ export type SetlistSong = {
   duration_ms: number | null;
 };
 
+export type SetlistSource = 'event' | 'tour';
+
 export type Setlist = {
   id: string;
   concert_id: string;
@@ -20,6 +22,8 @@ export type Setlist = {
   song_count: number;
   encore_count: number;
   not_found: boolean;
+  source: SetlistSource;
+  source_event_date: string | null;
   fetched_at: string;
 };
 

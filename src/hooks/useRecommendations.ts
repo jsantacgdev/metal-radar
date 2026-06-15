@@ -18,7 +18,7 @@ async function fetchRecommendations(): Promise<RecommendedBand[]> {
     headers: { Authorization: `Bearer ${session?.access_token}` },
   });
   const json = await res.json();
-  console.log('recommendations response:', JSON.stringify(json, null, 2));
+  // console.log('recommendations response:', JSON.stringify(json, null, 2));
   if (json.error) throw new Error(json.error);
   return json.recommendations ?? [];
 }

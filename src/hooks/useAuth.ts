@@ -25,6 +25,7 @@ export function useAuth() {
     let cancelled = false;
 
     supabase.auth.getSession().then(({ data }) => {
+      console.log('JWT:', data.session?.access_token);
       if (cancelled) return;
       setSession(data.session);
       setLoading(false);

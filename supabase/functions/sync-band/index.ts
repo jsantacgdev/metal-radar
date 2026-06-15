@@ -34,6 +34,36 @@ function normalizeCountry(name?: string): string | null {
   return name.toLowerCase().trim();
 }
 
+/**
+ * Extrae el nombre del tour del nombre del evento de Ticketmaster.
+ * Patrón típico: "ARTIST - Tour Name 2026" → "Tour Name 2026"
+ * Acepta varios separadores: " - ", " – ", " — ", ": "
+ * Comparación case-insensitive para tolerar "LINKIN PARK" vs "Linkin Park".
+ */
+function extractTourName(eventName: string, attractionName: string): string | null {
+  if (!eventName || !attractionName) return null;
+
+  const eventLower = eventName.toLowerCase().trim();
+  const artistLower = attractionName.toLowerCase().trim();
+
+  if (!eventLower.startsWith(artistLower)) return null;
+
+  const rest = eventName.slice(attractionName.length).trimStart();
+  const separators = [' - ', ' – ', ' — ', ': ', '- ', '– ', '— ', ':'];
+
+  for (const sep of separators) {
+    if (rest.startsWith(sep)) {
+      const tour = rest.slice(sep.length).trim();
+      return tour.length > 0 ? tour : null;
+    }
+  }
+
+  if (rest.length > 0 && rest !== eventName) {
+    return rest;
+  }
+  return null;
+}
+
 async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=3`;
@@ -61,6 +91,16 @@ async function forwardGeocode(query: string): Promise<{ lat: number; lng: number
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+type TmAttraction = {
+  id: string;
+  name: string;
+  images?: { url: string }[];
+  externalLinks?: {
+    musicbrainz?: { id: string; url?: string }[];
+    spotify?: { url: string }[];
+  };
+};
+
 type TmEvent = {
   id: string;
   name: string;
@@ -75,11 +115,7 @@ type TmEvent = {
       country?: { name: string };
       location?: { latitude: string; longitude: string };
     }[];
-    attractions?: {
-      id: string;
-      name: string;
-      images?: { url: string }[];
-    }[];
+    attractions?: TmAttraction[];
   };
 };
 
@@ -117,7 +153,6 @@ Deno.serve(async (req) => {
     const band: any = (ub as any)?.band;
     if (!band) throw new Error('Banda no encontrada o no seguida por el usuario');
 
-    // Threshold de 12h (saltable con force=true)
     const STALE_HOURS = 12;
     const staleSince = new Date(Date.now() - STALE_HOURS * 60 * 60 * 1000).toISOString();
     if (!force && band.last_concerts_sync_at && band.last_concerts_sync_at > staleSince) {
@@ -171,7 +206,12 @@ Deno.serve(async (req) => {
       }
 
       attractionId = matched.id;
-      await admin.from('bands').update({ ticketmaster_id: attractionId }).eq('id', band.id);
+      const matchedMbid: string | null = matched.externalLinks?.musicbrainz?.[0]?.id ?? null;
+
+      const updatePayload: Record<string, unknown> = { ticketmaster_id: attractionId };
+      if (matchedMbid) updatePayload.musicbrainz_mbid = matchedMbid;
+
+      await admin.from('bands').update(updatePayload).eq('id', band.id);
     }
 
     const tmUrl =
@@ -201,6 +241,9 @@ Deno.serve(async (req) => {
 
       const eventDate = ev.dates.start.dateTime ?? ev.dates.start.localDate;
       if (!eventDate) continue;
+
+      const headlinerName = ev._embedded?.attractions?.[0]?.name ?? band.name;
+      const tourName = extractTourName(ev.name, headlinerName);
 
       const declaredCountry = normalizeCountry(venue.country?.name);
       let lat: number | null = venue.location ? parseFloat(venue.location.latitude) : null;
@@ -266,6 +309,7 @@ Deno.serve(async (req) => {
             price_min: priceRange?.min ?? null,
             price_max: priceRange?.max ?? null,
             currency: priceRange?.currency ?? null,
+            tour_name: tourName,
             last_synced_at: new Date().toISOString(),
           },
           { onConflict: 'ticketmaster_id' },
@@ -278,7 +322,6 @@ Deno.serve(async (req) => {
       const attractions = ev._embedded?.attractions ?? [];
 
       if (attractions.length === 0) {
-        // Fallback: si no hay attractions, al menos asociamos la banda que sincronizamos
         await admin
           .from('concert_bands')
           .upsert(
@@ -290,10 +333,11 @@ Deno.serve(async (req) => {
           const attr = attractions[idx];
           if (!attr.name) continue;
 
-          // Buscar o crear banda en BD
+          const attrMbid: string | null = attr.externalLinks?.musicbrainz?.[0]?.id ?? null;
+
           const { data: existingBand } = await admin
             .from('bands')
-            .select('id')
+            .select('id, musicbrainz_mbid')
             .or(`ticketmaster_id.eq.${attr.id},name.ilike.${attr.name.replace(/,/g, '')}`)
             .limit(1)
             .maybeSingle();
@@ -302,19 +346,21 @@ Deno.serve(async (req) => {
 
           if (!bandIdInDb) {
             const imageUrl = attr.images?.[0]?.url ?? null;
+            const insertPayload: Record<string, unknown> = {
+              name: attr.name,
+              ticketmaster_id: attr.id,
+              image_url: imageUrl,
+            };
+            if (attrMbid) insertPayload.musicbrainz_mbid = attrMbid;
+
             const { data: newBand } = await admin
               .from('bands')
-              .upsert(
-                {
-                  name: attr.name,
-                  ticketmaster_id: attr.id,
-                  image_url: imageUrl,
-                },
-                { onConflict: 'ticketmaster_id' },
-              )
+              .upsert(insertPayload, { onConflict: 'ticketmaster_id' })
               .select('id')
               .single();
             bandIdInDb = newBand?.id;
+          } else if (attrMbid && !existingBand?.musicbrainz_mbid) {
+            await admin.from('bands').update({ musicbrainz_mbid: attrMbid }).eq('id', bandIdInDb);
           }
 
           if (bandIdInDb) {

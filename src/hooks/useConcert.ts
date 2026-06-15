@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../lib/supabase';
 import i18n from '../i18n';
+import { supabase } from '../lib/supabase';
 
 export type ConcertDetail = {
   id: string;
@@ -110,10 +110,14 @@ export function useConcert(concertId: string) {
           { onConflict: 'user_id,concert_id' },
         );
 
-        // Fire-and-forget: si marca como attended, dispara fetch de setlists
-        if (status === 'attended') {
+        // Fire-and-forget: en cualquier estado intentamos cachear el setlist
+        // si no existe ya. fetch-setlist es idempotente sin force=true.
+        if (status === 'interested' || status === 'going' || status === 'attended') {
           supabase.functions
             .invoke('fetch-setlist', { body: { concertId } })
+            .then(() => {
+              queryClient.invalidateQueries({ queryKey: ['setlists', concertId] });
+            })
             .catch((e) => console.warn('Setlist fetch failed:', e.message));
         }
       }

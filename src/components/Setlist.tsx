@@ -13,6 +13,13 @@ type Props = {
   bandName: string;
 };
 
+const TOUR_ACCENT = '#ffa500'; // Naranja para "predicción de gira"
+
+function localeFromI18n(lng: string): string {
+  if (lng.startsWith('en')) return 'en-US';
+  return 'es-ES';
+}
+
 function useFormatDuration() {
   const { t } = useTranslation();
   return (min: number | null): string => {
@@ -25,11 +32,17 @@ function useFormatDuration() {
   };
 }
 
+function formatSourceDate(isoDate: string, locale: string): string {
+  const d = new Date(isoDate);
+  return d.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 export default function SetlistView({ concertId, setlist, bandId, bandName }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const refresh = useRefreshSetlist();
   const [expanded, setExpanded] = useState(false);
   const formatDuration = useFormatDuration();
+  const locale = localeFromI18n(i18n.language);
 
   const handleRefresh = () => {
     refresh.mutate({ concertId, bandId, force: true });
@@ -77,6 +90,7 @@ export default function SetlistView({ concertId, setlist, bandId, bandName }: Pr
   const hasMore = setlist.songs.length > 8;
   const mainSongs = setlist.songs.filter((s) => !s.encore);
   const encoreSongs = setlist.songs.filter((s) => s.encore);
+  const isTourPrediction = setlist.source === 'tour';
 
   return (
     <View style={styles.container}>
@@ -86,11 +100,19 @@ export default function SetlistView({ concertId, setlist, bandId, bandName }: Pr
             {t('setlist.headerLabel', { band: bandName.toUpperCase() })}
           </Text>
           <View style={styles.statsRow}>
-            <View style={styles.badge}>
-              <Text variant="monoSM" color="bloodBright">
-                {t('setlist.realSetlist')}
-              </Text>
-            </View>
+            {isTourPrediction ? (
+              <View style={[styles.badge, styles.badgeTour]}>
+                <Text variant="monoSM" style={{ color: TOUR_ACCENT }}>
+                  {t('setlist.tourPrediction')}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.badge}>
+                <Text variant="monoSM" color="bloodBright">
+                  {t('setlist.realSetlist')}
+                </Text>
+              </View>
+            )}
             <Text variant="monoSM" color="silver">
               {t('setlist.songsCount', { count: setlist.song_count })}
             </Text>
@@ -100,6 +122,13 @@ export default function SetlistView({ concertId, setlist, bandId, bandName }: Pr
               </Text>
             )}
           </View>
+          {isTourPrediction && setlist.source_event_date && (
+            <Text variant="monoSM" color="muted" style={{ marginTop: 4 }}>
+              {t('setlist.basedOnConcert', {
+                date: formatSourceDate(setlist.source_event_date, locale),
+              })}
+            </Text>
+          )}
         </View>
         <TouchableOpacity onPress={handleRefresh} disabled={refresh.isPending} hitSlop={10}>
           {refresh.isPending ? (
@@ -240,6 +269,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bloodTint,
     borderWidth: 1,
     borderColor: colors.bloodTintBorder,
+  },
+  badgeTour: {
+    backgroundColor: 'rgba(255, 165, 0, 0.15)',
+    borderColor: 'rgba(255, 165, 0, 0.4)',
   },
   emptyBox: {
     paddingVertical: spacing.xl,

@@ -110,7 +110,10 @@
     "emptyDesc": "Follow more bands in Radar or come back later",
     "venueSummary_one": "{{km}} KM · 1 CONCERT",
     "venueSummary_other": "{{km}} KM · {{count}} CONCERTS",
-    "bandsPrefix": "Bands:"
+    "bandsPrefix": "Bands:",
+    "noLocationTitle": "Location unavailable",
+    "noLocationDesc": "Enable GPS or set your home location in your profile",
+    "headerSummaryHome": "{{total}} CONCERTS · FROM HOME LOCATION"
   },
   "diary": {
     "title": "Diary",
@@ -236,7 +239,9 @@
     "tapeTag": "TAPE",
     "durationMin": "{{min}} min",
     "durationH": "{{h}}h",
-    "durationHM": "{{h}}h {{m}}m"
+    "durationHM": "{{h}}h {{m}}m",
+    "tourPrediction": "🎯 TOUR PREDICTION",
+    "basedOnConcert": "Based on the concert from {{date}}"
   },
   "photoGallery": {
     "headerLabel": "PHOTOS · {{count}}/{{max}}",

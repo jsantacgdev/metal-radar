@@ -110,7 +110,10 @@
     "emptyDesc": "Sigue más bandas en el Radar o vuelve más tarde",
     "venueSummary_one": "{{km}} KM · 1 CONCIERTO",
     "venueSummary_other": "{{km}} KM · {{count}} CONCIERTOS",
-    "bandsPrefix": "Bandas:"
+    "bandsPrefix": "Bandas:",
+    "noLocationTitle": "Ubicación no disponible",
+    "noLocationDesc": "Activa el GPS o configura tu ubicación de referencia en el perfil",
+    "headerSummaryHome": "{{total}} CONCIERTOS · DESDE UBICACIÓN BASE"
   },
   "diary": {
     "title": "Diario",
@@ -236,7 +239,9 @@
     "tapeTag": "TAPE",
     "durationMin": "{{min}} min",
     "durationH": "{{h}}h",
-    "durationHM": "{{h}}h {{m}}m"
+    "durationHM": "{{h}}h {{m}}m",
+    "tourPrediction": "🎯 PREDICCIÓN · GIRA",
+    "basedOnConcert": "Basado en el concierto del {{date}}"
   },
   "photoGallery": {
     "headerLabel": "FOTOS · {{count}}/{{max}}",

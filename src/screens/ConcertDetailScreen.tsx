@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -22,7 +22,6 @@ import { useSetlists } from '../hooks/useSetlist';
 
 type Props = NativeStackScreenProps<MapStackParamList, 'ConcertDetail'>;
 
-// Mapea el lng de i18n al locale BCP-47 que usa Intl/toLocaleDateString
 function localeFromI18n(lng: string): string {
   if (lng.startsWith('en')) return 'en-US';
   return 'es-ES';
@@ -34,8 +33,7 @@ export default function ConcertDetailScreen({ route }: Props) {
   const { concert, loading, error, updateStatus, updateRating, updateNotes } =
     useConcert(concertId);
 
-  const isAttended = concert?.userStatus === 'attended';
-  const { data: setlists = [] } = useSetlists(isAttended ? concert.id : null);
+  const { data: setlists = [] } = useSetlists(concert ? concert.id : null);
 
   if (loading) {
     return (
@@ -54,6 +52,8 @@ export default function ConcertDetailScreen({ route }: Props) {
       </View>
     );
   }
+
+  const isAttended = concert.userStatus === 'attended';
 
   const locale = localeFromI18n(i18n.language);
   const dateObj = new Date(concert.event_date);
@@ -199,26 +199,23 @@ export default function ConcertDetailScreen({ route }: Props) {
           </View>
         </Section>
 
-        {concert.userConcertId && (
-          <>
-            {/* Setlists - uno por banda */}
-            <View style={{ paddingHorizontal: spacing.xl }}>
-              {concert.bands.map((band) => {
-                const setlist = setlists.find((s) => s.band_id === band.id) ?? null;
-                return (
-                  <SetlistView
-                    key={band.id}
-                    concertId={concert.id}
-                    setlist={setlist}
-                    bandId={band.id}
-                    bandName={band.name}
-                  />
-                );
-              })}
-            </View>
-          </>
-        )}
+        {/* Setlists - SIEMPRE visibles. Si no hay datos en BD, el componente muestra el botón "BUSCAR" */}
+        <View style={{ paddingHorizontal: spacing.xl }}>
+          {concert.bands.map((band) => {
+            const setlist = setlists.find((s) => s.band_id === band.id) ?? null;
+            return (
+              <SetlistView
+                key={band.id}
+                concertId={concert.id}
+                setlist={setlist}
+                bandId={band.id}
+                bandName={band.name}
+              />
+            );
+          })}
+        </View>
 
+        {/* Rating, notes y fotos solo para conciertos a los que asististe */}
         {isAttended && concert.userConcertId && (
           <>
             <Section title={t('concertDetail.ratingTitle')}>
@@ -337,7 +334,11 @@ function RatingPicker({ value, onChange }: { value: number; onChange: (v: number
           hitSlop={8}
           style={styles.ratingTouch}
         >
-          <Ionicons name="star" size={26} color={i <= value ? colors.bloodBright : colors.faint} />
+          <Ionicons
+            name="triangle"
+            size={26}
+            color={i <= value ? colors.bloodBright : colors.faint}
+          />
         </TouchableOpacity>
       ))}
       <View style={{ flex: 1 }} />

@@ -12,7 +12,6 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const COVER_REGEX = /\(([^)]+)\s+cover\)/i;
 const SETLISTFM_DELAY_MS = 600; // 2 req/s con margen
 const SPOTIFY_DELAY_MS = 250;
 
@@ -37,6 +36,19 @@ function formatDate(isoDate: string): string {
   return `${dd}-${mm}-${yyyy}`;
 }
 
+/** Convierte DD-MM-YYYY (formato setlist.fm) → YYYY-MM-DD (formato Postgres DATE) */
+function setlistfmDateToISO(ddmmyyyy: string): string | null {
+  const parts = ddmmyyyy.split('-');
+  if (parts.length !== 3) return null;
+  const [dd, mm, yyyy] = parts;
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/** Quita un año al final del tour name si está presente. "From Zero World Tour 2026" → "From Zero World Tour" */
+function stripTrailingYear(tour: string): string {
+  return tour.replace(/\s+\d{4}$/, '').trim();
+}
+
 type SetlistfmSong = { name: string; cover?: { name: string }; tape?: boolean };
 type SetlistfmSet = { name?: string; encore?: number; song: SetlistfmSong[] };
 type SetlistfmSetlist = {
@@ -44,7 +56,8 @@ type SetlistfmSetlist = {
   artist: { name: string };
   venue: { name: string; city: { name: string; country: { code: string } } };
   sets: { set: SetlistfmSet[] };
-  eventDate: string;
+  eventDate: string; // DD-MM-YYYY
+  tour?: { name: string };
 };
 
 type Song = {
@@ -56,7 +69,8 @@ type Song = {
   duration_ms: number | null;
 };
 
-async function searchSetlistfm(
+/** Busca el setlist del PROPIO evento (artist + date). Comportamiento original. */
+async function searchSetlistfmByDate(
   artistName: string,
   date: string,
   cityName?: string | null,
@@ -73,7 +87,7 @@ async function searchSetlistfm(
   });
 
   if (res.status === 404) return null;
-  if (res.status === 429) throw new Error(`SETLISTFM_RATE_LIMITED`);
+  if (res.status === 429) throw new Error('SETLISTFM_RATE_LIMITED');
   if (!res.ok) {
     console.log(`[setlistfm] HTTP ${res.status} for "${artistName}" ${date}`);
     return null;
@@ -82,11 +96,8 @@ async function searchSetlistfm(
   const data = await res.json();
   const setlists: SetlistfmSetlist[] = data.setlist ?? [];
   if (setlists.length === 0) return null;
-
-  // Si solo hay uno, ese
   if (setlists.length === 1) return setlists[0];
 
-  // Si hay varios, preferir el de misma ciudad
   if (cityName) {
     const targetCity = normalizeName(cityName);
     const cityMatch = setlists.find(
@@ -95,8 +106,73 @@ async function searchSetlistfm(
     if (cityMatch) return cityMatch;
   }
 
-  // Si no, el primero
   return setlists[0];
+}
+
+/**
+ * Llama al endpoint search/setlists filtrando por mbid + tourName.
+ * Devuelve el setlist más reciente con canciones, o null si no hay ninguno.
+ */
+async function fetchTourSetlistRaw(
+  artistMbid: string,
+  tourName: string,
+): Promise<SetlistfmSetlist | null> {
+  const url =
+    `https://api.setlist.fm/rest/1.0/search/setlists?` +
+    `artistMbid=${encodeURIComponent(artistMbid)}` +
+    `&tourName=${encodeURIComponent(tourName)}`;
+
+  const res = await fetch(url, {
+    headers: {
+      'x-api-key': SETLISTFM_API_KEY,
+      Accept: 'application/json',
+    },
+  });
+
+  if (res.status === 404) return null;
+  if (res.status === 429) throw new Error('SETLISTFM_RATE_LIMITED');
+  if (!res.ok) {
+    console.log(`[setlistfm] tour HTTP ${res.status} mbid=${artistMbid} tour="${tourName}"`);
+    return null;
+  }
+
+  const data = await res.json();
+  const setlists: SetlistfmSetlist[] = data.setlist ?? [];
+  if (setlists.length === 0) return null;
+
+  // Ordenar por fecha descendente
+  const withDate = setlists
+    .map((s) => ({ s, t: setlistfmDateToISO(s.eventDate) }))
+    .filter((x) => x.t)
+    .sort((a, b) => (a.t! < b.t! ? 1 : -1));
+
+  // Coger el primero con canciones
+  for (const { s } of withDate) {
+    const total = (s.sets?.set ?? []).reduce((acc, set) => acc + (set.song?.length ?? 0), 0);
+    if (total > 0) return s;
+  }
+  return null;
+}
+
+/**
+ * Busca setlist por gira. Hace hasta 2 intentos:
+ * 1. Con el tourName tal cual
+ * 2. Si no hay resultados, sin el año al final ("Tour Name 2026" → "Tour Name")
+ */
+async function searchSetlistfmByTour(
+  artistMbid: string,
+  tourName: string,
+): Promise<SetlistfmSetlist | null> {
+  let setlist = await fetchTourSetlistRaw(artistMbid, tourName);
+  if (setlist) return setlist;
+  await sleep(SETLISTFM_DELAY_MS);
+
+  const cleaned = stripTrailingYear(tourName);
+  if (cleaned && cleaned !== tourName) {
+    setlist = await fetchTourSetlistRaw(artistMbid, cleaned);
+    if (setlist) return setlist;
+  }
+  return null;
 }
 
 function flattenSongs(setlist: SetlistfmSetlist): Song[] {
@@ -107,10 +183,7 @@ function flattenSongs(setlist: SetlistfmSetlist): Song[] {
   for (const set of sets) {
     const isEncore = (set.encore ?? 0) > 0;
     for (const s of set.song) {
-      if (!s.name || s.name.trim() === '') {
-        // setlist.fm a veces tiene placeholders vacíos (Drum solo, etc.)
-        continue;
-      }
+      if (!s.name || s.name.trim() === '') continue;
       pos++;
       songs.push({
         name: s.name,
@@ -122,7 +195,6 @@ function flattenSongs(setlist: SetlistfmSetlist): Song[] {
       });
     }
   }
-
   return songs;
 }
 
@@ -153,7 +225,6 @@ async function enrichSongDuration(
   artistName: string,
   token: string,
 ): Promise<number | null> {
-  // Si es cover, busca con el artista original
   const searchArtist = song.cover_of ?? artistName;
   const q = `track:"${song.name}" artist:"${searchArtist}"`;
   const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=1`;
@@ -169,57 +240,81 @@ async function enrichSongDuration(
   }
 }
 
+type BandToProcess = {
+  id: string;
+  name: string;
+  mbid: string | null;
+  isHeadliner: boolean;
+};
+
 async function processConcertBand(
   admin: any,
   concertId: string,
-  bandId: string,
-  bandName: string,
+  band: BandToProcess,
   eventDate: string,
   cityName: string | null,
+  tourName: string | null,
   spotifyToken: string,
 ) {
-  console.log(`[fetch-setlist] processing "${bandName}" @ ${eventDate}`);
+  console.log(`[fetch-setlist] processing "${band.name}" @ ${eventDate}`);
 
-  // 1. Buscar en setlist.fm
-  const setlist = await searchSetlistfm(bandName, eventDate, cityName);
+  // 1. Intentar setlist del propio evento
+  let setlist = await searchSetlistfmByDate(band.name, eventDate, cityName);
   await sleep(SETLISTFM_DELAY_MS);
 
+  let source: 'event' | 'tour' = 'event';
+  let sourceEventDate: string | null = null;
+
+  // 2. Si no hay y la banda es headliner con mbid y hay tour_name → buscar por gira
+  if (!setlist && band.isHeadliner && band.mbid && tourName) {
+    console.log(`[fetch-setlist] no event setlist for "${band.name}", trying tour "${tourName}"`);
+    setlist = await searchSetlistfmByTour(band.mbid, tourName);
+    await sleep(SETLISTFM_DELAY_MS);
+    if (setlist) {
+      source = 'tour';
+      sourceEventDate = setlistfmDateToISO(setlist.eventDate);
+    }
+  }
+
   if (!setlist) {
-    // Marcar como not_found
     await admin.from('setlists').upsert(
       {
         concert_id: concertId,
-        band_id: bandId,
+        band_id: band.id,
         not_found: true,
         songs: [],
+        source: 'event',
+        source_event_date: null,
         fetched_at: new Date().toISOString(),
       },
       { onConflict: 'concert_id,band_id' },
     );
-    return { band: bandName, found: false };
+    return { band: band.name, found: false };
   }
 
-  // 2. Aplanar canciones
-  let songs = flattenSongs(setlist);
+  // 3. Aplanar canciones
+  const songs = flattenSongs(setlist);
 
   if (songs.length === 0) {
     await admin.from('setlists').upsert(
       {
         concert_id: concertId,
-        band_id: bandId,
+        band_id: band.id,
         setlistfm_id: setlist.id,
         not_found: true,
         songs: [],
+        source,
+        source_event_date: sourceEventDate,
         fetched_at: new Date().toISOString(),
       },
       { onConflict: 'concert_id,band_id' },
     );
-    return { band: bandName, found: false };
+    return { band: band.name, found: false, source };
   }
 
-  // 3. Enriquecer con duración (en paralelo limitado)
+  // 4. Enriquecer duración con Spotify
   for (let i = 0; i < songs.length; i++) {
-    songs[i].duration_ms = await enrichSongDuration(songs[i], bandName, spotifyToken);
+    songs[i].duration_ms = await enrichSongDuration(songs[i], band.name, spotifyToken);
     if (i < songs.length - 1) await sleep(SPOTIFY_DELAY_MS);
   }
 
@@ -227,23 +322,25 @@ async function processConcertBand(
   const totalMinutes = totalDurationMs > 0 ? Math.round(totalDurationMs / 60000) : null;
   const encoreCount = songs.filter((s) => s.encore).length;
 
-  // 4. Guardar
+  // 5. Guardar
   await admin.from('setlists').upsert(
     {
       concert_id: concertId,
-      band_id: bandId,
+      band_id: band.id,
       setlistfm_id: setlist.id,
       songs,
       total_duration_minutes: totalMinutes,
       song_count: songs.length,
       encore_count: encoreCount,
       not_found: false,
+      source,
+      source_event_date: sourceEventDate,
       fetched_at: new Date().toISOString(),
     },
     { onConflict: 'concert_id,band_id' },
   );
 
-  return { band: bandName, found: true, songs: songs.length, duration: totalMinutes };
+  return { band: band.name, found: true, source, songs: songs.length, duration: totalMinutes };
 }
 
 Deno.serve(async (req) => {
@@ -260,14 +357,14 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // 1. Datos del concierto
+    // 1. Datos del concierto (incluyendo tour_name y mbid + is_headliner por banda)
     const { data: concert, error: cErr } = await admin
       .from('concerts')
       .select(
         `
-        id, event_date,
+        id, event_date, tour_name,
         venue:venues!inner ( city ),
-        concert_bands ( band:bands!inner ( id, name ) )
+        concert_bands ( is_headliner, band:bands!inner ( id, name, musicbrainz_mbid ) )
       `,
       )
       .eq('id', concertId)
@@ -282,7 +379,14 @@ Deno.serve(async (req) => {
 
     const c: any = concert;
     const cityName = c.venue?.city ?? null;
-    const allBands: { id: string; name: string }[] = c.concert_bands.map((cb: any) => cb.band);
+    const tourName: string | null = c.tour_name ?? null;
+
+    const allBands: BandToProcess[] = c.concert_bands.map((cb: any) => ({
+      id: cb.band.id,
+      name: cb.band.name,
+      mbid: cb.band.musicbrainz_mbid ?? null,
+      isHeadliner: !!cb.is_headliner,
+    }));
 
     // Filtrar por bandId si se pidió
     const bandsToProcess = bandId ? allBands.filter((b) => b.id === bandId) : allBands;
@@ -294,7 +398,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 2. Si no es force, ignorar las que ya tenemos
+    // 2. Si no es force, saltar las que ya tenemos
     let pendingBands = bandsToProcess;
     if (!force) {
       const { data: existing } = await admin
@@ -322,10 +426,10 @@ Deno.serve(async (req) => {
         const r = await processConcertBand(
           admin,
           concertId,
-          band.id,
-          band.name,
+          band,
           c.event_date,
           cityName,
+          tourName,
           spotifyToken,
         );
         results.push(r);
