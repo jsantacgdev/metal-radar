@@ -12,10 +12,12 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-let cachedSpotifyToken: {
-  value: string;
-  expiresAt: number;
-} | null = null;
+const TARGET_RECOMMENDATIONS = 20;
+const PER_BAND_QUOTA = 1;
+const POOL_SIZE = 50;
+const MEMBERS_CACHE_TTL_DAYS = 30;
+
+let cachedSpotifyToken: { value: string; expiresAt: number } | null = null;
 
 async function getSpotifyToken(): Promise<string> {
   if (cachedSpotifyToken && cachedSpotifyToken.expiresAt > Date.now()) {
@@ -39,12 +41,50 @@ async function getSpotifyToken(): Promise<string> {
   return cachedSpotifyToken.value;
 }
 
+async function getBandMembers(bandName: string, mbid: string | null): Promise<string[]> {
+  try {
+    let artistId = mbid;
+
+    // Si no tenemos MBID, buscar el artista por nombre
+    if (!artistId) {
+      const searchUrl = `https://musicbrainz.org/ws/2/artist?query=${encodeURIComponent(
+        `artist:"${bandName}" AND type:group`,
+      )}&fmt=json&limit=1`;
+      const searchRes = await fetch(searchUrl, {
+        headers: { 'User-Agent': 'MetalRadar/1.0 (contacto: tu@email.com)' },
+      });
+      if (!searchRes.ok) return [];
+      const searchData = await searchRes.json();
+      artistId = searchData.artists?.[0]?.id ?? null;
+      if (!artistId) return [];
+    }
+
+    // Recuperar las relaciones member-of
+    const relUrl = `https://musicbrainz.org/ws/2/artist/${artistId}?inc=artist-rels&fmt=json`;
+    const relRes = await fetch(relUrl, {
+      headers: { 'User-Agent': 'MetalRadar/1.0 (contacto: tu@email.com)' },
+    });
+    if (!relRes.ok) return [];
+    const relData = await relRes.json();
+
+    const members: string[] = [];
+    for (const rel of relData.relations ?? []) {
+      if (rel.type === 'member of band' && rel.artist?.name) {
+        members.push(rel.artist.name);
+      }
+    }
+    return members;
+  } catch {
+    return [];
+  }
+}
+
 async function getSimilarFromLastfm(artistName: string): Promise<string[]> {
   const url =
     `https://ws.audioscrobbler.com/2.0/?method=artist.getsimilar` +
     `&artist=${encodeURIComponent(artistName)}` +
     `&api_key=${LASTFM_API_KEY}` +
-    `&format=json&limit=10`;
+    `&format=json&limit=15`;
   const res = await fetch(url);
   if (!res.ok) return [];
   const data = await res.json();
@@ -64,7 +104,6 @@ async function searchSpotifyArtist(
   admin: any,
   retryCount = 0,
 ): Promise<BandData | null> {
-  // 1. Buscar primero en BD (case-insensitive con ilike)
   const { data: existing } = await admin
     .from('bands')
     .select('spotify_id, name, image_url, genres')
@@ -82,36 +121,25 @@ async function searchSpotifyArtist(
     };
   }
 
-  // 2. Si no está en BD, consultar Spotify
   const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(name)}&type=artist&limit=1`;
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
 
   if (res.status === 429 && retryCount < 2) {
     const retryAfter = parseInt(res.headers.get('Retry-After') ?? '2', 10);
-    // Si el bloqueo es muy largo (>60s), abortamos para no quedarnos colgados
     if (retryAfter > 60) {
       console.log(`Spotify 429 for "${name}", retry too long (${retryAfter}s), skipping`);
       return null;
     }
-    console.log(`Spotify 429 for "${name}", retrying after ${retryAfter}s`);
     await new Promise((r) => setTimeout(r, (retryAfter + 0.5) * 1000));
     return searchSpotifyArtist(name, token, admin, retryCount + 1);
   }
 
-  if (!res.ok) {
-    console.log(`Spotify search "${name}" → ${res.status}`);
-    return null;
-  }
-
+  if (!res.ok) return null;
   const data = await res.json();
   const artist = data.artists?.items?.[0];
-  if (!artist) {
-    console.log(`Spotify no result for "${name}"`);
-    return null;
-  }
-  if (artist.name.toLowerCase() !== name.toLowerCase()) {
-    return null;
-  }
+  if (!artist) return null;
+  if (artist.name.toLowerCase() !== name.toLowerCase()) return null;
+
   return {
     spotify_id: artist.id,
     name: artist.name,
@@ -120,11 +148,34 @@ async function searchSpotifyArtist(
   };
 }
 
+/**
+ * Selección ponderada aleatoria. Sin reemplazo.
+ * Items con mayor weight tienen más probabilidad pero no garantizada.
+ */
+function weightedSample<T>(items: { item: T; weight: number }[], count: number): T[] {
+  const result: T[] = [];
+  const pool = [...items];
+  while (result.length < count && pool.length > 0) {
+    const totalWeight = pool.reduce((acc, x) => acc + x.weight, 0);
+    let r = Math.random() * totalWeight;
+    let picked = -1;
+    for (let i = 0; i < pool.length; i++) {
+      r -= pool[i].weight;
+      if (r <= 0) {
+        picked = i;
+        break;
+      }
+    }
+    if (picked === -1) picked = pool.length - 1;
+    result.push(pool[picked].item);
+    pool.splice(picked, 1);
+  }
+  return result;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', {
-      headers: CORS_HEADERS,
-    });
+    return new Response('ok', { headers: CORS_HEADERS });
   }
 
   try {
@@ -132,9 +183,7 @@ Deno.serve(async (req) => {
     if (!authHeader) throw new Error('Falta Authorization header');
 
     const userClient = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY')!, {
-      global: {
-        headers: { Authorization: authHeader },
-      },
+      global: { headers: { Authorization: authHeader } },
     });
 
     const {
@@ -145,10 +194,9 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // 1. Bandas seguidas
     const { data: userBands, error: ubError } = await admin
       .from('user_bands')
-      .select('band:bands(id, name)')
+      .select('band:bands(id, name, musicbrainz_mbid)')
       .eq('user_id', user.id);
     if (ubError) throw ubError;
 
@@ -156,70 +204,100 @@ Deno.serve(async (req) => {
       (userBands ?? []).map((ub: any) => ub.band?.name?.toLowerCase()).filter(Boolean),
     );
 
-    console.log(`userBands count: ${userBands?.length ?? 0}`);
-    console.log(`followedNames: ${Array.from(followedNames).slice(0, 5).join(', ')}...`);
-
     if (followedNames.size === 0) {
       return new Response(JSON.stringify({ recommendations: [] }), {
-        headers: {
-          ...CORS_HEADERS,
-          'Content-Type': 'application/json',
-        },
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
       });
     }
 
     const followedArr = Array.from(followedNames) as string[];
 
-    // 2. Last.fm en paralelo
-    const allSimilarLists = await Promise.all(
-      followedArr.map((name) => getSimilarFromLastfm(name)),
-    );
-    console.log(`Last.fm results per band: ${allSimilarLists.map((l) => l.length).join(', ')}`);
+    const followedWithMbid = (userBands ?? []).map((ub: any) => ub.band).filter(Boolean) as {
+      name: string;
+      musicbrainz_mbid: string | null;
+    }[];
 
-    // 3. Agregar y puntuar candidatos
+    // Lanzar Last.fm en paralelo (no tiene rate limit estricto y es independiente)
+    const lastfmPromise = Promise.all(followedArr.map((name) => getSimilarFromLastfm(name)));
+
+    // Mientras tanto, MusicBrainz secuencial
+    const membersLists: string[][] = [];
+    for (const b of followedWithMbid) {
+      const members = await getBandMembers(b.name, b.musicbrainz_mbid);
+      membersLists.push(members);
+      await new Promise((r) => setTimeout(r, 1100));
+    }
+
+    // Esperar a Last.fm (ya habrá terminado en la mayoría de casos)
+    const allSimilarLists = await lastfmPromise;
+
+    for (const b of followedWithMbid) {
+      const members = await getBandMembers(b.name, b.musicbrainz_mbid);
+      membersLists.push(members);
+      await new Promise((r) => setTimeout(r, 1100)); // 1.1s entre llamadas
+    }
+
+    // Construir el set de "bandas/personas a excluir" = miembros de las que ya sigues
+    const memberExclusions = new Set<string>();
+    for (const members of membersLists) {
+      for (const m of members) {
+        memberExclusions.add(m.toLowerCase());
+      }
+    }
+
+    console.log(`Filtering out ${memberExclusions.size} member-related artists`);
+
     const candidateScores = new Map<string, number>();
     for (const similar of allSimilarLists) {
       for (const s of similar) {
         const key = s.toLowerCase();
         if (followedNames.has(key)) continue;
+        if (memberExclusions.has(key)) continue; // ← nuevo
         candidateScores.set(key, (candidateScores.get(key) ?? 0) + 1);
       }
     }
 
-    // 4. Top 15 candidatos
-    const topCandidatesWithScore = Array.from(candidateScores.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 25);
-
-    const topCandidates = topCandidatesWithScore.map(([name]) => name);
-    const scoresByName = new Map(topCandidatesWithScore);
-
-    console.log(
-      `Total candidates: ${candidateScores.size}, top: ${topCandidates.slice(0, 5).join(', ')}`,
-    );
-
-    if (topCandidates.length === 0) {
+    if (candidateScores.size === 0) {
       return new Response(JSON.stringify({ recommendations: [] }), {
-        headers: {
-          ...CORS_HEADERS,
-          'Content-Type': 'application/json',
-        },
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
       });
     }
 
-    // 5. Buscar en caché (tabla bands) por nombre lowercase
-    const { data: cachedBands, error: cacheError } = await admin
-      .from('bands')
-      .select('spotify_id, name, image_url, genres')
-      .in('name', topCandidates) // matches case-sensitive
-      .not('spotify_id', 'is', null);
-
-    if (cacheError) {
-      console.warn('Cache lookup error:', cacheError.message);
+    const guaranteed = new Set<string>();
+    for (const similarList of allSimilarLists) {
+      let added = 0;
+      for (const similar of similarList) {
+        if (added >= PER_BAND_QUOTA) break;
+        const key = similar.toLowerCase();
+        if (followedNames.has(key) || guaranteed.has(key)) continue;
+        if (memberExclusions.has(key)) continue; // ← nuevo
+        guaranteed.add(key);
+        added++;
+      }
     }
 
-    // También probar match case-insensitive: traer todas y filtrar en memoria
-    // Solo si lo anterior no encontró todo. Para simplificar, lo hacemos siempre:
+    const poolEntries = Array.from(candidateScores.entries())
+      .filter(([name]) => !guaranteed.has(name))
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, POOL_SIZE);
+
+    const slotsLeft = Math.max(TARGET_RECOMMENDATIONS - guaranteed.size, 0);
+    const sampled = weightedSample(
+      poolEntries.map(([name, score]) => ({ item: name, weight: score })),
+      slotsLeft,
+    );
+
+    const finalCandidates = [...Array.from(guaranteed), ...sampled].slice(
+      0,
+      TARGET_RECOMMENDATIONS,
+    );
+    const scoresByName = new Map(Array.from(candidateScores.entries()));
+    const { data: cachedBands } = await admin
+      .from('bands')
+      .select('spotify_id, name, image_url, genres')
+      .in('name', finalCandidates)
+      .not('spotify_id', 'is', null);
+
     const { data: allCandidateMatches } = await admin
       .from('bands')
       .select('spotify_id, name, image_url, genres')
@@ -227,10 +305,9 @@ Deno.serve(async (req) => {
       .filter(
         'name',
         'in',
-        `(${topCandidates.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')})`,
+        `(${finalCandidates.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')})`,
       );
 
-    // Mapa de cacheadas por nombre normalizado
     const cachedByName = new Map<string, BandData>();
     for (const row of cachedBands ?? []) {
       cachedByName.set(row.name.toLowerCase(), row as BandData);
@@ -239,18 +316,14 @@ Deno.serve(async (req) => {
       cachedByName.set(row.name.toLowerCase(), row as BandData);
     }
 
-    // 6. Separar: cacheadas vs por buscar
     const fromCache: BandData[] = [];
     const toFetch: string[] = [];
-    for (const candidate of topCandidates) {
+    for (const candidate of finalCandidates) {
       const cached = cachedByName.get(candidate.toLowerCase());
       if (cached) fromCache.push(cached);
       else toFetch.push(candidate);
     }
 
-    console.log(`fromCache: ${fromCache.length}, toFetch: ${toFetch.length}`);
-
-    // 7. Buscar los que faltan en Spotify (paralelo)
     let fromSpotify: BandData[] = [];
     if (toFetch.length > 0) {
       const spotifyToken = await getSpotifyToken();
@@ -268,7 +341,6 @@ Deno.serve(async (req) => {
       }
       fromSpotify = spotifyResults.filter((r): r is BandData => r !== null);
 
-      // Cachear en BD para futuros usuarios
       if (fromSpotify.length > 0) {
         const { error: insertError } = await admin.from('bands').upsert(
           fromSpotify.map((b) => ({
@@ -283,32 +355,28 @@ Deno.serve(async (req) => {
       }
     }
 
-    const recommendations = [...fromCache, ...fromSpotify].map((b) => {
-      const score = scoresByName.get(b.name.toLowerCase()) ?? 1;
-      const affinity = Math.min(95, 75 + score * 6);
-      return { ...b, affinity };
-    });
+    const all = [...fromCache, ...fromSpotify];
+    const recommendations = all
+      .map((b) => {
+        const score = scoresByName.get(b.name.toLowerCase()) ?? 1;
+        const affinity = Math.min(95, 75 + score * 6);
+        return { ...b, affinity };
+      })
+      .sort((a, b) => b.affinity - a.affinity);
 
     return new Response(
       JSON.stringify({
         recommendations,
         cached: fromCache.length,
         fetched: fromSpotify.length,
+        guaranteed: guaranteed.size,
       }),
       { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
     );
   } catch (err) {
-    return new Response(
-      JSON.stringify({
-        error: (err as Error).message,
-      }),
-      {
-        status: 500,
-        headers: {
-          ...CORS_HEADERS,
-          'Content-Type': 'application/json',
-        },
-      },
-    );
+    return new Response(JSON.stringify({ error: (err as Error).message }), {
+      status: 500,
+      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+    });
   }
 });

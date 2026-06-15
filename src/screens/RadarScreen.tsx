@@ -48,7 +48,13 @@ export default function RadarScreen() {
     reload: reloadFollowed,
     unfollow,
   } = useFollowedBands();
-  const { recommendations, loading: loadingRecs, reload: reloadRecs } = useRecommendations();
+
+  const {
+    recommendations,
+    loading: loadingRecs,
+    refreshing: refreshingRecs,
+    reload: reloadRecs,
+  } = useRecommendations();
 
   const [activeTab, setActiveTab] = useState<Tab>('foryou');
   const [followingId, setFollowingId] = useState<string | null>(null);
@@ -297,7 +303,7 @@ export default function RadarScreen() {
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
-              refreshing={loadingRecs}
+              refreshing={refreshingRecs}
               onRefresh={reloadRecs}
               tintColor={colors.bloodBright}
             />
@@ -349,7 +355,16 @@ export default function RadarScreen() {
                         </View>
                       )}
 
-                      <TouchableOpacity style={styles.carouselAddBtn}>
+                      <TouchableOpacity
+                        style={styles.carouselAddBtn}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          handleFollowRec(rec);
+                        }}
+                        disabled={followingId !== null}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
+                      >
                         {isFollowing ? (
                           <ActivityIndicator color="#fff" size="small" />
                         ) : (

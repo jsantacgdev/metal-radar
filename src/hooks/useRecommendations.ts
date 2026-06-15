@@ -18,7 +18,6 @@ async function fetchRecommendations(): Promise<RecommendedBand[]> {
     headers: { Authorization: `Bearer ${session?.access_token}` },
   });
   const json = await res.json();
-  // console.log('recommendations response:', JSON.stringify(json, null, 2));
   if (json.error) throw new Error(json.error);
   return json.recommendations ?? [];
 }
@@ -27,12 +26,13 @@ export function useRecommendations() {
   const query = useQuery({
     queryKey: ['recommendations'],
     queryFn: fetchRecommendations,
-    staleTime: 10 * 60 * 1000,
+    staleTime: 0,
   });
 
   return {
     recommendations: query.data ?? [],
     loading: query.isLoading,
+    refreshing: query.isFetching && !query.isLoading,
     error: query.error?.message ?? null,
     reload: query.refetch,
   };
