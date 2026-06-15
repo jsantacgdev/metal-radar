@@ -18,11 +18,13 @@ import { supabase } from '../../lib/supabase';
 import { AuthStackParamList } from '../../navigation/AuthNavigator';
 import { colors, fontFamily, radius, spacing } from '../../theme';
 import { Button, Text } from '../../components/ui';
+import { Linking } from 'react-native';
+import { privacyUrl, termsUrl } from '../../lib/legalUrls';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
 export default function RegisterScreen({ navigation }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -132,6 +134,27 @@ export default function RegisterScreen({ navigation }: Props) {
                 onSubmitEditing={handleRegister}
               />
             </View>
+            <View style={styles.legalNotice}>
+              <Text variant="bodySM" color="muted" style={{ textAlign: 'center', lineHeight: 18 }}>
+                {t('register.legalPrefix')}{' '}
+                <Text
+                  variant="bodySM"
+                  color="bloodBright"
+                  onPress={() => Linking.openURL(privacyUrl(i18n.language))}
+                >
+                  {t('register.legalPrivacy')}
+                </Text>{' '}
+                {t('register.legalAnd')}{' '}
+                <Text
+                  variant="bodySM"
+                  color="bloodBright"
+                  onPress={() => Linking.openURL(termsUrl(i18n.language))}
+                >
+                  {t('register.legalTerms')}
+                </Text>
+                {t('register.legalSuffix')}
+              </Text>
+            </View>
 
             <Button label={t('register.submit')} onPress={handleRegister} loading={loading} />
 
@@ -205,5 +228,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     marginTop: spacing.lg,
+  },
+  legalNotice: {
+    paddingHorizontal: spacing.md,
+    marginTop: -spacing.sm,
+    marginBottom: spacing.sm,
   },
 });

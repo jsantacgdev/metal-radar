@@ -58,7 +58,12 @@
     "missingNameBody": "Enter your name or nickname",
     "missingEmailPasswordBody": "Enter email and password",
     "shortPasswordTitle": "Password too short",
-    "shortPasswordBody": "Minimum 6 characters"
+    "shortPasswordBody": "Minimum 6 characters",
+    "legalPrefix": "By signing up you accept our",
+    "legalPrivacy": "Privacy Policy",
+    "legalAnd": "and",
+    "legalTerms": "Terms of Use",
+    "legalSuffix": "."
   },
   "onboarding": {
     "step1Eyebrow": "STEP 1 OF 2 · YOUR PROFILE",
@@ -225,7 +230,10 @@
     "signOutConfirm": "Are you sure you want to sign out?",
     "dangerZoneLabel": "DANGER ZONE",
     "dangerZoneDesc": "Irreversible actions affecting your account.",
-    "deleteAccountButton": "Delete account"
+    "deleteAccountButton": "Delete account",
+    "legalLabel": "LEGAL",
+    "privacyPolicy": "Privacy Policy",
+    "termsOfUse": "Terms of Use"
   },
   "deleteAccount": {
     "title": "Delete account",

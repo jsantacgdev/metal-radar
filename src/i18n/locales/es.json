@@ -58,7 +58,12 @@
     "missingNameBody": "Introduce tu nombre o nick",
     "missingEmailPasswordBody": "Introduce email y contraseña",
     "shortPasswordTitle": "Contraseña corta",
-    "shortPasswordBody": "Mínimo 6 caracteres"
+    "shortPasswordBody": "Mínimo 6 caracteres",
+    "legalPrefix": "Al registrarte aceptas la",
+    "legalPrivacy": "Política de Privacidad",
+    "legalAnd": "y los",
+    "legalTerms": "Términos de Uso",
+    "legalSuffix": "."
   },
   "onboarding": {
     "step1Eyebrow": "PASO 1 DE 2 · TU PERFIL",
@@ -225,7 +230,10 @@
     "signOutConfirm": "¿Seguro que quieres salir?",
     "dangerZoneLabel": "ZONA DE PELIGRO",
     "dangerZoneDesc": "Acciones irreversibles que afectan a tu cuenta.",
-    "deleteAccountButton": "Borrar cuenta"
+    "deleteAccountButton": "Borrar cuenta",
+    "legalLabel": "LEGAL",
+    "privacyPolicy": "Política de privacidad",
+    "termsOfUse": "Términos de uso"
   },
   "deleteAccount": {
     "title": "Borrar cuenta",

@@ -16,10 +16,11 @@ import { useTranslation } from 'react-i18next';
 import { useLanguage } from '../i18n/useLanguage';
 import { SupportedLanguage } from '../i18n';
 import { useNavigation } from '@react-navigation/native';
+import { privacyUrl, termsUrl } from '../lib/legalUrls';
 
 export default function ProfileScreen() {
   const queryClient = useQueryClient();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { current: currentLang, changeLanguage } = useLanguage();
 
   const { session } = useAuth();
@@ -392,6 +393,39 @@ export default function ProfileScreen() {
         />
       </View>
 
+      {/* Legal */}
+      <View style={styles.section}>
+        <Text variant="monoMD" color="muted" style={styles.sectionLabel}>
+          {t('profile.legalLabel')}
+        </Text>
+
+        <TouchableOpacity
+          style={styles.legalRow}
+          onPress={() => Linking.openURL(privacyUrl(i18n.language))}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="shield-checkmark-outline" size={18} color={colors.silver} />
+          <Text variant="body" color="silver" style={{ flex: 1, marginLeft: spacing.md }}>
+            {t('profile.privacyPolicy')}
+          </Text>
+          <Ionicons name="open-outline" size={16} color={colors.muted} />
+        </TouchableOpacity>
+
+        <View style={styles.legalDivider} />
+
+        <TouchableOpacity
+          style={styles.legalRow}
+          onPress={() => Linking.openURL(termsUrl(i18n.language))}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="document-text-outline" size={18} color={colors.silver} />
+          <Text variant="body" color="silver" style={{ flex: 1, marginLeft: spacing.md }}>
+            {t('profile.termsOfUse')}
+          </Text>
+          <Ionicons name="open-outline" size={16} color={colors.muted} />
+        </TouchableOpacity>
+      </View>
+
       {/* Footer */}
       <View style={styles.footer}>
         <Text variant="monoSM" color="faint" style={{ textAlign: 'center' }}>
@@ -535,5 +569,14 @@ const styles = StyleSheet.create({
   langDivider: {
     height: 1,
     backgroundColor: colors.line,
+  },
+  legalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+  },
+  legalDivider: {
+    height: 1,
+    backgroundColor: colors.lineSoft,
   },
 });
