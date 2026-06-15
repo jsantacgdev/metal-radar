@@ -15,6 +15,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '../i18n/useLanguage';
 import { SupportedLanguage } from '../i18n';
+import { useNavigation } from '@react-navigation/native';
 
 export default function ProfileScreen() {
   const queryClient = useQueryClient();
@@ -30,6 +31,8 @@ export default function ProfileScreen() {
   const [pushStatus, setPushStatus] = useState<
     'granted' | 'denied' | 'undetermined' | 'unsupported' | 'loading' | null
   >(null);
+
+  const navigation = useNavigation();
 
   const { value: skipConfirm, setValue: setSkipConfirm } = usePreference<boolean>(
     'skipUnfollowConfirm',
@@ -369,6 +372,23 @@ export default function ProfileScreen() {
           variant="ghost"
           onPress={handleLogout}
           icon={<Ionicons name="log-out-outline" size={18} color={colors.silver} />}
+        />
+      </View>
+
+      {/* Danger zone */}
+      <View style={styles.section}>
+        <Text variant="monoMD" color="bloodBright" style={styles.sectionLabel}>
+          {t('profile.dangerZoneLabel')}
+        </Text>
+        <Text variant="bodySM" color="muted" style={styles.sectionDesc}>
+          {t('profile.dangerZoneDesc')}
+        </Text>
+
+        <Button
+          label={t('profile.deleteAccountButton')}
+          variant="ghost"
+          onPress={() => navigation.navigate('DeleteAccount' as never)}
+          icon={<Ionicons name="trash-outline" size={18} color={colors.bloodBright} />}
         />
       </View>
 

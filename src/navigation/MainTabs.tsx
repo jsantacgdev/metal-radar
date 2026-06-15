@@ -6,9 +6,9 @@ import { useTranslation } from 'react-i18next';
 import RadarStack from './RadarStack';
 import MapStack from './MapStack';
 import DiaryStack from './DiaryStack';
-import ProfileScreen from '../screens/ProfileScreen';
 import { colors, fontFamily } from '../theme';
 import { useNotificationResponse } from '../hooks/useNotificationResponse';
+import ProfileStack from './ProfileStack';
 
 export type MainTabsParamList = {
   Radar: undefined;
@@ -73,7 +73,7 @@ export default function MainTabs() {
       />
       <Tab.Screen
         name="Profile"
-        component={ProfileScreen}
+        component={ProfileStack}
         options={{
           title: t('navigation.tabProfile'),
           tabBarIcon: ({ color, focused }) => (

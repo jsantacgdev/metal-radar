@@ -222,7 +222,28 @@
     "radiusSaveError": "Error saving radius",
     "notificationsEnabled": "Notifications enabled",
     "notificationsDeniedBody": "To enable them you need to go to system settings and grant permission to Metal Radar",
-    "signOutConfirm": "Are you sure you want to sign out?"
+    "signOutConfirm": "Are you sure you want to sign out?",
+    "dangerZoneLabel": "DANGER ZONE",
+    "dangerZoneDesc": "Irreversible actions affecting your account.",
+    "deleteAccountButton": "Delete account"
+  },
+  "deleteAccount": {
+    "title": "Delete account",
+    "intro": "You're about to permanently delete the account for {{email}}. This action cannot be undone.",
+    "whatGetsDeletedTitle": "WHAT WILL BE DELETED",
+    "bulletProfile": "Your profile and personal data",
+    "bulletFollowedBands": "All bands you follow",
+    "bulletConcerts": "Your saved and attended concerts",
+    "bulletDiary": "Your notes, ratings, and diary",
+    "bulletPhotos": "Concert photos you've uploaded",
+    "bulletPreferences": "Your preferences and settings",
+    "irreversibleWarning": "This action is permanent. We won't be able to recover your data afterwards.",
+    "confirmInstruction": "Type {{keyword}} to confirm:",
+    "confirmKeyword": "DELETE",
+    "deleteButton": "Delete my account forever",
+    "finalAlertTitle": "Are you absolutely sure?",
+    "finalAlertBody": "This is your last chance to cancel. Your account and all your data will be deleted immediately.",
+    "finalAlertConfirm": "Yes, delete"
   },
   "setlist": {
     "headerLabel": "SETLIST · {{band}}",

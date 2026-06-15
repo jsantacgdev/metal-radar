@@ -222,7 +222,28 @@
     "radiusSaveError": "Error al guardar radio",
     "notificationsEnabled": "Notificaciones activadas",
     "notificationsDeniedBody": "Para activarlas tienes que ir a los ajustes del sistema y dar permiso a Metal Radar",
-    "signOutConfirm": "¿Seguro que quieres salir?"
+    "signOutConfirm": "¿Seguro que quieres salir?",
+    "dangerZoneLabel": "ZONA DE PELIGRO",
+    "dangerZoneDesc": "Acciones irreversibles que afectan a tu cuenta.",
+    "deleteAccountButton": "Borrar cuenta"
+  },
+  "deleteAccount": {
+    "title": "Borrar cuenta",
+    "intro": "Vas a borrar permanentemente la cuenta de {{email}}. Esta acción no se puede deshacer.",
+    "whatGetsDeletedTitle": "QUÉ SE BORRARÁ",
+    "bulletProfile": "Tu perfil y datos personales",
+    "bulletFollowedBands": "Todas las bandas que sigues",
+    "bulletConcerts": "Tus conciertos guardados y asistidos",
+    "bulletDiary": "Tus notas, valoraciones y diario",
+    "bulletPhotos": "Las fotos que has subido de conciertos",
+    "bulletPreferences": "Tus preferencias y configuración",
+    "irreversibleWarning": "Esta acción es permanente. No podremos recuperar tus datos después.",
+    "confirmInstruction": "Escribe {{keyword}} para confirmar:",
+    "confirmKeyword": "BORRAR",
+    "deleteButton": "Borrar mi cuenta para siempre",
+    "finalAlertTitle": "¿Estás completamente seguro?",
+    "finalAlertBody": "Esta es la última oportunidad para cancelar. Tu cuenta y todos tus datos se borrarán inmediatamente.",
+    "finalAlertConfirm": "Sí, borrar"
   },
   "setlist": {
     "headerLabel": "SETLIST · {{band}}",
