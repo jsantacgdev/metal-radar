@@ -69,11 +69,18 @@ export default function RadarScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const { value: skipConfirm, setValue: setSkipConfirm } = usePreference<boolean>(
     'skipUnfollowConfirm',
     false,
   );
+
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setSearchQuery('');
+    setSearchResults([]);
+  };
 
   const openBandDetail = async (band: {
     spotify_id?: string;
@@ -279,9 +286,14 @@ export default function RadarScreen() {
         </View>
         <TouchableOpacity
           style={styles.avatarBtn}
-          onPress={() => navigation.getParent()?.navigate('Profile' as never)}
+          onPress={() => (searchOpen ? closeSearch() : setSearchOpen(true))}
+          activeOpacity={0.7}
         >
-          <Ionicons name="person" size={18} color={colors.silver} />
+          <Ionicons
+            name={searchOpen ? 'close' : 'search'}
+            size={20}
+            color={searchOpen ? colors.bloodBright : colors.silver}
+          />
         </TouchableOpacity>
       </View>
 
@@ -297,6 +309,79 @@ export default function RadarScreen() {
           onPress={() => setActiveTab('mybands')}
         />
       </View>
+
+      {searchOpen && (
+        <View style={styles.searchWrapper}>
+          <Ionicons name="search" size={18} color={colors.muted} style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder={t('radar.searchPlaceholder')}
+            placeholderTextColor={colors.faint}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="words"
+            autoFocus
+          />
+          {searching && (
+            <ActivityIndicator color={colors.bloodBright} style={{ marginLeft: spacing.sm }} />
+          )}
+        </View>
+      )}
+
+      {searchOpen && searchResults.length > 0 && (
+        <View style={styles.listSection}>
+          {searchResults.map((b: any, i) => {
+            const isFollowed = followedNames.has(b.name.toLowerCase());
+            return (
+              <TouchableOpacity
+                key={b.spotify_id}
+                style={[styles.row, i === searchResults.length - 1 && { borderBottomWidth: 0 }]}
+                onPress={() =>
+                  openBandDetail({
+                    spotify_id: b.spotify_id,
+                    name: b.name,
+                    image_url: b.image_url,
+                    genres: b.genres ?? [],
+                  })
+                }
+                activeOpacity={0.7}
+              >
+                <BandImage url={b.image_url} size={50} showTag={!b.image_url} />
+                <View style={styles.rowContent}>
+                  <Text variant="displaySM" numberOfLines={1} style={{ paddingVertical: 2 }}>
+                    {b.name}
+                  </Text>
+                  {b.genres?.length > 0 && (
+                    <Text variant="monoSM" color="muted" numberOfLines={1} style={{ marginTop: 4 }}>
+                      {b.genres.slice(0, 2).join(' · ')}
+                    </Text>
+                  )}
+                </View>
+                {isFollowed ? (
+                  <Text variant="monoSM" color="muted" style={{ marginRight: 4 }}>
+                    {t('radar.followingBadge')}
+                  </Text>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.addBtn, followingId === b.spotify_id && { opacity: 0.5 }]}
+                    onPress={() => {
+                      handleFollowFromSearch(b);
+                      closeSearch();
+                    }}
+                    disabled={followingId !== null}
+                  >
+                    {followingId === b.spotify_id ? (
+                      <ActivityIndicator color={colors.silver} size="small" />
+                    ) : (
+                      <Ionicons name="add" size={18} color={colors.silver} />
+                    )}
+                  </TouchableOpacity>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
 
       {activeTab === 'foryou' ? (
         <ScrollView
@@ -493,136 +578,58 @@ export default function RadarScreen() {
             />
           }
         >
-          <View style={styles.searchWrapper}>
-            <Ionicons name="search" size={18} color={colors.muted} style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder={t('radar.searchPlaceholder')}
-              placeholderTextColor={colors.faint}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              autoCapitalize="words"
-            />
-            {searching && (
-              <ActivityIndicator color={colors.bloodBright} style={{ marginLeft: spacing.sm }} />
-            )}
-          </View>
-
-          {searchResults.length > 0 && (
+          <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
+            {t('radar.followingTitle', { count: followedBands.length })}
+          </Text>
+          {loadingFollowed ? (
+            <ActivityIndicator color={colors.bloodBright} style={{ marginTop: spacing.lg }} />
+          ) : followedBands.length === 0 ? (
+            <Text variant="body" color="muted" style={styles.emptyText}>
+              {t('radar.emptyFollowed')}
+            </Text>
+          ) : (
             <View style={styles.listSection}>
-              {searchResults.map((b: any, i) => {
-                const isFollowed = followedNames.has(b.name.toLowerCase());
-                return (
-                  <TouchableOpacity
-                    key={b.spotify_id}
-                    style={[styles.row, i === searchResults.length - 1 && { borderBottomWidth: 0 }]}
-                    onPress={() =>
-                      openBandDetail({
-                        spotify_id: b.spotify_id,
-                        name: b.name,
-                        image_url: b.image_url,
-                        genres: b.genres ?? [],
-                      })
-                    }
-                    activeOpacity={0.7}
-                  >
-                    <BandImage url={b.image_url} size={50} showTag={!b.image_url} />
-                    <View style={styles.rowContent}>
-                      <Text variant="displaySM" numberOfLines={1} style={{ paddingVertical: 2 }}>
-                        {b.name}
-                      </Text>
-                      {b.genres?.length > 0 && (
-                        <Text
-                          variant="monoSM"
-                          color="muted"
-                          numberOfLines={1}
-                          style={{ marginTop: 4 }}
-                        >
-                          {b.genres.slice(0, 2).join(' · ')}
-                        </Text>
-                      )}
-                    </View>
-                    {isFollowed ? (
-                      <Text variant="monoSM" color="muted" style={{ marginRight: 4 }}>
-                        {t('radar.followingBadge')}
-                      </Text>
-                    ) : (
-                      <TouchableOpacity
-                        style={[styles.addBtn, followingId === b.spotify_id && { opacity: 0.5 }]}
-                        onPress={() => handleFollowFromSearch(b)}
-                        disabled={followingId !== null}
+              {followedBands.map((b: FollowedBand, i) => (
+                <TouchableOpacity
+                  key={b.id}
+                  style={[styles.row, i === followedBands.length - 1 && { borderBottomWidth: 0 }]}
+                  onPress={() => {
+                    openBandDetail({
+                      id: b.id,
+                      name: b.name,
+                      image_url: b.image_url,
+                      genres: b.genres ?? [],
+                    });
+                    closeSearch();
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <BandImage url={b.image_url} size={50} showTag={!b.image_url} />
+                  <View style={styles.rowContent}>
+                    <Text variant="displaySM" numberOfLines={1} style={{ paddingVertical: 2 }}>
+                      {b.name}
+                    </Text>
+                    {b.genres && b.genres.length > 0 && (
+                      <Text
+                        variant="monoSM"
+                        color="muted"
+                        numberOfLines={1}
+                        style={{ marginTop: 4 }}
                       >
-                        {followingId === b.spotify_id ? (
-                          <ActivityIndicator color={colors.silver} size="small" />
-                        ) : (
-                          <Ionicons name="add" size={18} color={colors.silver} />
-                        )}
-                      </TouchableOpacity>
+                        {b.genres.slice(0, 2).join(' · ')}
+                      </Text>
                     )}
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => handleUnfollow(b.id, b.name)}
+                    style={styles.removeBtn}
+                    hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                  >
+                    <Ionicons name="close" size={18} color={colors.muted} />
                   </TouchableOpacity>
-                );
-              })}
+                </TouchableOpacity>
+              ))}
             </View>
-          )}
-
-          {searchResults.length === 0 && (
-            <>
-              <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
-                {t('radar.followingTitle', { count: followedBands.length })}
-              </Text>
-              {loadingFollowed ? (
-                <ActivityIndicator color={colors.bloodBright} style={{ marginTop: spacing.lg }} />
-              ) : followedBands.length === 0 ? (
-                <Text variant="body" color="muted" style={styles.emptyText}>
-                  {t('radar.emptyFollowed')}
-                </Text>
-              ) : (
-                <View style={styles.listSection}>
-                  {followedBands.map((b: FollowedBand, i) => (
-                    <TouchableOpacity
-                      key={b.id}
-                      style={[
-                        styles.row,
-                        i === followedBands.length - 1 && { borderBottomWidth: 0 },
-                      ]}
-                      onPress={() =>
-                        openBandDetail({
-                          id: b.id,
-                          name: b.name,
-                          image_url: b.image_url,
-                          genres: b.genres ?? [],
-                        })
-                      }
-                      activeOpacity={0.7}
-                    >
-                      <BandImage url={b.image_url} size={50} showTag={!b.image_url} />
-                      <View style={styles.rowContent}>
-                        <Text variant="displaySM" numberOfLines={1} style={{ paddingVertical: 2 }}>
-                          {b.name}
-                        </Text>
-                        {b.genres && b.genres.length > 0 && (
-                          <Text
-                            variant="monoSM"
-                            color="muted"
-                            numberOfLines={1}
-                            style={{ marginTop: 4 }}
-                          >
-                            {b.genres.slice(0, 2).join(' · ')}
-                          </Text>
-                        )}
-                      </View>
-                      <TouchableOpacity
-                        onPress={() => handleUnfollow(b.id, b.name)}
-                        style={styles.removeBtn}
-                        hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-                      >
-                        <Ionicons name="close" size={18} color={colors.muted} />
-                      </TouchableOpacity>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-            </>
           )}
 
           <View style={{ height: spacing.xxxl }} />
