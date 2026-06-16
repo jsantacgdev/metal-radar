@@ -20,6 +20,7 @@ import PhotoGallery from '../components/PhotoGallery';
 import SetlistView from '../components/Setlist';
 import { useSetlists } from '../hooks/useSetlist';
 import { localeFromI18n } from '../i18n';
+import { Share } from 'react-native';
 
 type Props = NativeStackScreenProps<MapStackParamList, 'ConcertDetail'>;
 
@@ -69,6 +70,30 @@ export default function ConcertDetailScreen({ route }: Props) {
 
   const openTickets = () => {
     if (concert.ticket_url) Linking.openURL(concert.ticket_url);
+  };
+
+  const handleShare = async () => {
+    const headliner = concert.bands.find((b) => b.is_headliner) ?? concert.bands[0];
+    const bandName = headliner?.name ?? t('concertDetail.noBand');
+    const dateText = dateObj.toLocaleDateString(locale, {
+      day: 'numeric',
+      month: 'long',
+    });
+    const place = concert.venue.city ?? concert.venue.name;
+
+    const message = t('concertDetail.shareMessage', {
+      band: bandName,
+      date: dateText,
+      place,
+    });
+
+    try {
+      await Share.share({
+        message: concert.ticket_url ? `${message}\n\n${concert.ticket_url}` : message,
+      });
+    } catch (err: any) {
+      console.warn('Share error:', err.message);
+    }
   };
 
   return (
@@ -246,22 +271,37 @@ export default function ConcertDetailScreen({ route }: Props) {
         )}
       </ScrollView>
 
-      {!isPast && concert.ticket_url && (
+      {!isPast && (
         <View style={styles.ctaContainer}>
-          <TouchableOpacity style={styles.ctaButton} onPress={openTickets} activeOpacity={0.85}>
-            <Ionicons name="ticket-outline" size={20} color="#fff" />
-            <Text
-              style={{
-                color: '#fff',
-                fontFamily: fontFamily.bodyBold,
-                fontSize: 15,
-                letterSpacing: 0.3,
-                marginLeft: spacing.sm,
-              }}
+          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            {concert.ticket_url && (
+              <TouchableOpacity
+                style={[styles.ctaButton, { flex: 1 }]}
+                onPress={openTickets}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="ticket-outline" size={20} color="#fff" />
+                <Text
+                  style={{
+                    color: '#fff',
+                    fontFamily: fontFamily.bodyBold,
+                    fontSize: 15,
+                    letterSpacing: 0.3,
+                    marginLeft: spacing.sm,
+                  }}
+                >
+                  {t('concertDetail.buyTickets')}
+                </Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={styles.shareCtaButton}
+              onPress={handleShare}
+              activeOpacity={0.85}
             >
-              {t('concertDetail.buyTickets')}
-            </Text>
-          </TouchableOpacity>
+              <Ionicons name="share-social-outline" size={20} color={colors.silver} />
+            </TouchableOpacity>
+          </View>
         </View>
       )}
     </View>
@@ -529,5 +569,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 12,
     elevation: 4,
+  },
+  shareCtaButton: {
+    width: 52,
+    height: 52,
+    borderRadius: radius.lg,
+    backgroundColor: colors.panel,
+    borderWidth: 1,
+    borderColor: colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

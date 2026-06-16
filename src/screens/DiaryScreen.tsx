@@ -76,6 +76,19 @@ export default function DiaryScreen() {
         <StatCard value={CURRENT_YEAR.toString()} label={t('diary.statYear')} />
       </View>
 
+      <View style={styles.tabsRow}>
+        <TabPill
+          label={`${t('diary.tabUpcoming')} · ${upcoming.length}`}
+          active={filter === 'upcoming'}
+          onPress={() => setFilter('upcoming')}
+        />
+        <TabPill
+          label={`${t('diary.tabPast')} · ${past.length}`}
+          active={filter === 'past'}
+          onPress={() => setFilter('past')}
+        />
+      </View>
+
       {/* Banner Wrapped */}
       {showWrappedBanner && (
         <TouchableOpacity
@@ -97,19 +110,6 @@ export default function DiaryScreen() {
           <Ionicons name="chevron-forward" size={20} color={colors.silver} />
         </TouchableOpacity>
       )}
-
-      <View style={styles.tabsRow}>
-        <TabPill
-          label={`${t('diary.tabUpcoming')} · ${upcoming.length}`}
-          active={filter === 'upcoming'}
-          onPress={() => setFilter('upcoming')}
-        />
-        <TabPill
-          label={`${t('diary.tabPast')} · ${past.length}`}
-          active={filter === 'past'}
-          onPress={() => setFilter('past')}
-        />
-      </View>
 
       <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
         {filter === 'upcoming' ? t('diary.upcomingTitle') : t('diary.recent')}

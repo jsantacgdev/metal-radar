@@ -168,7 +168,8 @@
     "charactersCount_one": "{{count}} character",
     "charactersCount_other": "{{count}} characters",
     "statusBanner": "STATUS: {{status}}",
-    "buyTickets": "Buy tickets"
+    "buyTickets": "Buy tickets",
+    "shareMessage": "🤘 Going to see {{band}} on {{date}} in {{place}}. Wanna join?"
   },
   "festivalDetail": {
     "notFound": "Festival not found",
