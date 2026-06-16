@@ -308,5 +308,14 @@
     "bandFetchFailed": "Error fetching band",
     "cameraPermissionDenied": "Camera permission denied",
     "libraryPermissionDenied": "Library permission denied"
+  },
+  "calendar": {
+    "permissionDeniedTitle": "Permission denied",
+    "permissionDeniedBody": "To add concerts to your calendar, enable the permission in system settings.",
+    "noCalendarFound": "No writable calendar found on this device.",
+    "addedTitle": "Added to calendar",
+    "addedBody": "\"{{title}}\" was added to your calendar.",
+    "eventTitle": "Concert: {{band}}",
+    "eventNotes": "Full lineup: {{lineup}}"
   }
 }

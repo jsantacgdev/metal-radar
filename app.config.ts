@@ -51,6 +51,12 @@ export default ({ config }: ConfigContext): ExpoConfig => {
           organization: 'metal-radar-i0',
         },
       ],
+      [
+        'expo-calendar',
+        {
+          calendarPermission: 'Permite a Metal Radar añadir conciertos a tu calendario.',
+        },
+      ],
       // expo-dev-client SOLO en builds de desarrollo
       // ...(isDevBuild ? ['expo-dev-client'] : []),
     ],

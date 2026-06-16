@@ -21,6 +21,7 @@ import SetlistView from '../components/Setlist';
 import { useSetlists } from '../hooks/useSetlist';
 import { localeFromI18n } from '../i18n';
 import { Share } from 'react-native';
+import { addEventToCalendar } from '../lib/calendar';
 
 type Props = NativeStackScreenProps<MapStackParamList, 'ConcertDetail'>;
 
@@ -94,6 +95,35 @@ export default function ConcertDetailScreen({ route }: Props) {
     } catch (err: any) {
       console.warn('Share error:', err.message);
     }
+  };
+
+  const handleAddToCalendar = async () => {
+    const headliner = concert.bands.find((b) => b.is_headliner) ?? concert.bands[0];
+    const bandName = headliner?.name ?? t('concertDetail.noBand');
+
+    const title = t('calendar.eventTitle', { band: bandName });
+    const location = [concert.venue.name, concert.venue.city, concert.venue.country]
+      .filter(Boolean)
+      .join(', ');
+    const lineup = concert.bands.map((b) => b.name).join(', ');
+    const notes = t('calendar.eventNotes', { lineup });
+
+    let startDate: Date;
+    let endDate: Date | undefined;
+
+    const [year, month, day] = concert.event_date.split('T')[0].split('-').map(Number);
+    startDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+    endDate = new Date(Date.UTC(year, month - 1, day, 23, 59, 0));
+
+    await addEventToCalendar({
+      title,
+      startDate,
+      endDate,
+      location,
+      notes,
+      url: concert.ticket_url ?? undefined,
+      allDay: true,
+    });
   };
 
   return (
@@ -295,7 +325,14 @@ export default function ConcertDetailScreen({ route }: Props) {
               </TouchableOpacity>
             )}
             <TouchableOpacity
-              style={styles.shareCtaButton}
+              style={styles.iconCtaButton}
+              onPress={handleAddToCalendar}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="calendar-outline" size={20} color={colors.silver} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.iconCtaButton}
               onPress={handleShare}
               activeOpacity={0.85}
             >
@@ -571,6 +608,16 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   shareCtaButton: {
+    width: 52,
+    height: 52,
+    borderRadius: radius.lg,
+    backgroundColor: colors.panel,
+    borderWidth: 1,
+    borderColor: colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconCtaButton: {
     width: 52,
     height: 52,
     borderRadius: radius.lg,

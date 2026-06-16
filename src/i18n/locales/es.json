@@ -308,5 +308,14 @@
     "bandFetchFailed": "Error al obtener banda",
     "cameraPermissionDenied": "Permiso de cámara denegado",
     "libraryPermissionDenied": "Permiso de galería denegado"
+  },
+  "calendar": {
+    "permissionDeniedTitle": "Permiso denegado",
+    "permissionDeniedBody": "Para añadir conciertos a tu calendario, activa el permiso desde los ajustes del sistema.",
+    "noCalendarFound": "No se encontró ningún calendario en el que escribir.",
+    "addedTitle": "Añadido al calendario",
+    "addedBody": "\"{{title}}\" se ha añadido a tu calendario.",
+    "eventTitle": "Concierto: {{band}}",
+    "eventNotes": "Cartel completo: {{lineup}}"
   }
 }
