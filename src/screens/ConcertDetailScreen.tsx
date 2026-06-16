@@ -197,18 +197,20 @@ export default function ConcertDetailScreen({ route }: Props) {
 
         {/* Setlists - SIEMPRE visibles. Si no hay datos en BD, el componente muestra el botón "BUSCAR" */}
         <View style={{ paddingHorizontal: spacing.xl }}>
-          {concert.bands.map((band) => {
-            const setlist = setlists.find((s) => s.band_id === band.id) ?? null;
+          {(() => {
+            const headliner = concert.bands.find((b) => b.is_headliner) ?? concert.bands[0];
+            if (!headliner) return null;
+            const setlist = setlists.find((s) => s.band_id === headliner.id) ?? null;
             return (
               <SetlistView
-                key={band.id}
+                key={headliner.id}
                 concertId={concert.id}
                 setlist={setlist}
-                bandId={band.id}
-                bandName={band.name}
+                bandId={headliner.id}
+                bandName={headliner.name}
               />
             );
-          })}
+          })()}
         </View>
 
         {/* Rating, notes y fotos solo para conciertos a los que asististe */}

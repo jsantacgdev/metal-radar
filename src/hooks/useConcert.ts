@@ -22,6 +22,7 @@ export type ConcertDetail = {
     id: string;
     name: string;
     image_url: string | null;
+    is_headliner: boolean;
   }[];
   userStatus: 'interested' | 'going' | 'attended' | null;
   userConcertId: string | null;
@@ -41,7 +42,7 @@ async function fetchConcert(concertId: string): Promise<ConcertDetail> {
       `
       id, event_date, ticket_url, price_min, price_max, currency, status,
       venue:venues!inner ( id, name, city, country, lat, lng ),
-      concert_bands ( band:bands ( id, name, image_url ) )
+      concert_bands ( is_headliner, band:bands ( id, name, image_url ) )
     `,
     )
     .eq('id', concertId)
@@ -66,7 +67,10 @@ async function fetchConcert(concertId: string): Promise<ConcertDetail> {
     currency: c.currency,
     status: c.status,
     venue: c.venue,
-    bands: c.concert_bands.map((cb: any) => cb.band),
+    bands: c.concert_bands.map((cb: any) => ({
+      ...cb.band,
+      is_headliner: !!cb.is_headliner,
+    })),
     userStatus: ucData?.status ?? null,
     userConcertId: ucData?.id ?? null,
     rating: ucData?.rating ?? null,

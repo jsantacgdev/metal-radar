@@ -17,6 +17,7 @@ import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from '../components/ui';
 import BandImage from '../components/BandImage';
 import { localeFromI18n } from '../i18n';
+import { LinearGradient } from 'expo-linear-gradient';
 
 type RouteParams = RouteProp<MapStackParamList, 'FestivalDetail'>;
 
@@ -101,13 +102,40 @@ export default function FestivalDetailScreen() {
       >
         <View style={styles.hero}>
           {festival.image_url ? (
-            <Image source={{ uri: festival.image_url }} style={styles.heroImage} />
+            <Image
+              source={{ uri: festival.image_url }}
+              style={styles.heroImage}
+              resizeMode="cover"
+            />
           ) : (
             <View style={[styles.heroImage, styles.heroPlaceholder]}>
-              <Ionicons name="musical-notes" size={64} color={colors.faint} />
+              <View style={styles.placeholderCircle}>
+                <Text
+                  style={{
+                    fontFamily: fontFamily.displayBold,
+                    fontSize: 56,
+                    color: colors.bloodBright,
+                    lineHeight: 64,
+                  }}
+                >
+                  {festival.name.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+              <Ionicons
+                name="flame"
+                size={20}
+                color={colors.bloodBright}
+                style={{ marginTop: spacing.md, opacity: 0.6 }}
+              />
             </View>
           )}
-          <View style={styles.heroOverlay} />
+
+          <LinearGradient
+            colors={['transparent', 'rgba(10,10,12,0.4)', colors.ink]}
+            locations={[0.2, 0.6, 1]}
+            style={styles.heroGradient}
+            pointerEvents="none"
+          />
 
           <View style={styles.festivalBadge}>
             <Ionicons name="flame" size={12} color={colors.bloodBright} />
@@ -294,12 +322,22 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   hero: {
-    width: '100%',
-    height: 220,
+    width: 380,
+    height: 280,
     position: 'relative',
+    overflow: 'hidden',
+    backgroundColor: colors.ink,
   },
   heroImage: {
     width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  heroGradient: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     height: '100%',
   },
   heroPlaceholder: {
@@ -307,19 +345,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 80,
-    backgroundColor: colors.ink,
-    opacity: 0.6,
+  placeholderCircle: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: colors.bloodTint,
+    borderWidth: 2,
+    borderColor: colors.bloodTintBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   festivalBadge: {
     position: 'absolute',
     top: spacing.md,
-    right: spacing.md,
+    right: spacing.xl,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(10,10,12,0.85)',

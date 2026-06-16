@@ -13,7 +13,7 @@ const CORS_HEADERS = {
 };
 
 const HEAVY_GENRE_REGEX =
-  /metal|rock|hardcore|punk|metalcore|deathcore|grunge|emo|screamo|thrash|doom|sludge|stoner|industrial|gothic|prog|alternative|nu.?metal|post.?punk|psychedelic|garage|indie/i;
+  /metal|rock|ska|hardcore|punk|metalcore|deathcore|grunge|emo|screamo|thrash|doom|sludge|stoner|industrial|gothic|prog|alternative|nu.?metal|post.?punk|psychedelic|garage|indie/i;
 
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
