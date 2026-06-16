@@ -102,11 +102,7 @@ export default function FestivalDetailScreen() {
       >
         <View style={styles.hero}>
           {festival.image_url ? (
-            <Image
-              source={{ uri: festival.image_url }}
-              style={styles.heroImage}
-              resizeMode="cover"
-            />
+            <Image source={{ uri: festival.image_url }} style={styles.heroImage} />
           ) : (
             <View style={[styles.heroImage, styles.heroPlaceholder]}>
               <View style={styles.placeholderCircle}>
@@ -322,7 +318,7 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   hero: {
-    width: 380,
+    width: '100%',
     height: 280,
     position: 'relative',
     overflow: 'hidden',
