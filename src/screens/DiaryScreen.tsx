@@ -20,6 +20,7 @@ import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from '../components/ui';
 import BandImage from '../components/BandImage';
 import { localeFromI18n } from '../i18n';
+import EmptyState from '../components/EmptyState';
 
 type Filter = 'upcoming' | 'past';
 
@@ -130,12 +131,21 @@ export default function DiaryScreen() {
         </View>
       ) : filtered.length === 0 ? (
         <View style={styles.centered}>
-          <Text variant="displaySM" color="silver" style={{ textAlign: 'center' }}>
-            {filter === 'upcoming' ? t('diary.emptyUpcomingTitle') : t('diary.emptyPastTitle')}
-          </Text>
-          <Text variant="bodySM" color="muted" style={styles.emptySub}>
-            {filter === 'upcoming' ? t('diary.emptyUpcomingDesc') : t('diary.emptyPastDesc')}
-          </Text>
+          <EmptyState
+            icon={filter === 'upcoming' ? 'calendar-outline' : 'book-outline'}
+            title={
+              filter === 'upcoming' ? t('diary.emptyUpcomingTitle') : t('diary.emptyPastTitle')
+            }
+            description={
+              filter === 'upcoming' ? t('diary.emptyUpcomingDesc') : t('diary.emptyPastDesc')
+            }
+            actionLabel={filter === 'upcoming' ? t('diary.emptyUpcomingCta') : undefined}
+            onAction={
+              filter === 'upcoming'
+                ? () => navigation.getParent()?.navigate('MapTab' as never)
+                : undefined
+            }
+          />
         </View>
       ) : (
         <FlatList

@@ -40,7 +40,7 @@ export default function DiaryStack() {
       <Stack.Screen
         name="DiaryHome"
         component={DiaryScreen}
-        options={{ title: t('navigation.diary') }}
+        options={{ title: t('navigation.diary'), headerTitle: '', headerShown: false }}
       />
       <Stack.Screen
         name="ConcertDetail"

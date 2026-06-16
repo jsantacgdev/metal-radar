@@ -102,7 +102,13 @@
     "unfollowTitle": "Unfollow",
     "unfollowBody": "Remove {{name}}?",
     "unfollowDontAsk": "Remove and don't ask again",
-    "unfollowConfirm": "Remove"
+    "unfollowConfirm": "Remove",
+    "emptyForYouTitle": "No recommendations yet",
+    "emptyForYouDesc": "Follow your favorite bands to discover similar artists and get notified about upcoming concerts.",
+    "emptyForYouCta": "Find bands",
+    "emptyMyBandsTitle": "You don't follow any bands",
+    "emptyMyBandsDesc": "Start adding your favorite groups so Metal Radar can show you nearby concerts.",
+    "emptyMyBandsCta": "Find bands"
   },
   "map": {
     "title": "Map",
@@ -131,13 +137,14 @@
     "tabPast": "Past",
     "tabUpcoming": "Upcoming",
     "recent": "RECENT",
-    "emptyUpcomingTitle": "No upcoming concerts",
-    "emptyUpcomingDesc": "Mark concerts as \"Going\" from the map",
-    "emptyPastTitle": "No past concerts",
-    "emptyPastDesc": "Concerts you attend will appear here",
+    "emptyPastTitle": "Your diary is empty",
+    "emptyPastDesc": "When you attend a concert, mark it as attended and it'll appear here with your notes, rating and photos.",
+    "emptyUpcomingTitle": "No concerts in sight",
+    "emptyUpcomingDesc": "Mark concerts as 'interested' or 'going' from the map to see them here.",
     "didYouGo": "DID YOU GO?",
     "confirmYes": "YES",
-    "confirmNo": "NO"
+    "confirmNo": "NO",
+    "emptyUpcomingCta": "Browse map"
   },
   "concertDetail": {
     "notFound": "Concert not found",

@@ -35,8 +35,9 @@ async function getBandMembers(bandName: string, mbid: string | null): Promise<st
 
     const members: string[] = [];
     for (const rel of relData.relations ?? []) {
-      if (rel.type === 'member of band' && rel.artist?.name) {
-        members.push(rel.artist.name);
+      const name = rel?.artist?.name;
+      if (rel?.type === 'member of band' && typeof name === 'string' && name.trim().length > 0) {
+        members.push(name.trim());
       }
     }
     return members;
@@ -94,7 +95,7 @@ Deno.serve(async (req) => {
       await admin
         .from('bands')
         .update({
-          members,
+          member_names: members,
           members_fetched_at: new Date().toISOString(),
         })
         .eq('id', b.id);

@@ -27,6 +27,7 @@ import { supabase } from '../lib/supabase';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RadarStackParamList } from '../navigation/RadarStack';
 import { localeFromI18n } from '../i18n';
+import EmptyState from '../components/EmptyState';
 
 type Tab = 'foryou' | 'mybands';
 
@@ -390,15 +391,21 @@ export default function RadarScreen() {
             />
           }
         >
-          <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
-            {t('radar.newForYouTitle')}
-          </Text>
+          {newForYou.length > 0 && (
+            <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
+              {t('radar.newForYouTitle')}
+            </Text>
+          )}
           {loadingRecs && newForYou.length === 0 ? (
             <ActivityIndicator color={colors.bloodBright} style={{ marginVertical: spacing.xl }} />
           ) : newForYou.length === 0 ? (
-            <Text variant="body" color="muted" style={styles.emptyText}>
-              {t('radar.followToGetRecs')}
-            </Text>
+            <EmptyState
+              icon="radio-outline"
+              title={t('radar.emptyForYouTitle')}
+              description={t('radar.emptyForYouDesc')}
+              actionLabel={t('radar.emptyForYouCta')}
+              onAction={() => setSearchOpen(true)}
+            />
           ) : (
             <ScrollView
               horizontal
@@ -574,15 +581,21 @@ export default function RadarScreen() {
             />
           }
         >
-          <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
-            {t('radar.followingTitle', { count: followedBands.length })}
-          </Text>
+          {followedBands.length > 0 && (
+            <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
+              {t('radar.followingTitle', { count: followedBands.length })}
+            </Text>
+          )}
           {loadingFollowed ? (
             <ActivityIndicator color={colors.bloodBright} style={{ marginTop: spacing.lg }} />
           ) : followedBands.length === 0 ? (
-            <Text variant="body" color="muted" style={styles.emptyText}>
-              {t('radar.emptyFollowed')}
-            </Text>
+            <EmptyState
+              icon="heart-outline"
+              title={t('radar.emptyMyBandsTitle')}
+              description={t('radar.emptyMyBandsDesc')}
+              actionLabel={t('radar.emptyMyBandsCta')}
+              onAction={() => setSearchOpen(true)}
+            />
           ) : (
             <View style={styles.listSection}>
               {followedBands.map((b: FollowedBand, i) => (

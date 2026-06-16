@@ -182,7 +182,7 @@ Deno.serve(async (req) => {
     // 1. Bandas seguidas (incluyendo cache de miembros)
     const { data: userBands, error: ubError } = await admin
       .from('user_bands')
-      .select('band:bands(id, name, musicbrainz_mbid, members, members_fetched_at)')
+      .select('band:bands(id, name, musicbrainz_mbid, member_names, members_fetched_at)') // ← member_names
       .eq('user_id', user.id);
     if (ubError) throw ubError;
 
@@ -202,7 +202,7 @@ Deno.serve(async (req) => {
       id: string;
       name: string;
       musicbrainz_mbid: string | null;
-      members: string[] | null;
+      member_names: string[] | null;
       members_fetched_at: string | null;
     }[];
 
@@ -213,11 +213,13 @@ Deno.serve(async (req) => {
 
     const ttlMs = MEMBERS_CACHE_TTL_DAYS * 24 * 60 * 60 * 1000;
     for (const b of followedBands) {
-      if (b.members && b.members_fetched_at) {
+      if (b.member_names && b.members_fetched_at) {
         const ageMs = Date.now() - new Date(b.members_fetched_at).getTime();
         if (ageMs < ttlMs) {
-          for (const m of b.members) {
-            memberExclusions.add(m.toLowerCase());
+          for (const m of b.member_names) {
+            if (typeof m === 'string' && m.trim().length > 0) {
+              memberExclusions.add(m.toLowerCase().trim());
+            }
           }
           continue;
         }
