@@ -58,6 +58,8 @@ export async function followBand(band: BandToFollow): Promise<string> {
 
   if (followError && followError.code !== '23505') throw followError;
 
+  void prewarmBandMembers([bandId]);
+
   return bandId;
 }
 
@@ -114,4 +116,22 @@ export async function getOrCreateBandId(spotify: {
     .single();
   if (error || !data) throw error ?? new Error(i18n.t('errors.bandFetchFailed'));
   return data.id;
+}
+
+async function prewarmBandMembers(bandIds: string[]): Promise<void> {
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session?.access_token) return;
+
+    await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/prewarm-band-members`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ band_ids: bandIds }),
+    });
+  } catch {}
 }

@@ -15,7 +15,7 @@ const CORS_HEADERS = {
 const TARGET_RECOMMENDATIONS = 20;
 const PER_BAND_QUOTA = 1;
 const POOL_SIZE = 50;
-const MEMBERS_CACHE_TTL_DAYS = 30;
+const MEMBERS_CACHE_TTL_DAYS = 180;
 
 let cachedSpotifyToken: { value: string; expiresAt: number } | null = null;
 
@@ -39,44 +39,6 @@ async function getSpotifyToken(): Promise<string> {
     expiresAt: Date.now() + (data.expires_in - 60) * 1000,
   };
   return cachedSpotifyToken.value;
-}
-
-async function getBandMembers(bandName: string, mbid: string | null): Promise<string[]> {
-  try {
-    let artistId = mbid;
-
-    // Si no tenemos MBID, buscar el artista por nombre
-    if (!artistId) {
-      const searchUrl = `https://musicbrainz.org/ws/2/artist?query=${encodeURIComponent(
-        `artist:"${bandName}" AND type:group`,
-      )}&fmt=json&limit=1`;
-      const searchRes = await fetch(searchUrl, {
-        headers: { 'User-Agent': 'MetalRadar/1.0 (contacto: tu@email.com)' },
-      });
-      if (!searchRes.ok) return [];
-      const searchData = await searchRes.json();
-      artistId = searchData.artists?.[0]?.id ?? null;
-      if (!artistId) return [];
-    }
-
-    // Recuperar las relaciones member-of
-    const relUrl = `https://musicbrainz.org/ws/2/artist/${artistId}?inc=artist-rels&fmt=json`;
-    const relRes = await fetch(relUrl, {
-      headers: { 'User-Agent': 'MetalRadar/1.0 (contacto: tu@email.com)' },
-    });
-    if (!relRes.ok) return [];
-    const relData = await relRes.json();
-
-    const members: string[] = [];
-    for (const rel of relData.relations ?? []) {
-      if (rel.type === 'member of band' && rel.artist?.name) {
-        members.push(rel.artist.name);
-      }
-    }
-    return members;
-  } catch {
-    return [];
-  }
 }
 
 async function getSimilarFromLastfm(artistName: string): Promise<string[]> {
@@ -148,10 +110,6 @@ async function searchSpotifyArtist(
   };
 }
 
-/**
- * Selección ponderada aleatoria. Sin reemplazo.
- * Items con mayor weight tienen más probabilidad pero no garantizada.
- */
 function weightedSample<T>(items: { item: T; weight: number }[], count: number): T[] {
   const result: T[] = [];
   const pool = [...items];
@@ -171,6 +129,33 @@ function weightedSample<T>(items: { item: T; weight: number }[], count: number):
     pool.splice(picked, 1);
   }
   return result;
+}
+
+/**
+ * Lanza pre-warming en background para bandas sin caché de miembros.
+ * Fire-and-forget: no espera el resultado.
+ */
+function triggerPrewarm(bandIds: string[], authHeader: string) {
+  if (bandIds.length === 0) return;
+
+  // EdgeRuntime.waitUntil permite que la función siga ejecutando
+  // tras enviar la respuesta al cliente
+  const task = fetch(`${SUPABASE_URL}/functions/v1/prewarm-band-members`, {
+    method: 'POST',
+    headers: {
+      Authorization: authHeader,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ band_ids: bandIds }),
+  }).catch((err) => {
+    console.warn('Prewarm trigger error:', err);
+  });
+
+  // @ts-ignore - EdgeRuntime es global en Supabase Edge Functions
+  if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+    // @ts-ignore
+    EdgeRuntime.waitUntil(task);
+  }
 }
 
 Deno.serve(async (req) => {
@@ -194,9 +179,10 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // 1. Bandas seguidas (incluyendo cache de miembros)
     const { data: userBands, error: ubError } = await admin
       .from('user_bands')
-      .select('band:bands(id, name, musicbrainz_mbid)')
+      .select('band:bands(id, name, musicbrainz_mbid, members, members_fetched_at)')
       .eq('user_id', user.id);
     if (ubError) throw ubError;
 
@@ -212,47 +198,54 @@ Deno.serve(async (req) => {
 
     const followedArr = Array.from(followedNames) as string[];
 
-    const followedWithMbid = (userBands ?? []).map((ub: any) => ub.band).filter(Boolean) as {
+    const followedBands = (userBands ?? []).map((ub: any) => ub.band).filter(Boolean) as {
+      id: string;
       name: string;
       musicbrainz_mbid: string | null;
+      members: string[] | null;
+      members_fetched_at: string | null;
     }[];
 
-    // Lanzar Last.fm en paralelo (no tiene rate limit estricto y es independiente)
-    const lastfmPromise = Promise.all(followedArr.map((name) => getSimilarFromLastfm(name)));
-
-    // Mientras tanto, MusicBrainz secuencial
-    const membersLists: string[][] = [];
-    for (const b of followedWithMbid) {
-      const members = await getBandMembers(b.name, b.musicbrainz_mbid);
-      membersLists.push(members);
-      await new Promise((r) => setTimeout(r, 1100));
-    }
-
-    // Esperar a Last.fm (ya habrá terminado en la mayoría de casos)
-    const allSimilarLists = await lastfmPromise;
-
-    for (const b of followedWithMbid) {
-      const members = await getBandMembers(b.name, b.musicbrainz_mbid);
-      membersLists.push(members);
-      await new Promise((r) => setTimeout(r, 1100)); // 1.1s entre llamadas
-    }
-
-    // Construir el set de "bandas/personas a excluir" = miembros de las que ya sigues
+    // 2. Recolectar miembros SOLO desde caché. No bloquear nunca con MusicBrainz.
+    //    Las bandas sin caché se anotarán para hacer pre-warming en background.
     const memberExclusions = new Set<string>();
-    for (const members of membersLists) {
-      for (const m of members) {
-        memberExclusions.add(m.toLowerCase());
+    const needsPrewarm: string[] = [];
+
+    const ttlMs = MEMBERS_CACHE_TTL_DAYS * 24 * 60 * 60 * 1000;
+    for (const b of followedBands) {
+      if (b.members && b.members_fetched_at) {
+        const ageMs = Date.now() - new Date(b.members_fetched_at).getTime();
+        if (ageMs < ttlMs) {
+          for (const m of b.members) {
+            memberExclusions.add(m.toLowerCase());
+          }
+          continue;
+        }
       }
+      needsPrewarm.push(b.id);
     }
 
-    console.log(`Filtering out ${memberExclusions.size} member-related artists`);
+    console.log(
+      `Member exclusions: ${memberExclusions.size}. Bands needing prewarm: ${needsPrewarm.length}`,
+    );
 
+    // 3. Last.fm en paralelo (la parte lenta es Spotify y la teníamos ya bien)
+    const allSimilarLists = await Promise.all(
+      followedArr.map((name) => getSimilarFromLastfm(name)),
+    );
+
+    // 4. Disparar pre-warming en background (no bloquea)
+    if (needsPrewarm.length > 0) {
+      triggerPrewarm(needsPrewarm, authHeader);
+    }
+
+    // 5. Scoring de candidatos
     const candidateScores = new Map<string, number>();
     for (const similar of allSimilarLists) {
       for (const s of similar) {
         const key = s.toLowerCase();
         if (followedNames.has(key)) continue;
-        if (memberExclusions.has(key)) continue; // ← nuevo
+        if (memberExclusions.has(key)) continue;
         candidateScores.set(key, (candidateScores.get(key) ?? 0) + 1);
       }
     }
@@ -263,6 +256,7 @@ Deno.serve(async (req) => {
       });
     }
 
+    // 6. Cuota por banda + muestreo ponderado (igual que antes)
     const guaranteed = new Set<string>();
     for (const similarList of allSimilarLists) {
       let added = 0;
@@ -270,7 +264,7 @@ Deno.serve(async (req) => {
         if (added >= PER_BAND_QUOTA) break;
         const key = similar.toLowerCase();
         if (followedNames.has(key) || guaranteed.has(key)) continue;
-        if (memberExclusions.has(key)) continue; // ← nuevo
+        if (memberExclusions.has(key)) continue;
         guaranteed.add(key);
         added++;
       }
@@ -292,27 +286,16 @@ Deno.serve(async (req) => {
       TARGET_RECOMMENDATIONS,
     );
     const scoresByName = new Map(Array.from(candidateScores.entries()));
+
+    // 7. Resolver desde cache de BD (una sola query, no dos)
     const { data: cachedBands } = await admin
       .from('bands')
       .select('spotify_id, name, image_url, genres')
       .in('name', finalCandidates)
       .not('spotify_id', 'is', null);
 
-    const { data: allCandidateMatches } = await admin
-      .from('bands')
-      .select('spotify_id, name, image_url, genres')
-      .not('spotify_id', 'is', null)
-      .filter(
-        'name',
-        'in',
-        `(${finalCandidates.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')})`,
-      );
-
     const cachedByName = new Map<string, BandData>();
     for (const row of cachedBands ?? []) {
-      cachedByName.set(row.name.toLowerCase(), row as BandData);
-    }
-    for (const row of allCandidateMatches ?? []) {
       cachedByName.set(row.name.toLowerCase(), row as BandData);
     }
 
@@ -324,6 +307,7 @@ Deno.serve(async (req) => {
       else toFetch.push(candidate);
     }
 
+    // 8. Buscar las que falten en Spotify
     let fromSpotify: BandData[] = [];
     if (toFetch.length > 0) {
       const spotifyToken = await getSpotifyToken();
@@ -355,6 +339,7 @@ Deno.serve(async (req) => {
       }
     }
 
+    // 9. Calcular affinity y ordenar
     const all = [...fromCache, ...fromSpotify];
     const recommendations = all
       .map((b) => {
@@ -370,6 +355,7 @@ Deno.serve(async (req) => {
         cached: fromCache.length,
         fetched: fromSpotify.length,
         guaranteed: guaranteed.size,
+        prewarmTriggered: needsPrewarm.length,
       }),
       { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
     );

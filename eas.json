@@ -10,11 +10,17 @@
     },
     "preview": {
       "distribution": "internal",
-      "environment": "preview"
+      "environment": "preview",
+      "env": {
+        "NPM_CONFIG_PRODUCTION": "true"
+      }
     },
     "production": {
       "autoIncrement": true,
-      "environment": "production"
+      "environment": "production",
+      "env": {
+        "NPM_CONFIG_PRODUCTION": "true"
+      }
     }
   },
   "submit": {

@@ -7,6 +7,32 @@ const CRON_SECRET = Deno.env.get('CRON_SECRET')!;
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 
+type Lang = 'es' | 'en';
+type SupportedLanguage = Lang;
+const DEFAULT_LANG: Lang = 'es';
+
+// Diccionario de strings de notificaciones
+const I18N: Record<
+  Lang,
+  {
+    title: (band: string) => string;
+    body: (date: string, place: string) => string;
+  }
+> = {
+  es: {
+    title: (band) => `🤘 ${band}`,
+    body: (date, place) => `Toca el ${date} en ${place}`,
+  },
+  en: {
+    title: (band) => `🤘 ${band}`,
+    body: (date, place) => `Playing on ${date} in ${place}`,
+  },
+};
+
+function localeFor(lang: Lang): string {
+  return lang === 'en' ? 'en-US' : 'es-ES';
+}
+
 type PushPayload = {
   to: string;
   title: string;
@@ -100,18 +126,34 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Traer el idioma de los usuarios implicados en una sola query
+    const uniqueUserIds = Array.from(new Set(allPending.map((r) => r.user_id)));
+    const { data: profilesData } = await admin
+      .from('profiles')
+      .select('id, language')
+      .in('id', uniqueUserIds);
+
+    const languageByUser = new Map<string, Lang>();
+    for (const p of profilesData ?? []) {
+      const lang = (p as any).language as SupportedLanguage | null;
+      languageByUser.set(p.id, lang === 'en' ? 'en' : 'es');
+    }
+
     // Construir payloads
     const messages: PushPayload[] = allPending.map((row) => {
+      const lang = languageByUser.get(row.user_id) ?? DEFAULT_LANG;
+      const dict = I18N[lang];
       const date = new Date(row.event_date);
-      const dateStr = date.toLocaleDateString('es-ES', {
+      const dateStr = date.toLocaleDateString(localeFor(lang), {
         day: 'numeric',
         month: 'short',
       });
+      const place = row.venue_city ?? row.venue_name;
 
       return {
         to: row.push_token,
-        title: `🤘 ${row.band_name}`,
-        body: `Toca el ${dateStr} en ${row.venue_city ?? row.venue_name}`,
+        title: dict.title(row.band_name),
+        body: dict.body(dateStr, place),
         data: { concertId: row.concert_id },
         sound: 'default',
         priority: 'high',
