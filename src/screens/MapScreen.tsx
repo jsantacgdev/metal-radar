@@ -15,15 +15,11 @@ import { Text } from '../components/ui';
 import BandImage from '../components/BandImage';
 import LeafletMap, { LeafletMarker } from '../components/LeafletMap';
 import { useFocusEffect } from '@react-navigation/native';
+import { localeFromI18n } from '../i18n';
 
 const LOCATION_CACHE_KEY = 'last_known_location';
 const LOCATION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const LOCATION_TIMEOUT_MS = 8000;
-
-function localeFromI18n(lng: string): string {
-  if (lng.startsWith('en')) return 'en-US';
-  return 'es-ES';
-}
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();

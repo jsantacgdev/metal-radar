@@ -19,15 +19,11 @@ import { DiaryStackParamList } from '../navigation/DiaryStack';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from '../components/ui';
 import BandImage from '../components/BandImage';
+import { localeFromI18n } from '../i18n';
 
 type Filter = 'upcoming' | 'past';
 
 const CURRENT_YEAR = new Date().getFullYear();
-
-function localeFromI18n(lng: string): string {
-  if (lng.startsWith('en')) return 'en-US';
-  return 'es-ES';
-}
 
 export default function DiaryScreen() {
   const insets = useSafeAreaInsets();

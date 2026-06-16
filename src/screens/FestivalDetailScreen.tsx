@@ -16,13 +16,9 @@ import { MapStackParamList } from '../navigation/MapStack';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from '../components/ui';
 import BandImage from '../components/BandImage';
+import { localeFromI18n } from '../i18n';
 
 type RouteParams = RouteProp<MapStackParamList, 'FestivalDetail'>;
-
-function localeFromI18n(lng: string): string {
-  if (lng.startsWith('en')) return 'en-US';
-  return 'es-ES';
-}
 
 function formatDateRange(
   start: string,

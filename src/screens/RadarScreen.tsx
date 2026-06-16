@@ -26,13 +26,9 @@ import { Text } from '../components/ui';
 import { supabase } from '../lib/supabase';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RadarStackParamList } from '../navigation/RadarStack';
+import { localeFromI18n } from '../i18n';
 
 type Tab = 'foryou' | 'mybands';
-
-function localeFromI18n(lng: string): string {
-  if (lng.startsWith('en')) return 'en-US';
-  return 'es-ES';
-}
 
 export default function RadarScreen() {
   const insets = useSafeAreaInsets();

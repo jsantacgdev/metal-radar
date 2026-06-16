@@ -19,13 +19,9 @@ import BandImage from '../components/BandImage';
 import PhotoGallery from '../components/PhotoGallery';
 import SetlistView from '../components/Setlist';
 import { useSetlists } from '../hooks/useSetlist';
+import { localeFromI18n } from '../i18n';
 
 type Props = NativeStackScreenProps<MapStackParamList, 'ConcertDetail'>;
-
-function localeFromI18n(lng: string): string {
-  if (lng.startsWith('en')) return 'en-US';
-  return 'es-ES';
-}
 
 export default function ConcertDetailScreen({ route }: Props) {
   const { t, i18n } = useTranslation();

@@ -52,5 +52,14 @@ export async function setLanguage(lang: SupportedLanguage) {
   await AsyncStorage.setItem(STORAGE_KEY, lang);
 }
 
+export function localeFromI18n(lng: string): string {
+  if (lng.startsWith('en')) return 'en-US';
+  return 'es-ES';
+}
+
+export function currentLocale(): string {
+  return localeFromI18n(i18n.language);
+}
+
 export { STORAGE_KEY as LANGUAGE_STORAGE_KEY };
 export default i18n;

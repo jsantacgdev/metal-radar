@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Setlist, useRefreshSetlist } from '../hooks/useSetlist';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from './ui';
+import { localeFromI18n } from '../i18n';
 
 type Props = {
   concertId: string;
@@ -14,11 +15,6 @@ type Props = {
 };
 
 const TOUR_ACCENT = '#ffa500'; // Naranja para "predicción de gira"
-
-function localeFromI18n(lng: string): string {
-  if (lng.startsWith('en')) return 'en-US';
-  return 'es-ES';
-}
 
 function useFormatDuration() {
   const { t } = useTranslation();
