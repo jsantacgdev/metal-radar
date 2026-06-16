@@ -1,3 +1,4 @@
+import { Animated, Easing } from 'react-native';
 import { useEffect, useMemo, useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,12 +17,15 @@ import BandImage from '../components/BandImage';
 import LeafletMap, { LeafletMarker } from '../components/LeafletMap';
 import { useFocusEffect } from '@react-navigation/native';
 import { localeFromI18n } from '../i18n';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '../lib/supabase';
 
 const LOCATION_CACHE_KEY = 'last_known_location';
 const LOCATION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const LOCATION_TIMEOUT_MS = 8000;
 
 export default function MapScreen() {
+  const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<MapStackParamList>>();
   const { profile } = useProfile();
@@ -43,8 +47,31 @@ export default function MapScreen() {
     venue: ConcertWithDetails['venue'];
     concerts: ConcertWithDetails[];
   } | null>(null);
-
+  const [refreshing, setRefreshing] = useState(false);
   const radiusKm = profile?.search_radius_km ?? 500;
+
+  const spinValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (refreshing) {
+      Animated.loop(
+        Animated.timing(spinValue, {
+          toValue: 1,
+          duration: 800,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+      ).start();
+    } else {
+      spinValue.stopAnimation();
+      spinValue.setValue(0);
+    }
+  }, [refreshing, spinValue]);
+
+  const spin = spinValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
 
   const { concerts, farConcerts, loading, error } = useNearbyConcerts(
     location?.lat ?? null,
@@ -174,11 +201,27 @@ export default function MapScreen() {
     loadLocation();
   }, [loadLocation]);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadLocation(true);
-    }, [loadLocation]),
-  );
+  const handleManualRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadLocation(true);
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/sync-concerts`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ['nearbyConcerts'] });
+      await queryClient.invalidateQueries({ queryKey: ['concerts'] });
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadLocation, queryClient]);
 
   if (noLocationAvailable) {
     return (
@@ -244,6 +287,21 @@ export default function MapScreen() {
                 : t('map.headerSummary', { total: visible.length, near: concerts.length })}
             </Text>
           </View>
+          <TouchableOpacity
+            style={styles.refreshBtn}
+            onPress={handleManualRefresh}
+            disabled={refreshing}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+          >
+            <Animated.View style={{ transform: [{ rotate: spin }] }}>
+              <Ionicons
+                name="refresh"
+                size={18}
+                color={refreshing ? colors.bloodBright : colors.silver}
+              />
+            </Animated.View>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -517,5 +575,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.bloodTintBorder,
     borderRadius: radius.md,
+  },
+  refreshBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.full,
+    backgroundColor: colors.panel2,
+    borderWidth: 1,
+    borderColor: colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: spacing.sm,
   },
 });

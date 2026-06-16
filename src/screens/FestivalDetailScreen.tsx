@@ -326,7 +326,10 @@ const styles = StyleSheet.create({
   },
   heroImage: {
     width: '100%',
-    height: '100%',
+    aspectRatio: 0.75,
+    position: 'absolute',
+    top: 0,
+    left: 0,
     resizeMode: 'cover',
   },
   heroGradient: {
