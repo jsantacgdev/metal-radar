@@ -32,7 +32,7 @@ export default function DiaryScreen() {
   const { t, i18n } = useTranslation();
   const { entries, loading, error, reload } = useDiary();
   const stats = useDiaryStats(entries, CURRENT_YEAR);
-  const [filter, setFilter] = useState<Filter>('past');
+  const [filter, setFilter] = useState<Filter>('upcoming');
 
   const locale = localeFromI18n(i18n.language);
 
@@ -100,22 +100,20 @@ export default function DiaryScreen() {
 
       <View style={styles.tabsRow}>
         <TabPill
-          label={`${t('diary.tabPast')} · ${past.length}`}
-          active={filter === 'past'}
-          onPress={() => setFilter('past')}
-        />
-        <TabPill
           label={`${t('diary.tabUpcoming')} · ${upcoming.length}`}
           active={filter === 'upcoming'}
           onPress={() => setFilter('upcoming')}
         />
+        <TabPill
+          label={`${t('diary.tabPast')} · ${past.length}`}
+          active={filter === 'past'}
+          onPress={() => setFilter('past')}
+        />
       </View>
 
-      {filter === 'past' && (
-        <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
-          {t('diary.recent')}
-        </Text>
-      )}
+      <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
+        {filter === 'upcoming' ? t('diary.upcomingTitle') : t('diary.recent')}
+      </Text>
 
       {error && (
         <View style={styles.errorBox}>

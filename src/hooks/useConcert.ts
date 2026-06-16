@@ -105,7 +105,7 @@ export function useConcert(concertId: string) {
           .eq('user_id', user.id)
           .eq('concert_id', concertId);
       } else {
-        await supabase.from('user_concerts').upsert(
+        const { error: upsertError } = await supabase.from('user_concerts').upsert(
           {
             user_id: user.id,
             concert_id: concertId,
@@ -113,6 +113,8 @@ export function useConcert(concertId: string) {
           },
           { onConflict: 'user_id,concert_id' },
         );
+
+        if (upsertError) throw upsertError;
 
         // Fire-and-forget: en cualquier estado intentamos cachear el setlist
         // si no existe ya. fetch-setlist es idempotente sin force=true.

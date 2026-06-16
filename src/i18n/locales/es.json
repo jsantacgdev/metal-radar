@@ -144,7 +144,8 @@
     "didYouGo": "¿FUISTE?",
     "confirmYes": "SÍ",
     "confirmNo": "NO",
-    "emptyUpcomingCta": "Explorar mapa"
+    "emptyUpcomingCta": "Explorar mapa",
+    "upcomingTitle": "Próximos conciertos"
   },
   "concertDetail": {
     "notFound": "Concierto no encontrado",
