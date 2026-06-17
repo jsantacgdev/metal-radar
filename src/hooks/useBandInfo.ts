@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 
 export type BandMember = {
@@ -15,9 +16,12 @@ export type BandInfo = {
   country: string | null;
   members: BandMember[];
   genres: string[];
+  mb_match_quality?: 'verified' | 'unverified';
+  image_url?: string | null;
+  spotify_id?: string | null;
 };
 
-async function fetchBandInfo(bandId: string): Promise<BandInfo> {
+async function fetchBandInfo(bandId: string, lang: string): Promise<BandInfo> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -27,19 +31,21 @@ async function fetchBandInfo(bandId: string): Promise<BandInfo> {
       Authorization: `Bearer ${session?.access_token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ band_id: bandId }),
+    body: JSON.stringify({ band_id: bandId, lang }),
   });
   const json = await res.json();
-  console.log('band-info response:', JSON.stringify(json, null, 2));
   if (json.error) throw new Error(json.error);
   return json;
 }
 
 export function useBandInfo(bandId: string) {
+  const { i18n } = useTranslation();
+  const lang = i18n.language.startsWith('en') ? 'en' : 'es';
+
   const query = useQuery({
-    queryKey: ['bandInfo', bandId],
-    queryFn: () => fetchBandInfo(bandId),
-    staleTime: 30 * 60 * 1000, // 30 min en cliente
+    queryKey: ['bandInfo', bandId, lang],
+    queryFn: () => fetchBandInfo(bandId, lang),
+    staleTime: 30 * 60 * 1000,
   });
 
   return {

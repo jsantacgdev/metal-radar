@@ -18,6 +18,8 @@ import { Text } from '../components/ui';
 import BandImage from '../components/BandImage';
 import { localeFromI18n } from '../i18n';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 type RouteParams = RouteProp<MapStackParamList, 'FestivalDetail'>;
 
@@ -48,6 +50,7 @@ function formatDateRange(
 
 export default function FestivalDetailScreen() {
   const route = useRoute<RouteParams>();
+  const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { t, i18n } = useTranslation();
   const { festival, loading, error, updateStatus } = useFestival(route.params.festivalId);
 
@@ -239,7 +242,12 @@ export default function FestivalDetailScreen() {
                 {t('festivalDetail.yourBandsTitle')}
               </Text>
               {followedBands.map((b) => (
-                <View key={b.id} style={styles.bandRow}>
+                <TouchableOpacity
+                  key={b.id}
+                  style={styles.bandRow}
+                  onPress={() => navigation.navigate('BandDetail', { bandId: b.id })}
+                  activeOpacity={0.7}
+                >
                   <BandImage url={b.image_url} size={44} showTag={!b.image_url} />
                   <View style={{ flex: 1, marginLeft: spacing.md, minWidth: 0 }}>
                     <Text variant="displaySM" numberOfLines={1}>
@@ -252,33 +260,31 @@ export default function FestivalDetailScreen() {
                     )}
                   </View>
                   <Ionicons name="heart" size={18} color={colors.bloodBright} />
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
           )}
 
-          {headliners.filter((h) => !h.is_followed).length > 0 && (
-            <View style={styles.section}>
-              <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
-                {t('festivalDetail.headlinersTitle')}
-              </Text>
-              {headliners
-                .filter((h) => !h.is_followed)
-                .map((b) => (
-                  <View key={b.id} style={styles.bandRow}>
-                    <BandImage url={b.image_url} size={44} showTag={!b.image_url} />
-                    <View style={{ flex: 1, marginLeft: spacing.md, minWidth: 0 }}>
-                      <Text variant="displaySM" numberOfLines={1}>
-                        {b.name}
-                      </Text>
-                      <Text variant="monoSM" color="bloodBright" style={{ marginTop: 2 }}>
-                        {t('festivalDetail.headlinerTag')}
-                      </Text>
-                    </View>
-                  </View>
-                ))}
-            </View>
-          )}
+          {headliners
+            .filter((h) => !h.is_followed)
+            .map((b) => (
+              <TouchableOpacity
+                key={b.id}
+                style={styles.bandRow}
+                onPress={() => navigation.navigate('BandDetail', { bandId: b.id })}
+                activeOpacity={0.7}
+              >
+                <BandImage url={b.image_url} size={44} showTag={!b.image_url} />
+                <View style={{ flex: 1, marginLeft: spacing.md, minWidth: 0 }}>
+                  <Text variant="displaySM" numberOfLines={1}>
+                    {b.name}
+                  </Text>
+                  <Text variant="monoSM" color="bloodBright" style={{ marginTop: 2 }}>
+                    {t('festivalDetail.headlinerTag')}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
 
           {otherBands.length > 0 && (
             <View style={styles.section}>
@@ -287,11 +293,16 @@ export default function FestivalDetailScreen() {
               </Text>
               <View style={styles.tagWrap}>
                 {otherBands.map((b) => (
-                  <View key={b.id} style={styles.tag}>
+                  <TouchableOpacity
+                    key={b.id}
+                    style={styles.tag}
+                    onPress={() => navigation.navigate('BandDetail', { bandId: b.id })}
+                    activeOpacity={0.7}
+                  >
                     <Text variant="bodySM" color="silver">
                       {b.name}
                     </Text>
-                  </View>
+                  </TouchableOpacity>
                 ))}
               </View>
             </View>
