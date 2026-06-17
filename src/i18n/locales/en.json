@@ -193,7 +193,12 @@
     "headlinersTitle": "HEADLINERS",
     "fullLineupTitle": "FULL LINEUP · {{count}}",
     "officialWebsite": "Official website",
-    "buyTickets": "Buy tickets"
+    "buyTickets": "Buy tickets",
+    "statusTitle": "STATUS",
+    "attendanceTitle": "ATTENDANCE",
+    "statusInterested": "Interested",
+    "statusGoing": "Going",
+    "statusAttended": "Attended"
   },
   "bandDetail": {
     "heroLabel": "BAND PROFILE",

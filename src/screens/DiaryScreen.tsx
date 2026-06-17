@@ -161,7 +161,13 @@ export default function DiaryScreen() {
             <DiaryItem
               entry={item}
               locale={locale}
-              onPress={() => navigation.navigate('ConcertDetail', { concertId: item.concert_id })}
+              onPress={() => {
+                if (item.kind === 'festival') {
+                  navigation.navigate('FestivalDetail', { festivalId: item.concert_id });
+                } else {
+                  navigation.navigate('ConcertDetail', { concertId: item.concert_id });
+                }
+              }}
             />
           )}
         />
@@ -273,16 +279,25 @@ function DiaryItem({
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
       <BandImage
-        url={firstBand?.image_url ?? null}
+        url={
+          entry.kind === 'festival'
+            ? (entry.concert.image_url ?? null)
+            : (firstBand?.image_url ?? null)
+        }
         size={48}
         radiusOverride={radius.sm}
-        showTag={!firstBand?.image_url}
+        showTag={entry.kind === 'festival' ? !entry.concert.image_url : !firstBand?.image_url}
       />
 
       <View style={styles.cardContent}>
         <View style={styles.cardTopRow}>
+          {entry.kind === 'festival' && (
+            <Ionicons name="flame" size={14} color="#ffa500" style={{ marginRight: 6 }} />
+          )}
           <Text variant="displaySM" numberOfLines={1} style={{ flex: 1 }}>
-            {entry.concert.bands.map((b) => b.name).join(' · ')}
+            {entry.kind === 'festival' && entry.concert.festival_name
+              ? entry.concert.festival_name
+              : entry.concert.bands.map((b) => b.name).join(' · ')}
           </Text>
           <Text variant="monoSM" color="muted" style={{ marginLeft: spacing.sm }}>
             {dateLabel}
@@ -290,8 +305,14 @@ function DiaryItem({
         </View>
 
         <Text variant="monoSM" color="muted" numberOfLines={1} style={{ marginTop: 4 }}>
-          {entry.concert.venue.name}
-          {entry.concert.venue.city ? ` · ${entry.concert.venue.city.toUpperCase()}` : ''}
+          {entry.kind === 'festival'
+            ? entry.concert.bands
+                .slice(0, 3)
+                .map((b) => b.name)
+                .join(' · ')
+            : `${entry.concert.venue.name}${
+                entry.concert.venue.city ? ` · ${entry.concert.venue.city.toUpperCase()}` : ''
+              }`}
         </Text>
 
         {entry.status === 'attended' && (

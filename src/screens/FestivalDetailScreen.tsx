@@ -49,7 +49,7 @@ function formatDateRange(
 export default function FestivalDetailScreen() {
   const route = useRoute<RouteParams>();
   const { t, i18n } = useTranslation();
-  const { festival, loading, error } = useFestival(route.params.festivalId);
+  const { festival, loading, error, updateStatus } = useFestival(route.params.festivalId);
 
   const locale = localeFromI18n(i18n.language);
 
@@ -185,6 +185,37 @@ export default function FestivalDetailScreen() {
             </View>
           )}
 
+          <View style={styles.section}>
+            <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
+              {isPast ? t('festivalDetail.attendanceTitle') : t('festivalDetail.statusTitle')}
+            </Text>
+            <View style={styles.actionsRow}>
+              {!isPast && (
+                <>
+                  <ActionPill
+                    label={t('festivalDetail.statusInterested')}
+                    active={festival.userStatus === 'interested'}
+                    onPress={() =>
+                      updateStatus(festival.userStatus === 'interested' ? null : 'interested')
+                    }
+                  />
+                  <ActionPill
+                    label={t('festivalDetail.statusGoing')}
+                    active={festival.userStatus === 'going'}
+                    highlight
+                    onPress={() => updateStatus(festival.userStatus === 'going' ? null : 'going')}
+                  />
+                </>
+              )}
+              <ActionPill
+                label={t('festivalDetail.statusAttended')}
+                active={festival.userStatus === 'attended'}
+                highlight
+                onPress={() => updateStatus(festival.userStatus === 'attended' ? null : 'attended')}
+              />
+            </View>
+          </View>
+
           {festival.description && (
             <View style={styles.section}>
               <Text variant="body" color="silver" style={{ lineHeight: 22 }}>
@@ -306,6 +337,46 @@ export default function FestivalDetailScreen() {
         </View>
       )}
     </View>
+  );
+}
+
+function ActionPill({
+  label,
+  active,
+  highlight,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  highlight?: boolean;
+  onPress: () => void;
+}) {
+  const bg = active ? (highlight ? colors.blood : colors.silver) : 'transparent';
+  const border = active ? (highlight ? colors.bloodBright : colors.silver) : colors.line;
+  const textColor = active ? (highlight ? '#fff' : colors.ink) : colors.silver;
+
+  return (
+    <TouchableOpacity
+      style={[styles.actionPill, { backgroundColor: bg, borderColor: border }]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <Text
+        numberOfLines={1}
+        style={{
+          fontFamily: fontFamily.mono,
+          fontSize: 11,
+          lineHeight: 13,
+          letterSpacing: 0.8,
+          textTransform: 'uppercase',
+          color: textColor,
+          includeFontPadding: false,
+          textAlignVertical: 'center',
+        }}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
   );
 }
 
@@ -458,5 +529,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.blood,
     borderRadius: radius.md,
     paddingVertical: 16,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  actionPill: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 10,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 36,
   },
 });

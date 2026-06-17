@@ -3,11 +3,13 @@ import { Text as RNText } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import DiaryScreen from '../screens/DiaryScreen';
 import ConcertDetailScreen from '../screens/ConcertDetailScreen';
+import FestivalDetailScreen from '../screens/FestivalDetailScreen';
 import { colors, fontFamily } from '../theme';
 
 export type DiaryStackParamList = {
   DiaryHome: undefined;
   ConcertDetail: { concertId: string };
+  FestivalDetail: { festivalId: string };
 };
 
 const Stack = createNativeStackNavigator<DiaryStackParamList>();
@@ -46,6 +48,15 @@ export default function DiaryStack() {
         name="ConcertDetail"
         component={ConcertDetailScreen}
         options={{ title: t('navigation.concert') }}
+      />
+      <Stack.Screen
+        name="FestivalDetail"
+        component={FestivalDetailScreen}
+        options={{
+          title: '',
+          headerTransparent: true,
+          headerStyle: { backgroundColor: 'transparent' },
+        }}
       />
     </Stack.Navigator>
   );

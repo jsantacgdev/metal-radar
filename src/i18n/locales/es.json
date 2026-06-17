@@ -193,7 +193,12 @@
     "headlinersTitle": "HEADLINERS",
     "fullLineupTitle": "CARTEL COMPLETO · {{count}}",
     "officialWebsite": "Web oficial",
-    "buyTickets": "Comprar entradas"
+    "buyTickets": "Comprar entradas",
+    "statusTitle": "ESTADO",
+    "attendanceTitle": "ASISTENCIA",
+    "statusInterested": "Me interesa",
+    "statusGoing": "Voy",
+    "statusAttended": "Ya fui"
   },
   "bandDetail": {
     "heroLabel": "FICHA DE BANDA",
