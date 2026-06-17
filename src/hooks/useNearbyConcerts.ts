@@ -21,6 +21,7 @@ export type ConcertWithDetails = {
   distance_km: number;
   is_festival: boolean;
   festival_name?: string;
+  user_status: 'interested' | 'going' | 'attended' | null; // ← nuevo
 };
 
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -82,7 +83,18 @@ async function fetchNearbyConcerts(userLat: number, userLng: number) {
 
   if (fError) throw fError;
 
-  // 3. Procesar conciertos normales
+  // 3. Cargar estados del usuario para todos los conciertos
+  const { data: userConcertsData } = await supabase
+    .from('user_concerts')
+    .select('concert_id, status')
+    .eq('user_id', user.id);
+
+  const statusByConcertId = new Map<string, 'interested' | 'going' | 'attended'>();
+  for (const uc of userConcertsData ?? []) {
+    statusByConcertId.set(uc.concert_id, uc.status);
+  }
+
+  // 4. Procesar conciertos normales
   const concerts: ConcertWithDetails[] = (concertsData ?? [])
     .filter((c: any) => c.venue?.lat && c.venue?.lng)
     .map((c: any) => ({
@@ -96,9 +108,10 @@ async function fetchNearbyConcerts(userLat: number, userLng: number) {
       bands: c.concert_bands.map((cb: any) => cb.band),
       distance_km: haversine(userLat, userLng, c.venue.lat, c.venue.lng),
       is_festival: false,
+      user_status: statusByConcertId.get(c.id) ?? null,
     }));
 
-  // 4. Procesar festivales
+  // 5. Procesar festivales
   const festivals: ConcertWithDetails[] = (festivalsData ?? [])
     .filter((f: any) => f.venue?.lat && f.venue?.lng)
     .map((f: any) => ({
@@ -113,9 +126,10 @@ async function fetchNearbyConcerts(userLat: number, userLng: number) {
       distance_km: haversine(userLat, userLng, f.venue.lat, f.venue.lng),
       is_festival: true,
       festival_name: f.name,
+      user_status: null,
     }));
 
-  // 5. Combinar y ordenar por fecha
+  // 6. Combinar y ordenar por fecha
   const all = [...concerts, ...festivals];
 
   // Deduplicar por venue+día+tipo

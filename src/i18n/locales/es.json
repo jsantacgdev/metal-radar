@@ -124,7 +124,17 @@
     "bandsPrefix": "Bandas:",
     "noLocationTitle": "Ubicación no disponible",
     "noLocationDesc": "Activa el GPS o configura tu ubicación de referencia en el perfil",
-    "headerSummaryHome": "{{total}} CONCIERTOS · DESDE UBICACIÓN BASE"
+    "headerSummaryHome": "{{total}} CONCIERTOS · DESDE UBICACIÓN BASE",
+    "filtersTitle": "Filtros",
+    "filterTypeLabel": "TIPO DE EVENTO",
+    "filterTypeAll": "Todos",
+    "filterTypeConcerts": "Conciertos",
+    "filterTypeFestivals": "Festivales",
+    "filterStatusLabel": "ESTADO",
+    "filterStatusAll": "Todos",
+    "filterStatusGoing": "Voy",
+    "filterStatusInterested": "Me interesa",
+    "clearFilters": "Limpiar filtros"
   },
   "diary": {
     "title": "Diario",

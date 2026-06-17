@@ -1,6 +1,13 @@
 import { Animated, Easing } from 'react-native';
 import { useEffect, useMemo, useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+  Modal,
+  Pressable,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -20,6 +27,10 @@ import { localeFromI18n } from '../i18n';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 
+type ConcertTypeFilter = 'all' | 'concerts' | 'festivals';
+type StatusFilter = 'all' | 'going' | 'interested';
+
+const FILTERS_CACHE_KEY = 'map_filters_v1';
 const LOCATION_CACHE_KEY = 'last_known_location';
 const LOCATION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const LOCATION_TIMEOUT_MS = 8000;
@@ -48,6 +59,10 @@ export default function MapScreen() {
     concerts: ConcertWithDetails[];
   } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<ConcertTypeFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
   const radiusKm = profile?.search_radius_km ?? 500;
 
   const spinValue = useRef(new Animated.Value(0)).current;
@@ -68,6 +83,25 @@ export default function MapScreen() {
     }
   }, [refreshing, spinValue]);
 
+  useEffect(() => {
+    AsyncStorage.getItem(FILTERS_CACHE_KEY)
+      .then((raw) => {
+        if (!raw) return;
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed.typeFilter) setTypeFilter(parsed.typeFilter);
+          if (parsed.statusFilter) setStatusFilter(parsed.statusFilter);
+        } catch {}
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.setItem(FILTERS_CACHE_KEY, JSON.stringify({ typeFilter, statusFilter })).catch(
+      () => {},
+    );
+  }, [typeFilter, statusFilter]);
+
   const spin = spinValue.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
@@ -79,7 +113,23 @@ export default function MapScreen() {
     radiusKm,
   );
 
-  const visible = useMemo(() => [...concerts, ...farConcerts], [concerts, farConcerts]);
+  const visible = useMemo(() => {
+    let all = [...concerts, ...farConcerts];
+
+    if (typeFilter === 'concerts') {
+      all = all.filter((c) => !c.is_festival);
+    } else if (typeFilter === 'festivals') {
+      all = all.filter((c) => c.is_festival);
+    }
+
+    if (statusFilter === 'going') {
+      all = all.filter((c) => c.user_status === 'going');
+    } else if (statusFilter === 'interested') {
+      all = all.filter((c) => c.user_status === 'interested');
+    }
+
+    return all;
+  }, [concerts, farConcerts, typeFilter, statusFilter]);
 
   const byVenue = useMemo(() => {
     const map = new Map<
@@ -148,7 +198,6 @@ export default function MapScreen() {
         return;
       }
 
-      // Cache: solo úsalo si no hay nada en pantalla aún
       if (!forceFresh) {
         try {
           const cached = await AsyncStorage.getItem(LOCATION_CACHE_KEY);
@@ -159,19 +208,15 @@ export default function MapScreen() {
               setUsingHomeFallback(false);
             }
           }
-        } catch {
-          // ignore
-        }
+        } catch {}
       }
 
-      // Permisos
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         fallbackToHomeOrFail();
         return;
       }
 
-      // GPS con timeout para no quedarnos colgados
       try {
         const pos = await Promise.race([
           Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
@@ -222,6 +267,36 @@ export default function MapScreen() {
       setRefreshing(false);
     }
   }, [loadLocation, queryClient]);
+
+  function FilterPill({
+    label,
+    active,
+    onPress,
+  }: {
+    label: string;
+    active: boolean;
+    onPress: () => void;
+  }) {
+    return (
+      <TouchableOpacity
+        style={[styles.filterPill, active && styles.filterPillActive]}
+        onPress={onPress}
+        activeOpacity={0.7}
+      >
+        <Text
+          style={{
+            fontFamily: fontFamily.mono,
+            fontSize: 11,
+            letterSpacing: 0.5,
+            textTransform: 'uppercase',
+            color: active ? colors.ink : colors.silver,
+          }}
+        >
+          {label}
+        </Text>
+      </TouchableOpacity>
+    );
+  }
 
   if (noLocationAvailable) {
     return (
@@ -287,6 +362,20 @@ export default function MapScreen() {
                 : t('map.headerSummary', { total: visible.length, near: concerts.length })}
             </Text>
           </View>
+          <TouchableOpacity
+            style={styles.refreshBtn}
+            onPress={() => setFiltersOpen(true)}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+          >
+            <Ionicons
+              name="options-outline"
+              size={18}
+              color={
+                typeFilter !== 'all' || statusFilter !== 'all' ? colors.bloodBright : colors.silver
+              }
+            />
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.refreshBtn}
             onPress={handleManualRefresh}
@@ -457,6 +546,83 @@ export default function MapScreen() {
           </Text>
         </View>
       )}
+      <Modal
+        visible={filtersOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setFiltersOpen(false)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setFiltersOpen(false)}>
+          <Pressable style={styles.filtersPanel} onPress={() => {}}>
+            <View style={styles.filtersHeader}>
+              <Text variant="displaySM">{t('map.filtersTitle')}</Text>
+              <TouchableOpacity
+                onPress={() => setFiltersOpen(false)}
+                hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+              >
+                <Ionicons name="close" size={22} color={colors.muted} />
+              </TouchableOpacity>
+            </View>
+
+            <Text variant="monoMD" color="muted" style={styles.filterLabel}>
+              {t('map.filterTypeLabel')}
+            </Text>
+            <View style={styles.filterRow}>
+              <FilterPill
+                label={t('map.filterTypeAll')}
+                active={typeFilter === 'all'}
+                onPress={() => setTypeFilter('all')}
+              />
+              <FilterPill
+                label={t('map.filterTypeConcerts')}
+                active={typeFilter === 'concerts'}
+                onPress={() => setTypeFilter('concerts')}
+              />
+              <FilterPill
+                label={t('map.filterTypeFestivals')}
+                active={typeFilter === 'festivals'}
+                onPress={() => setTypeFilter('festivals')}
+              />
+            </View>
+
+            <Text variant="monoMD" color="muted" style={styles.filterLabel}>
+              {t('map.filterStatusLabel')}
+            </Text>
+            <View style={styles.filterRow}>
+              <FilterPill
+                label={t('map.filterStatusAll')}
+                active={statusFilter === 'all'}
+                onPress={() => setStatusFilter('all')}
+              />
+              <FilterPill
+                label={t('map.filterStatusGoing')}
+                active={statusFilter === 'going'}
+                onPress={() => setStatusFilter('going')}
+              />
+              <FilterPill
+                label={t('map.filterStatusInterested')}
+                active={statusFilter === 'interested'}
+                onPress={() => setStatusFilter('interested')}
+              />
+            </View>
+
+            {(typeFilter !== 'all' || statusFilter !== 'all') && (
+              <TouchableOpacity
+                style={styles.clearFiltersBtn}
+                onPress={() => {
+                  setTypeFilter('all');
+                  setStatusFilter('all');
+                }}
+                activeOpacity={0.7}
+              >
+                <Text variant="monoSM" color="bloodBright">
+                  {t('map.clearFilters')}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -586,5 +752,51 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: spacing.sm,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'flex-end',
+  },
+  filtersPanel: {
+    backgroundColor: colors.ink,
+    borderTopWidth: 1,
+    borderColor: colors.line,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    padding: spacing.xl,
+    paddingBottom: spacing.xxxl,
+  },
+  filtersHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xl,
+  },
+  filterLabel: {
+    marginBottom: spacing.sm,
+    marginTop: spacing.md,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    flexWrap: 'wrap',
+  },
+  filterPill: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.panel,
+  },
+  filterPillActive: {
+    backgroundColor: colors.silver,
+    borderColor: colors.silver,
+  },
+  clearFiltersBtn: {
+    marginTop: spacing.xl,
+    alignItems: 'center',
+    paddingVertical: spacing.md,
   },
 });

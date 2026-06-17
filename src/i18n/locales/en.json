@@ -124,7 +124,17 @@
     "bandsPrefix": "Bands:",
     "noLocationTitle": "Location unavailable",
     "noLocationDesc": "Enable GPS or set your home location in your profile",
-    "headerSummaryHome": "{{total}} CONCERTS · FROM HOME LOCATION"
+    "headerSummaryHome": "{{total}} CONCERTS · FROM HOME LOCATION",
+    "filtersTitle": "Filters",
+    "filterTypeLabel": "EVENT TYPE",
+    "filterTypeAll": "All",
+    "filterTypeConcerts": "Concerts",
+    "filterTypeFestivals": "Festivals",
+    "filterStatusLabel": "STATUS",
+    "filterStatusAll": "All",
+    "filterStatusGoing": "Going",
+    "filterStatusInterested": "Interested",
+    "clearFilters": "Clear filters"
   },
   "diary": {
     "title": "Diary",
