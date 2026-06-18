@@ -58,6 +58,7 @@ export default function RadarScreen() {
   const [newBandIds, setNewBandIds] = useState<Set<string>>(new Set());
   const previousIdsRef = useRef<Set<string> | null>(null);
   const followedPositionRef = useRef<number | null>(null);
+  const refreshDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [insertSlot, setInsertSlot] = useState<{
     position: number;
     bandIds: string[];
@@ -72,6 +73,16 @@ export default function RadarScreen() {
     'skipUnfollowConfirm',
     false,
   );
+
+  const scheduleRecommendationsRefresh = useCallback(() => {
+    if (refreshDebounceRef.current) {
+      clearTimeout(refreshDebounceRef.current);
+    }
+    refreshDebounceRef.current = setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: ['recommendations'] });
+      refreshDebounceRef.current = null;
+    }, 3000);
+  }, [queryClient]);
 
   const closeSearch = () => {
     setSearchOpen(false);
@@ -202,6 +213,14 @@ export default function RadarScreen() {
     return () => clearTimeout(timer);
   }, [searchQuery, t]);
 
+  useEffect(() => {
+    return () => {
+      if (refreshDebounceRef.current) {
+        clearTimeout(refreshDebounceRef.current);
+      }
+    };
+  }, []);
+
   const handleFollowRec = async (band: RecommendedBand) => {
     if (followingId) return;
     try {
@@ -210,7 +229,7 @@ export default function RadarScreen() {
       followedPositionRef.current = position;
       const bandId = await followBand(band);
       queryClient.invalidateQueries({ queryKey: ['followedBands'] });
-      queryClient.invalidateQueries({ queryKey: ['recommendations'] });
+      scheduleRecommendationsRefresh();
       syncBandConcerts(bandId).then((result) => {
         if (result && result.synced > 0) {
           queryClient.invalidateQueries({ queryKey: ['nearbyConcerts'] });
