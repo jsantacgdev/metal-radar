@@ -1,5 +1,4 @@
 import * as AuthSession from 'expo-auth-session';
-import * as Crypto from 'expo-crypto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as WebBrowser from 'expo-web-browser';
 
@@ -68,8 +67,6 @@ export async function loginToSpotify(): Promise<StoredTokens> {
     responseType: AuthSession.ResponseType.Code,
     usePKCE: true,
   });
-
-  const url = await request.makeAuthUrlAsync(DISCOVERY);
 
   const result = await request.promptAsync(DISCOVERY);
 
@@ -151,28 +148,4 @@ export async function getValidAccessToken(): Promise<string | null> {
   } catch {
     return null;
   }
-}
-
-// PKCE helpers
-async function generateCodeVerifier(): Promise<string> {
-  // 64 bytes => 86 caracteres base64url. Spec permite 43-128.
-  const random = await Crypto.getRandomBytesAsync(64);
-  return base64urlEncode(random);
-}
-
-async function generateCodeChallenge(verifier: string): Promise<string> {
-  // Hash SHA256 del verifier en formato base64url (sin padding, sin caracteres especiales).
-  const digest = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, verifier, {
-    encoding: Crypto.CryptoEncoding.BASE64,
-  });
-  // Convertir base64 estándar a base64url
-  return digest.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function base64urlEncode(bytes: Uint8Array): string {
-  let str = '';
-  for (let i = 0; i < bytes.length; i++) {
-    str += String.fromCharCode(bytes[i]);
-  }
-  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }

@@ -12,20 +12,6 @@ export type ExportSong = {
   artist: string;
 };
 
-async function getCurrentUserId(token: string): Promise<string> {
-  const res = await fetch('https://api.spotify.com/v1/me', {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) {
-    const errText = await res.text();
-    console.error('[Spotify] getCurrentUserId failed:', res.status, errText);
-    throw new Error(`No se pudo obtener el perfil de Spotify: ${res.status}`);
-  }
-  const data = await res.json();
-
-  return data.id;
-}
-
 /**
  * Busca una canción y devuelve el URI de Spotify, o null si no la encuentra.
  */
