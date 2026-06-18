@@ -210,7 +210,9 @@
     "styleTitle": "STYLE",
     "lineupTitle": "LINEUP",
     "present": "PRESENT",
-    "current": "CURRENT"
+    "current": "CURRENT",
+    "followButton": "Follow",
+    "followingButton": "Following"
   },
   "profile": {
     "accountLabel": "ACCOUNT",

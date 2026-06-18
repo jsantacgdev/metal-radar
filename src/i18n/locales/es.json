@@ -210,7 +210,9 @@
     "styleTitle": "ESTILO",
     "lineupTitle": "FORMACIÓN",
     "present": "PRESENTE",
-    "current": "ACTUAL"
+    "current": "ACTUAL",
+    "followButton": "Seguir",
+    "followingButton": "Siguiendo"
   },
   "profile": {
     "accountLabel": "CUENTA",

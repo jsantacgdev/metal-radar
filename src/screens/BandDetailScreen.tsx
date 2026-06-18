@@ -1,4 +1,3 @@
-import { useQuery } from '@tanstack/react-query';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,13 +8,18 @@ import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text, Tag } from '../components/ui';
 import BandImage from '../components/BandImage';
 import { RadarStackParamList } from '../navigation/RadarStack';
+import { useMemo, useState } from 'react';
+import { Alert, TouchableOpacity } from 'react-native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useFollowedBands } from '../hooks/useFollowedBands';
+import { followBand, syncBandConcerts } from '../lib/bands';
 
 type Props = NativeStackScreenProps<RadarStackParamList, 'BandDetail'>;
 
 async function fetchBandBasics(bandId: string) {
   const { data, error } = await supabase
     .from('bands')
-    .select('id, name, image_url, genres')
+    .select('id, name, image_url, genres, spotify_id')
     .eq('id', bandId)
     .single();
   if (error) throw error;
@@ -45,13 +49,55 @@ export default function BandDetailScreen({ route }: Props) {
 
   const { info, loading, error } = useBandInfo(bandId);
 
+  const queryClient = useQueryClient();
+  const { bands: followedBands, unfollow } = useFollowedBands();
+  const [following, setFollowing] = useState(false);
+
+  const isFollowed = useMemo(
+    () => followedBands.some((b) => b.id === bandId),
+    [followedBands, bandId],
+  );
+
+  const handleToggleFollow = async () => {
+    if (following) return;
+    if (isFollowed) {
+      unfollow(bandId);
+      queryClient.invalidateQueries({ queryKey: ['recommendations'] });
+      return;
+    }
+
+    const source = info ?? basics;
+    if (!source) return;
+
+    try {
+      setFollowing(true);
+      const newBandId = await followBand({
+        spotify_id: (source as any).spotify_id ?? null,
+        name: source.name,
+        image_url: source.image_url ?? null,
+        genres: source.genres ?? [],
+      });
+      queryClient.invalidateQueries({ queryKey: ['followedBands'] });
+      queryClient.invalidateQueries({ queryKey: ['recommendations'] });
+      syncBandConcerts(newBandId).then((result) => {
+        if (result && result.synced > 0) {
+          queryClient.invalidateQueries({ queryKey: ['nearbyConcerts'] });
+        }
+      });
+    } catch (err: any) {
+      Alert.alert(t('common.error'), err.message);
+    } finally {
+      setFollowing(false);
+    }
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxxl }}>
       {/* Hero */}
       <View style={styles.hero}>
         <BandImage
           url={info?.image_url ?? basics?.image_url ?? null}
-          size={160}
+          size={130}
           radiusOverride={radius.lg}
           showTag={!(info?.image_url ?? basics?.image_url)}
         />
@@ -59,19 +105,62 @@ export default function BandDetailScreen({ route }: Props) {
           <Text variant="monoMD" color="bloodBright">
             {t('bandDetail.heroLabel')}
           </Text>
-          <Text variant="displayMD" style={{ marginTop: spacing.sm }}>
+          <Text
+            variant="displayMD"
+            style={{ marginTop: spacing.sm }}
+            numberOfLines={2}
+            adjustsFontSizeToFit
+            minimumFontScale={0.6}
+          >
             {info?.name ?? basics?.name ?? '...'}
           </Text>
           {info?.country && (
             <View style={styles.countryRow}>
-              <Ionicons name="location-outline" size={14} color={colors.silver} />
-              <Text variant="monoMD" color="silver" style={{ marginLeft: 6 }}>
-                {getFlagEmoji(info.country)}
-              </Text>
+              <Text style={styles.flagEmoji}>{getFlagEmoji(info.country)}</Text>
             </View>
           )}
         </View>
       </View>
+
+      {/* Botón Seguir / Siguiendo */}
+      {(info || basics) && (
+        <View style={styles.followButtonWrapper}>
+          <TouchableOpacity
+            style={[
+              styles.followButton,
+              isFollowed && styles.followButtonActive,
+              following && { opacity: 0.6 },
+            ]}
+            onPress={handleToggleFollow}
+            disabled={following}
+            activeOpacity={0.8}
+          >
+            {following ? (
+              <ActivityIndicator color={isFollowed ? colors.bloodBright : '#fff'} size="small" />
+            ) : (
+              <>
+                <Ionicons
+                  name={isFollowed ? 'heart' : 'heart-outline'}
+                  size={18}
+                  color={isFollowed ? colors.bloodBright : '#fff'}
+                />
+                <Text
+                  style={{
+                    fontFamily: fontFamily.displayBold,
+                    fontSize: 14,
+                    letterSpacing: 0.5,
+                    textTransform: 'uppercase',
+                    color: isFollowed ? colors.bloodBright : '#fff',
+                    marginLeft: spacing.sm,
+                  }}
+                >
+                  {isFollowed ? t('bandDetail.followingButton') : t('bandDetail.followButton')}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
 
       {loading && !info && (
         <View style={styles.centered}>
@@ -240,11 +329,6 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  countryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.md,
-  },
   centered: {
     alignItems: 'center',
     paddingVertical: spacing.xxxl,
@@ -306,5 +390,32 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: radius.full,
     backgroundColor: colors.faint,
+  },
+  countryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  flagEmoji: {
+    fontSize: 32,
+    lineHeight: 36,
+  },
+  followButtonWrapper: {
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.lg,
+  },
+  followButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 48,
+    borderRadius: radius.full,
+    backgroundColor: colors.blood,
+    borderWidth: 1,
+    borderColor: colors.bloodBright,
+  },
+  followButtonActive: {
+    backgroundColor: 'transparent',
+    borderColor: colors.bloodBright,
   },
 });
