@@ -29,6 +29,8 @@ export type FestivalDetail = {
   followed_count: number;
   userStatus: 'interested' | 'going' | 'attended' | null;
   userFestivalId: string | null;
+  rating: number | null;
+  notes: string | null;
 };
 
 async function fetchFestival(festivalId: string): Promise<FestivalDetail> {
@@ -54,7 +56,6 @@ async function fetchFestival(festivalId: string): Promise<FestivalDetail> {
 
   if (error) throw error;
 
-  // Cargar bandas seguidas por el user
   const { data: userBands } = await supabase
     .from('user_bands')
     .select('band_id')
@@ -62,10 +63,9 @@ async function fetchFestival(festivalId: string): Promise<FestivalDetail> {
 
   const followedIds = new Set((userBands ?? []).map((ub: any) => ub.band_id));
 
-  // Cargar estado del usuario para este festival
   const { data: ufData } = await supabase
     .from('user_festivals')
-    .select('id, status')
+    .select('id, status, rating, notes')
     .eq('user_id', user.id)
     .eq('festival_id', festivalId)
     .maybeSingle();
@@ -99,6 +99,8 @@ async function fetchFestival(festivalId: string): Promise<FestivalDetail> {
     followed_count: bands.filter((b: any) => b.is_followed).length,
     userStatus: ufData?.status ?? null,
     userFestivalId: ufData?.id ?? null,
+    rating: ufData?.rating ?? null,
+    notes: ufData?.notes ?? null,
   };
 }
 
@@ -145,6 +147,68 @@ export function useFestival(festivalId: string) {
     },
   });
 
+  const updateRatingMutation = useMutation({
+    mutationFn: async (rating: number | null) => {
+      const userFestivalId = query.data?.userFestivalId;
+      if (!userFestivalId) throw new Error(i18n.t('errors.markAttendedFirst'));
+      const { error } = await supabase
+        .from('user_festivals')
+        .update({ rating, updated_at: new Date().toISOString() })
+        .eq('id', userFestivalId);
+      if (error) throw error;
+    },
+    onMutate: async (rating) => {
+      await queryClient.cancelQueries({ queryKey: ['festival', festivalId] });
+      const prev = queryClient.getQueryData<FestivalDetail>(['festival', festivalId]);
+      if (prev) {
+        queryClient.setQueryData<FestivalDetail>(['festival', festivalId], {
+          ...prev,
+          rating,
+        });
+      }
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(['festival', festivalId], ctx.prev);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['festival', festivalId] });
+    },
+  });
+
+  const updateNotesMutation = useMutation({
+    mutationFn: async (notes: string) => {
+      const userFestivalId = query.data?.userFestivalId;
+      if (!userFestivalId) throw new Error(i18n.t('errors.markAttendedFirst'));
+      const trimmed = notes.trim();
+      const { error } = await supabase
+        .from('user_festivals')
+        .update({
+          notes: trimmed.length === 0 ? null : trimmed,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', userFestivalId);
+      if (error) throw error;
+    },
+    onMutate: async (notes) => {
+      await queryClient.cancelQueries({ queryKey: ['festival', festivalId] });
+      const prev = queryClient.getQueryData<FestivalDetail>(['festival', festivalId]);
+      if (prev) {
+        queryClient.setQueryData<FestivalDetail>(['festival', festivalId], {
+          ...prev,
+          notes: notes.trim() || null,
+        });
+      }
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(['festival', festivalId], ctx.prev);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['festival', festivalId] });
+    },
+  });
+
   return {
     festival: query.data ?? null,
     loading: query.isLoading,
@@ -152,5 +216,7 @@ export function useFestival(festivalId: string) {
     reload: query.refetch,
     updateStatus: (status: 'interested' | 'going' | 'attended' | null) =>
       updateStatusMutation.mutateAsync(status),
+    updateRating: (rating: number | null) => updateRatingMutation.mutateAsync(rating),
+    updateNotes: (notes: string) => updateNotesMutation.mutateAsync(notes),
   };
 }

@@ -20,6 +20,9 @@ import { localeFromI18n } from '../i18n';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useEffect, useState } from 'react';
+import { TextInput } from 'react-native';
+import PhotoGallery from '../components/PhotoGallery';
 
 type RouteParams = RouteProp<MapStackParamList, 'FestivalDetail'>;
 
@@ -52,7 +55,9 @@ export default function FestivalDetailScreen() {
   const route = useRoute<RouteParams>();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { t, i18n } = useTranslation();
-  const { festival, loading, error, updateStatus } = useFestival(route.params.festivalId);
+  const { festival, loading, error, updateStatus, updateRating, updateNotes } = useFestival(
+    route.params.festivalId,
+  );
 
   const locale = localeFromI18n(i18n.language);
 
@@ -96,6 +101,7 @@ export default function FestivalDetailScreen() {
 
   const isPast = new Date(festival.end_date) < new Date();
   const ctaUrl = festival.ticket_url ?? festival.official_url;
+  const isAttended = festival.userStatus === 'attended';
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.ink }}>
@@ -218,6 +224,34 @@ export default function FestivalDetailScreen() {
               />
             </View>
           </View>
+
+          {isAttended && festival.userFestivalId && (
+            <>
+              <View style={styles.section}>
+                <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
+                  {t('concertDetail.ratingTitle')}
+                </Text>
+                <RatingPicker
+                  value={festival.rating ?? 0}
+                  onChange={(v) => updateRating(v === festival.rating ? null : v)}
+                />
+              </View>
+
+              <View style={styles.section}>
+                <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
+                  {t('concertDetail.notesTitle')}
+                </Text>
+                <NotesEditor
+                  initialValue={festival.notes ?? ''}
+                  onSave={(text) => updateNotes(text)}
+                />
+              </View>
+
+              <View style={styles.section}>
+                <PhotoGallery kind="festival" userFestivalId={festival.userFestivalId} />
+              </View>
+            </>
+          )}
 
           {festival.description && (
             <View style={styles.section}>
@@ -391,6 +425,76 @@ function ActionPill({
   );
 }
 
+function RatingPicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  return (
+    <View style={styles.ratingRow}>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <TouchableOpacity
+          key={i}
+          onPress={() => onChange(i)}
+          activeOpacity={0.6}
+          hitSlop={8}
+          style={styles.ratingTouch}
+        >
+          <Ionicons name="star" size={26} color={i <= value ? colors.bloodBright : colors.faint} />
+        </TouchableOpacity>
+      ))}
+      <View style={{ flex: 1 }} />
+      {value > 0 && (
+        <Text variant="monoSM" color="silver">
+          {value}/5
+        </Text>
+      )}
+    </View>
+  );
+}
+
+function NotesEditor({
+  initialValue,
+  onSave,
+}: {
+  initialValue: string;
+  onSave: (text: string) => void;
+}) {
+  const { t } = useTranslation();
+  const [text, setText] = useState(initialValue);
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    setText(initialValue);
+  }, [initialValue]);
+
+  useEffect(() => {
+    if (text === initialValue) return;
+    const tm = setTimeout(() => onSave(text), 800);
+    return () => clearTimeout(tm);
+  }, [text, initialValue, onSave]);
+
+  return (
+    <View>
+      <TextInput
+        value={text}
+        onChangeText={setText}
+        onFocus={() => setFocused(true)}
+        onBlur={() => {
+          setFocused(false);
+          if (text !== initialValue) onSave(text);
+        }}
+        placeholder={t('concertDetail.notesPlaceholder')}
+        placeholderTextColor={colors.muted}
+        multiline
+        scrollEnabled={false}
+        style={[styles.notesInput, focused && { borderColor: colors.bloodBright }]}
+      />
+      {text.length > 0 && (
+        <Text variant="monoSM" color="muted" style={{ marginTop: 6, textAlign: 'right' }}>
+          {t('concertDetail.charactersCount', { count: text.length })}
+        </Text>
+      )}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   centered: {
     flex: 1,
@@ -553,5 +657,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 36,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  ratingTouch: {
+    paddingVertical: 4,
+  },
+  notesInput: {
+    minHeight: 100,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.panel,
+    color: colors.bright,
+    fontFamily: fontFamily.body,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlignVertical: 'top',
   },
 });

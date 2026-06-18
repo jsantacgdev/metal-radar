@@ -192,34 +192,6 @@ export default function ConcertDetailScreen({ route }: Props) {
           </View>
         </View>
 
-        {(concert.price_min ?? concert.price_max) != null && (
-          <Section title={t('concertDetail.priceTitle')}>
-            <Text variant="displaySM">
-              {concert.price_min === concert.price_max
-                ? `${concert.price_min} ${concert.currency}`
-                : `${concert.price_min ?? '?'} – ${concert.price_max ?? '?'} ${concert.currency ?? ''}`}
-            </Text>
-          </Section>
-        )}
-
-        {concert.bands.length > 0 && (
-          <Section title={t('concertDetail.lineupTitle')}>
-            {concert.bands.map((b, i) => (
-              <View
-                key={b.id}
-                style={[styles.bandRow, i === concert.bands.length - 1 && { borderBottomWidth: 0 }]}
-              >
-                <BandImage url={b.image_url} size={44} showTag={!b.image_url} />
-                <View style={{ flex: 1, marginLeft: spacing.md, minWidth: 0 }}>
-                  <Text variant="displaySM" numberOfLines={1}>
-                    {b.name}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </Section>
-        )}
-
         <Section
           title={isPast ? t('concertDetail.attendanceTitle') : t('concertDetail.statusTitle')}
         >
@@ -249,6 +221,34 @@ export default function ConcertDetailScreen({ route }: Props) {
             />
           </View>
         </Section>
+
+        {(concert.price_min ?? concert.price_max) != null && (
+          <Section title={t('concertDetail.priceTitle')}>
+            <Text variant="displaySM">
+              {concert.price_min === concert.price_max
+                ? `${concert.price_min} ${concert.currency}`
+                : `${concert.price_min ?? '?'} – ${concert.price_max ?? '?'} ${concert.currency ?? ''}`}
+            </Text>
+          </Section>
+        )}
+
+        {concert.bands.length > 0 && (
+          <Section title={t('concertDetail.lineupTitle')}>
+            {concert.bands.map((b, i) => (
+              <View
+                key={b.id}
+                style={[styles.bandRow, i === concert.bands.length - 1 && { borderBottomWidth: 0 }]}
+              >
+                <BandImage url={b.image_url} size={44} showTag={!b.image_url} />
+                <View style={{ flex: 1, marginLeft: spacing.md, minWidth: 0 }}>
+                  <Text variant="displaySM" numberOfLines={1}>
+                    {b.name}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </Section>
+        )}
 
         {/* Setlists - SIEMPRE visibles. Si no hay datos en BD, el componente muestra el botón "BUSCAR" */}
         <View style={{ paddingHorizontal: spacing.xl }}>

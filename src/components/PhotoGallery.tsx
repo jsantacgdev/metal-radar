@@ -15,22 +15,39 @@ import { useTranslation } from 'react-i18next';
 import { ConcertPhoto, useConcertPhotos } from '../hooks/useConcertPhotos';
 import { useUploadConcertPhoto } from '../hooks/useUploadConcertPhoto';
 import { useDeleteConcertPhoto } from '../hooks/useDeleteConcertPhoto';
+import { FestivalPhoto, useFestivalPhotos } from '../hooks/useFestivalPhotos';
+import { useUploadFestivalPhoto } from '../hooks/useUploadFestivalPhoto';
+import { useDeleteFestivalPhoto } from '../hooks/useDeleteFestivalPhoto';
 import { colors, radius, spacing } from '../theme';
 import { Text } from './ui';
 
-type Props = {
-  userConcertId: string;
-};
+type Photo = ConcertPhoto | FestivalPhoto;
+
+type Props =
+  | { kind: 'concert'; userConcertId: string; userFestivalId?: never }
+  | { kind: 'festival'; userFestivalId: string; userConcertId?: never };
 
 const PHOTO_SIZE = 100;
 const MAX_PHOTOS = 10;
 
-export default function PhotoGallery({ userConcertId }: Props) {
+export default function PhotoGallery(props: Props) {
   const { t } = useTranslation();
-  const { data: photos = [], isLoading } = useConcertPhotos(userConcertId);
-  const upload = useUploadConcertPhoto();
-  const remove = useDeleteConcertPhoto();
-  const [viewing, setViewing] = useState<ConcertPhoto | null>(null);
+  const [viewing, setViewing] = useState<Photo | null>(null);
+
+  // Concert hooks
+  const concertPhotos = useConcertPhotos(props.kind === 'concert' ? props.userConcertId : null);
+  const uploadConcert = useUploadConcertPhoto();
+  const removeConcert = useDeleteConcertPhoto();
+
+  // Festival hooks
+  const festivalPhotos = useFestivalPhotos(props.kind === 'festival' ? props.userFestivalId : null);
+  const uploadFestival = useUploadFestivalPhoto();
+  const removeFestival = useDeleteFestivalPhoto();
+
+  const photos: Photo[] =
+    props.kind === 'concert' ? (concertPhotos.data ?? []) : (festivalPhotos.data ?? []);
+  const isLoading = props.kind === 'concert' ? concertPhotos.isLoading : festivalPhotos.isLoading;
+  const isUploading = props.kind === 'concert' ? uploadConcert.isPending : uploadFestival.isPending;
 
   const canAddMore = photos.length < MAX_PHOTOS;
 
@@ -38,25 +55,41 @@ export default function PhotoGallery({ userConcertId }: Props) {
     Alert.alert(t('photoGallery.addTitle'), t('photoGallery.addBody'), [
       {
         text: t('photoGallery.camera'),
-        onPress: () =>
-          upload.mutate(
-            { userConcertId, source: 'camera' },
-            { onError: (e: Error) => Alert.alert(t('common.error'), e.message) },
-          ),
+        onPress: () => {
+          if (props.kind === 'concert') {
+            uploadConcert.mutate(
+              { userConcertId: props.userConcertId, source: 'camera' },
+              { onError: (e: Error) => Alert.alert(t('common.error'), e.message) },
+            );
+          } else {
+            uploadFestival.mutate(
+              { userFestivalId: props.userFestivalId, source: 'camera' },
+              { onError: (e: Error) => Alert.alert(t('common.error'), e.message) },
+            );
+          }
+        },
       },
       {
         text: t('photoGallery.library'),
-        onPress: () =>
-          upload.mutate(
-            { userConcertId, source: 'library' },
-            { onError: (e: Error) => Alert.alert(t('common.error'), e.message) },
-          ),
+        onPress: () => {
+          if (props.kind === 'concert') {
+            uploadConcert.mutate(
+              { userConcertId: props.userConcertId, source: 'library' },
+              { onError: (e: Error) => Alert.alert(t('common.error'), e.message) },
+            );
+          } else {
+            uploadFestival.mutate(
+              { userFestivalId: props.userFestivalId, source: 'library' },
+              { onError: (e: Error) => Alert.alert(t('common.error'), e.message) },
+            );
+          }
+        },
       },
       { text: t('common.cancel'), style: 'cancel' },
     ]);
   };
 
-  const handleDelete = (photo: ConcertPhoto) => {
+  const handleDelete = (photo: Photo) => {
     Alert.alert(t('photoGallery.deleteTitle'), t('photoGallery.deleteBody'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
@@ -64,11 +97,19 @@ export default function PhotoGallery({ userConcertId }: Props) {
         style: 'destructive',
         onPress: () => {
           setViewing(null);
-          remove.mutate({
-            photoId: photo.id,
-            storagePath: photo.storage_path,
-            userConcertId,
-          });
+          if (props.kind === 'concert') {
+            removeConcert.mutate({
+              photoId: photo.id,
+              storagePath: photo.storage_path,
+              userConcertId: props.userConcertId,
+            });
+          } else {
+            removeFestival.mutate({
+              photoId: photo.id,
+              storagePath: photo.storage_path,
+              userFestivalId: props.userFestivalId,
+            });
+          }
         },
       },
     ]);
@@ -80,7 +121,7 @@ export default function PhotoGallery({ userConcertId }: Props) {
         <Text variant="monoMD" color="muted">
           {t('photoGallery.headerLabel', { count: photos.length, max: MAX_PHOTOS })}
         </Text>
-        {upload.isPending && <ActivityIndicator size="small" color={colors.bloodBright} />}
+        {isUploading && <ActivityIndicator size="small" color={colors.bloodBright} />}
       </View>
 
       {isLoading ? (
@@ -107,7 +148,7 @@ export default function PhotoGallery({ userConcertId }: Props) {
                 style={styles.addTile}
                 onPress={handleAdd}
                 activeOpacity={0.7}
-                disabled={upload.isPending}
+                disabled={isUploading}
               >
                 <Ionicons name="add" size={28} color={colors.silver} />
               </TouchableOpacity>
