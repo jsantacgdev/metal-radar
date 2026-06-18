@@ -294,7 +294,15 @@
     "durationH": "{{h}}h",
     "durationHM": "{{h}}h {{m}}m",
     "tourPrediction": "🎯 PREDICCIÓN · GIRA",
-    "basedOnConcert": "Basado en el concierto del {{date}}"
+    "basedOnConcert": "Basado en el concierto del {{date}}",
+    "exportToSpotify": "Exportar a Spotify",
+    "playlistName": "Setlist · {{band}}",
+    "playlistDescriptionReal": "Setlist real de {{band}}. Creado con Metal Radar.",
+    "playlistDescriptionTour": "Setlist de {{band}} basado en su concierto del {{date}}. Creado con Metal Radar.",
+    "exportSuccessTitle": "¡Playlist creada!",
+    "exportSuccessBody": "Se han añadido {{found}} de {{total}} canciones a tu Spotify.",
+    "exportNotFound": "No encontradas: {{songs}}...",
+    "openInSpotify": "Abrir en Spotify"
   },
   "photoGallery": {
     "headerLabel": "FOTOS · {{count}}/{{max}}",

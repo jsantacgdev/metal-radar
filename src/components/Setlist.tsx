@@ -6,6 +6,9 @@ import { Setlist, useRefreshSetlist } from '../hooks/useSetlist';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from './ui';
 import { localeFromI18n } from '../i18n';
+import { Alert, Linking } from 'react-native';
+import { isSpotifyLoggedIn, loginToSpotify } from '../lib/spotify-auth';
+import { exportSetlistToSpotify } from '../lib/spotify-export';
 
 type Props = {
   concertId: string;
@@ -39,9 +42,68 @@ export default function SetlistView({ concertId, setlist, bandId, bandName }: Pr
   const [expanded, setExpanded] = useState(false);
   const formatDuration = useFormatDuration();
   const locale = localeFromI18n(i18n.language);
+  const [exporting, setExporting] = useState(false);
 
   const handleRefresh = () => {
     refresh.mutate({ concertId, bandId, force: true });
+  };
+
+  const handleExport = async () => {
+    if (!setlist || setlist.songs.length === 0) return;
+    setExporting(true);
+    try {
+      const loggedIn = await isSpotifyLoggedIn();
+      console.log('[Spotify] loggedIn:', loggedIn);
+
+      if (!loggedIn) {
+        console.log('[Spotify] Iniciando login...');
+        await loginToSpotify();
+        console.log('[Spotify] Login completado');
+      }
+
+      const songs = setlist.songs.map((s) => ({
+        title: s.name,
+        artist: s.cover_of ?? bandName,
+      }));
+
+      // Nombre y descripción según el origen
+      const playlistName = t('setlist.playlistName', { band: bandName });
+      const description =
+        setlist.source === 'tour' && setlist.source_event_date
+          ? t('setlist.playlistDescriptionTour', {
+              band: bandName,
+              date: formatSourceDate(setlist.source_event_date, locale),
+            })
+          : t('setlist.playlistDescriptionReal', { band: bandName });
+
+      const result = await exportSetlistToSpotify(playlistName, description, songs);
+
+      const notFoundMsg =
+        result.notFound.length > 0
+          ? '\n\n' + t('setlist.exportNotFound', { songs: result.notFound.slice(0, 3).join(', ') })
+          : '';
+
+      Alert.alert(
+        t('setlist.exportSuccessTitle'),
+        t('setlist.exportSuccessBody', {
+          found: result.foundSongs,
+          total: result.totalSongs,
+        }) + notFoundMsg,
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('setlist.openInSpotify'),
+            onPress: () => Linking.openURL(result.playlistUrl),
+          },
+        ],
+      );
+    } catch (err: any) {
+      if (err.message !== 'Cancelado') {
+        Alert.alert(t('common.error'), err.message);
+      }
+    } finally {
+      setExporting(false);
+    }
   };
 
   if (!setlist || setlist.not_found || setlist.song_count === 0) {
@@ -171,6 +233,43 @@ export default function SetlistView({ concertId, setlist, bandId, bandName }: Pr
           </TouchableOpacity>
         )}
       </View>
+
+      <TouchableOpacity
+        style={styles.exportBtn}
+        onPress={handleExport}
+        disabled={exporting}
+        activeOpacity={0.7}
+      >
+        {exporting ? (
+          <ActivityIndicator size="small" color="#1DB954" />
+        ) : (
+          <>
+            <Ionicons name="musical-notes" size={18} color="#1DB954" />
+            <Text
+              style={{
+                marginLeft: spacing.sm,
+                color: '#1DB954',
+                fontFamily: fontFamily.mono,
+                fontSize: 12,
+                letterSpacing: 0.8,
+                textTransform: 'uppercase',
+              }}
+            >
+              {t('setlist.exportToSpotify')}
+            </Text>
+          </>
+        )}
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={async () => {
+          const { clearSpotifyAuth } = await import('../lib/spotify-auth');
+          await clearSpotifyAuth();
+          Alert.alert('Spotify desconectado');
+        }}
+        style={{ padding: 10, marginTop: 10 }}
+      >
+        <Text style={{ color: 'red' }}>DEBUG: Desconectar Spotify</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -334,5 +433,17 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 1,
     backgroundColor: colors.line,
+  },
+  exportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.md,
+    paddingVertical: 12,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: '#1DB954',
+    backgroundColor: 'rgba(29, 185, 84, 0.1)',
   },
 });
