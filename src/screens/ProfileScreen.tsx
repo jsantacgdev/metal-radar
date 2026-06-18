@@ -19,6 +19,7 @@ import { useNavigation } from '@react-navigation/native';
 import { privacyUrl, termsUrl } from '../lib/legalUrls';
 import { Image } from 'react-native';
 import { useSpotifyAuth } from '../hooks/useSpotifyAuth';
+import { useProfileStats, StatsPeriod } from '../hooks/useProfileStats';
 
 export default function ProfileScreen() {
   const queryClient = useQueryClient();
@@ -34,6 +35,10 @@ export default function ProfileScreen() {
   const [pushStatus, setPushStatus] = useState<
     'granted' | 'denied' | 'undetermined' | 'unsupported' | 'loading' | null
   >(null);
+
+  const [statsPeriod, setStatsPeriod] = useState<StatsPeriod>('year');
+  const currentYear = new Date().getFullYear();
+  const { stats, loading: statsLoading } = useProfileStats(statsPeriod, currentYear);
 
   const navigation = useNavigation();
 
@@ -55,7 +60,9 @@ export default function ProfileScreen() {
   useFocusEffect(
     useCallback(() => {
       refreshPushStatus();
-    }, [profile?.push_token]),
+      queryClient.invalidateQueries({ queryKey: ['profileStats'] });
+      queryClient.invalidateQueries({ queryKey: ['spotify-user'] });
+    }, [profile?.push_token, queryClient]),
   );
 
   const displayRadius = radius ?? profile?.search_radius_km ?? 500;
@@ -219,6 +226,95 @@ export default function ProfileScreen() {
             {session?.user.email ?? '—'}
           </Text>
         </View>
+      </View>
+
+      {/* Estadísticas */}
+      <View style={styles.section}>
+        <View style={styles.statsHeader}>
+          <Text variant="monoMD" color="muted" style={{ flex: 1 }}>
+            {t('profile.statsLabel')}
+          </Text>
+          <View style={styles.periodToggle}>
+            <TouchableOpacity
+              style={[styles.periodTab, statsPeriod === 'year' && styles.periodTabActive]}
+              onPress={() => setStatsPeriod('year')}
+              activeOpacity={0.7}
+            >
+              <Text variant="monoSM" color={statsPeriod === 'year' ? 'bloodBright' : 'silver'}>
+                {currentYear}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.periodTab, statsPeriod === 'all' && styles.periodTabActive]}
+              onPress={() => setStatsPeriod('all')}
+              activeOpacity={0.7}
+            >
+              <Text variant="monoSM" color={statsPeriod === 'all' ? 'bloodBright' : 'silver'}>
+                {t('profile.statsAllTime')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {statsLoading ? (
+          <View style={{ alignItems: 'center', paddingVertical: spacing.xl }}>
+            <Text variant="bodySM" color="muted">
+              {t('common.loading')}
+            </Text>
+          </View>
+        ) : stats.concerts === 0 && stats.festivals === 0 ? (
+          <View style={styles.statsEmpty}>
+            <Ionicons name="musical-notes-outline" size={32} color={colors.faint} />
+            <Text
+              variant="bodySM"
+              color="muted"
+              style={{ marginTop: spacing.sm, textAlign: 'center' }}
+            >
+              {t('profile.statsEmpty')}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.statsList}>
+            <StatRow
+              icon="musical-notes"
+              value={stats.concerts.toString()}
+              label={t('profile.statConcerts')}
+            />
+            <StatRow
+              icon="flame"
+              value={stats.festivals.toString()}
+              label={t('profile.statFestivals')}
+            />
+            <StatRow icon="people" value={stats.bands.toString()} label={t('profile.statBands')} />
+            <StatRow
+              icon="location"
+              value={stats.cities.toString()}
+              label={t('profile.statCities')}
+            />
+            <StatRow
+              icon="car"
+              value={`${stats.km.toLocaleString(i18n.language)} km`}
+              label={t('profile.statKm')}
+            />
+            {stats.topBand && (
+              <StatRow
+                icon="heart"
+                value={`${stats.topBand.name} (${stats.topBand.count}x)`}
+                label={t('profile.statTopBand')}
+              />
+            )}
+            {stats.topGenre && (
+              <StatRow icon="disc" value={stats.topGenre} label={t('profile.statTopGenre')} />
+            )}
+            {statsPeriod === 'all' && stats.bestYear && (
+              <StatRow
+                icon="trophy"
+                value={`${stats.bestYear.year} (${stats.bestYear.count})`}
+                label={t('profile.statBestYear')}
+              />
+            )}
+          </View>
+        )}
       </View>
 
       {/* Radio de notificaciones */}
@@ -558,6 +654,32 @@ function LanguageOption({
   );
 }
 
+function StatRow({ icon, value, label }: { icon: any; value: string; label: string }) {
+  return (
+    <View style={styles.statRow}>
+      <View style={styles.statIconCircle}>
+        <Ionicons name={icon} size={16} color={colors.bloodBright} />
+      </View>
+      <Text variant="body" color="muted" style={{ flex: 1, marginLeft: spacing.md }}>
+        {label}
+      </Text>
+      <Text
+        style={{
+          fontFamily: fontFamily.displayBold,
+          fontSize: 16,
+          color: colors.bright,
+          letterSpacing: -0.3,
+          maxWidth: '50%',
+          textAlign: 'right',
+        }}
+        numberOfLines={1}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   userBlock: {
     flexDirection: 'row',
@@ -701,5 +823,88 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  statsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  periodToggle: {
+    flexDirection: 'row',
+    backgroundColor: colors.panel,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.full,
+    padding: 2,
+  },
+  periodTab: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radius.full,
+  },
+  periodTabActive: {
+    backgroundColor: colors.bloodTint,
+    borderWidth: 1,
+    borderColor: colors.bloodTintBorder,
+  },
+  statsEmpty: {
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  statTile: {
+    width: '48%',
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.panel,
+    alignItems: 'center',
+    minHeight: 110,
+    justifyContent: 'center',
+    gap: 6,
+  },
+  statIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.full,
+    backgroundColor: colors.bloodTint,
+    borderWidth: 1,
+    borderColor: colors.bloodTintBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  statValueNumber: {
+    fontFamily: fontFamily.displayBold,
+    fontSize: 22,
+    letterSpacing: -0.5,
+    lineHeight: 26,
+    textAlign: 'center',
+  },
+  statValueText: {
+    fontFamily: fontFamily.bodyBold,
+    fontSize: 13,
+    lineHeight: 17,
+    textAlign: 'center',
+  },
+  statsList: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.panel,
+    overflow: 'hidden',
+  },
+  statRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.lineSoft,
   },
 });

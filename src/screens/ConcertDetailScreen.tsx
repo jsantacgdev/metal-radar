@@ -409,11 +409,7 @@ function RatingPicker({ value, onChange }: { value: number; onChange: (v: number
           hitSlop={8}
           style={styles.ratingTouch}
         >
-          <Ionicons
-            name="triangle"
-            size={26}
-            color={i <= value ? colors.bloodBright : colors.faint}
-          />
+          <Ionicons name="star" size={26} color={i <= value ? colors.bloodBright : colors.faint} />
         </TouchableOpacity>
       ))}
       <View style={{ flex: 1 }} />

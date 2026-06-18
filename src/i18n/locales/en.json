@@ -267,7 +267,18 @@
     "spotifyConnect": "Connect to Spotify",
     "spotifyDisconnect": "Disconnect",
     "spotifyDisconnectTitle": "Disconnect Spotify?",
-    "spotifyDisconnectBody": "You'll need to link your account again to export setlists."
+    "spotifyDisconnectBody": "You'll need to link your account again to export setlists.",
+    "statsLabel": "STATS",
+    "statsAllTime": "All-time",
+    "statsEmpty": "Mark concerts as 'Attended' to start seeing your stats.",
+    "statConcerts": "Concerts",
+    "statFestivals": "Festivals",
+    "statBands": "Bands seen",
+    "statCities": "Cities",
+    "statKm": "Km traveled",
+    "statTopGenre": "Top genre",
+    "statTopBand": "Most seen band",
+    "statBestYear": "Best year"
   },
   "deleteAccount": {
     "title": "Delete account",

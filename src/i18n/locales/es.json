@@ -267,7 +267,18 @@
     "spotifyConnect": "Conectar con Spotify",
     "spotifyDisconnect": "Desconectar",
     "spotifyDisconnectTitle": "¿Desconectar Spotify?",
-    "spotifyDisconnectBody": "Tendrás que volver a vincular tu cuenta para exportar setlists."
+    "spotifyDisconnectBody": "Tendrás que volver a vincular tu cuenta para exportar setlists.",
+    "statsLabel": "ESTADÍSTICAS",
+    "statsAllTime": "Total",
+    "statsEmpty": "Marca conciertos como 'Asistido' para empezar a ver tus estadísticas.",
+    "statConcerts": "Conciertos",
+    "statFestivals": "Festivales",
+    "statBands": "Bandas vistas",
+    "statCities": "Ciudades",
+    "statKm": "Km recorridos",
+    "statTopBand": "Banda más vista",
+    "statTopGenre": "Género top",
+    "statBestYear": "Mejor año"
   },
   "deleteAccount": {
     "title": "Borrar cuenta",

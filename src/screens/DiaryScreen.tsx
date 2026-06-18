@@ -232,7 +232,7 @@ function RatingTriangles({ rating }: { rating: number }) {
       {[1, 2, 3, 4, 5].map((i) => (
         <Ionicons
           key={i}
-          name="triangle"
+          name="star"
           size={9}
           color={i <= rating ? colors.bloodBright : colors.faint}
         />
