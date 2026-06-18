@@ -257,7 +257,17 @@
     "deleteAccountButton": "Borrar cuenta",
     "legalLabel": "LEGAL",
     "privacyPolicy": "Política de privacidad",
-    "termsOfUse": "Términos de uso"
+    "termsOfUse": "Términos de uso",
+    "spotifyLabel": "SPOTIFY",
+    "spotifyDesc": "Conecta tu cuenta para exportar setlists como playlists.",
+    "spotifyConnected": "Conectado",
+    "spotifyNotConnected": "Sin conectar",
+    "spotifyConnectedDesc": "Tu cuenta de Spotify está vinculada.",
+    "spotifyDisconnectedDesc": "Conecta tu cuenta para crear playlists.",
+    "spotifyConnect": "Conectar con Spotify",
+    "spotifyDisconnect": "Desconectar",
+    "spotifyDisconnectTitle": "¿Desconectar Spotify?",
+    "spotifyDisconnectBody": "Tendrás que volver a vincular tu cuenta para exportar setlists."
   },
   "deleteAccount": {
     "title": "Borrar cuenta",

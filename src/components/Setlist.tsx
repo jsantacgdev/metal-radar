@@ -9,7 +9,7 @@ import { localeFromI18n } from '../i18n';
 import { Alert, Linking } from 'react-native';
 import { isSpotifyLoggedIn, loginToSpotify } from '../lib/spotify-auth';
 import { exportSetlistToSpotify } from '../lib/spotify-export';
-import { clearSpotifyAuth } from '../lib/spotify-auth';
+import { useQueryClient } from '@tanstack/react-query';
 
 type Props = {
   concertId: string;
@@ -45,6 +45,8 @@ export default function SetlistView({ concertId, setlist, bandId, bandName }: Pr
   const locale = localeFromI18n(i18n.language);
   const [exporting, setExporting] = useState(false);
 
+  const queryClient = useQueryClient();
+
   const handleRefresh = () => {
     refresh.mutate({ concertId, bandId, force: true });
   };
@@ -54,12 +56,9 @@ export default function SetlistView({ concertId, setlist, bandId, bandName }: Pr
     setExporting(true);
     try {
       const loggedIn = await isSpotifyLoggedIn();
-      console.log('[Spotify] loggedIn:', loggedIn);
-
       if (!loggedIn) {
-        console.log('[Spotify] Iniciando login...');
         await loginToSpotify();
-        console.log('[Spotify] Login completado');
+        queryClient.invalidateQueries({ queryKey: ['spotify-user'] });
       }
 
       const songs = setlist.songs.map((s) => ({
@@ -260,16 +259,6 @@ export default function SetlistView({ concertId, setlist, bandId, bandName }: Pr
             </Text>
           </>
         )}
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={async () => {
-          const { clearSpotifyAuth } = await import('../lib/spotify-auth');
-          await clearSpotifyAuth();
-          Alert.alert('Spotify desconectado');
-        }}
-        style={{ padding: 10, marginTop: 10 }}
-      >
-        <Text style={{ color: 'red' }}>DEBUG: Desconectar Spotify</Text>
       </TouchableOpacity>
     </View>
   );
