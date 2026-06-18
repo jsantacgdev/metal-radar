@@ -2,6 +2,7 @@ import { getValidAccessToken } from './spotify-auth';
 
 export type ExportResult = {
   playlistUrl: string;
+  playlistUri: string;
   totalSongs: number;
   foundSongs: number;
   notFound: string[];
@@ -41,7 +42,7 @@ async function createPlaylist(
   token: string,
   name: string,
   description: string,
-): Promise<{ id: string; url: string }> {
+): Promise<{ id: string; url: string; uri: string }> {
   const body = {
     name,
     description,
@@ -63,7 +64,11 @@ async function createPlaylist(
     throw new Error(`No se pudo crear la playlist: ${res.status} ${errText}`);
   }
   const data = await res.json();
-  return { id: data.id, url: data.external_urls.spotify };
+  return {
+    id: data.id,
+    url: data.external_urls.spotify,
+    uri: data.uri, // ← ej: spotify:playlist:5Et65bL5Z5IX9gmgqWVk1j
+  };
 }
 
 async function addTracksToPlaylist(
@@ -136,6 +141,7 @@ export async function exportSetlistToSpotify(
 
   return {
     playlistUrl: playlist.url,
+    playlistUri: playlist.uri,
     totalSongs: songs.length,
     foundSongs: foundUris.length,
     notFound,

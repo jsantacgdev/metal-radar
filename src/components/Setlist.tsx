@@ -93,7 +93,18 @@ export default function SetlistView({ concertId, setlist, bandId, bandName }: Pr
           { text: t('common.cancel'), style: 'cancel' },
           {
             text: t('setlist.openInSpotify'),
-            onPress: () => Linking.openURL(result.playlistUrl),
+            onPress: async () => {
+              try {
+                const supported = await Linking.canOpenURL(result.playlistUri);
+                if (supported) {
+                  await Linking.openURL(result.playlistUri);
+                } else {
+                  await Linking.openURL(result.playlistUrl);
+                }
+              } catch {
+                Linking.openURL(result.playlistUrl);
+              }
+            },
           },
         ],
       );
