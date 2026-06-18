@@ -9,6 +9,7 @@ import { localeFromI18n } from '../i18n';
 import { Alert, Linking } from 'react-native';
 import { isSpotifyLoggedIn, loginToSpotify } from '../lib/spotify-auth';
 import { exportSetlistToSpotify } from '../lib/spotify-export';
+import { clearSpotifyAuth } from '../lib/spotify-auth';
 
 type Props = {
   concertId: string;

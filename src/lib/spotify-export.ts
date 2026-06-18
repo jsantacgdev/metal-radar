@@ -16,21 +16,36 @@ async function getCurrentUserId(token: string): Promise<string> {
   const res = await fetch('https://api.spotify.com/v1/me', {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error('No se pudo obtener el perfil de Spotify');
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error('[Spotify] getCurrentUserId failed:', res.status, errText);
+    throw new Error(`No se pudo obtener el perfil de Spotify: ${res.status}`);
+  }
   const data = await res.json();
+
   return data.id;
 }
 
 /**
  * Busca una canción y devuelve el URI de Spotify, o null si no la encuentra.
  */
+/**
+ * Busca una canción y devuelve el URI de Spotify, o null si no la encuentra.
+ */
 async function searchTrack(token: string, title: string, artist: string): Promise<string | null> {
   const query = encodeURIComponent(`track:${title} artist:${artist}`);
-  const url = `https://api.spotify.com/v1/search?q=${query}&type=track&limit=1`;
+
+  const url = `https://api.spotify.com/v1/search?q=$${query}&type=track&limit=1`;
+
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) return null;
+
+  if (!res.ok) {
+    console.error(`[Spotify] Error buscando ${title}:`, res.status);
+    return null;
+  }
+
   const data = await res.json();
   const items = data.tracks?.items ?? [];
   return items[0]?.uri ?? null;
@@ -38,23 +53,29 @@ async function searchTrack(token: string, title: string, artist: string): Promis
 
 async function createPlaylist(
   token: string,
-  userId: string,
   name: string,
   description: string,
 ): Promise<{ id: string; url: string }> {
-  const res = await fetch(`https://api.spotify.com/v1/users/${userId}/playlists`, {
+  const body = {
+    name,
+    description,
+    public: false,
+  };
+
+  const res = await fetch(`https://api.spotify.com/v1/me/playlists`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      name,
-      description,
-      public: false,
-    }),
+    body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error('No se pudo crear la playlist');
+
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error('[Spotify] createPlaylist failed:', res.status, errText);
+    throw new Error(`No se pudo crear la playlist: ${res.status} ${errText}`);
+  }
   const data = await res.json();
   return { id: data.id, url: data.external_urls.spotify };
 }
@@ -64,18 +85,30 @@ async function addTracksToPlaylist(
   playlistId: string,
   uris: string[],
 ): Promise<void> {
-  // Spotify acepta máximo 100 por llamada
+  const url = `https://api.spotify.com/v1/playlists/${playlistId}/items`;
+
   for (let i = 0; i < uris.length; i += 100) {
     const chunk = uris.slice(i, i + 100);
-    const res = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ uris: chunk }),
-    });
-    if (!res.ok) throw new Error('No se pudieron añadir canciones');
+
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ uris: chunk }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error('[Spotify] Error de la API al añadir items:', res.status, errText);
+        throw new Error(`Error ${res.status} añadiendo canciones: ${errText}`);
+      }
+    } catch (error) {
+      console.error('[Spotify] Fallo en la petición fetch de addTracksToPlaylist:', error);
+      throw error;
+    }
   }
 }
 
@@ -90,10 +123,14 @@ export async function exportSetlistToSpotify(
   const token = await getValidAccessToken();
   if (!token) throw new Error('No hay sesión de Spotify activa');
 
-  const userId = await getCurrentUserId(token);
+  const searchResults: (string | null)[] = [];
 
-  // Buscar todas las canciones en paralelo
-  const searchResults = await Promise.all(songs.map((s) => searchTrack(token, s.title, s.artist)));
+  for (const song of songs) {
+    const uri = await searchTrack(token, song.title, song.artist);
+    searchResults.push(uri);
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
 
   const foundUris: string[] = [];
   const notFound: string[] = [];
@@ -103,10 +140,10 @@ export async function exportSetlistToSpotify(
     else notFound.push(songs[i].title);
   });
 
-  // Crear playlist
-  const playlist = await createPlaylist(token, userId, playlistName, description);
+  const playlist = await createPlaylist(token, playlistName, description);
 
-  // Añadir canciones encontradas
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+
   if (foundUris.length > 0) {
     await addTracksToPlaylist(token, playlist.id, foundUris);
   }
