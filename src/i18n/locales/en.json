@@ -278,7 +278,8 @@
     "statKm": "Km traveled",
     "statTopGenre": "Top genre",
     "statTopBand": "Most seen band",
-    "statBestYear": "Best year"
+    "statBestYear": "Best year",
+    "settingsButton": "Settings"
   },
   "deleteAccount": {
     "title": "Delete account",
@@ -361,5 +362,16 @@
     "addedBody": "\"{{title}}\" was added to your calendar.",
     "eventTitle": "Concert: {{band}}",
     "eventNotes": "Full lineup: {{lineup}}"
+  },
+  "settings": {
+    "title": "Settings",
+    "locationCategory": "LOCATION",
+    "notificationsCategory": "NOTIFICATIONS",
+    "spotifyCategory": "SPOTIFY",
+    "languageCategory": "LANGUAGE",
+    "preferencesCategory": "PREFERENCES",
+    "maintenanceCategory": "MAINTENANCE",
+    "legalCategory": "LEGAL",
+    "dangerCategory": "DANGER ZONE"
   }
 }

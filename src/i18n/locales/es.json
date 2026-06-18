@@ -278,7 +278,8 @@
     "statKm": "Km recorridos",
     "statTopBand": "Banda más vista",
     "statTopGenre": "Género top",
-    "statBestYear": "Mejor año"
+    "statBestYear": "Mejor año",
+    "settingsButton": "Configuración"
   },
   "deleteAccount": {
     "title": "Borrar cuenta",
@@ -361,5 +362,16 @@
     "addedBody": "\"{{title}}\" se ha añadido a tu calendario.",
     "eventTitle": "Concierto: {{band}}",
     "eventNotes": "Cartel completo: {{lineup}}"
+  },
+  "settings": {
+    "title": "Configuración",
+    "locationCategory": "UBICACIÓN",
+    "notificationsCategory": "NOTIFICACIONES",
+    "spotifyCategory": "SPOTIFY",
+    "languageCategory": "IDIOMA",
+    "preferencesCategory": "PREFERENCIAS",
+    "maintenanceCategory": "MANTENIMIENTO",
+    "legalCategory": "LEGAL",
+    "dangerCategory": "ZONA PELIGROSA"
   }
 }

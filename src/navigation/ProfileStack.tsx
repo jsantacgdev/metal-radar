@@ -1,9 +1,11 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import ProfileScreen from '../screens/ProfileScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 import DeleteAccountScreen from '../screens/DeleteAccountScreen';
 
 export type ProfileStackParamList = {
   ProfileHome: undefined;
+  Settings: undefined;
   DeleteAccount: undefined;
 };
 
@@ -19,6 +21,14 @@ export default function ProfileStack() {
       }}
     >
       <Stack.Screen name="ProfileHome" component={ProfileScreen} options={{ headerShown: false }} />
+      <Stack.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{
+          title: '',
+          headerBackTitle: '',
+        }}
+      />
       <Stack.Screen
         name="DeleteAccount"
         component={DeleteAccountScreen}
