@@ -14,8 +14,41 @@ const CORS_HEADERS = {
 
 const TARGET_RECOMMENDATIONS = 20;
 const PER_BAND_QUOTA = 1;
+const MAX_GUARANTEED = 8;
 const POOL_SIZE = 50;
 const MEMBERS_CACHE_TTL_DAYS = 180;
+
+const SIMILAR_SCORE = 6;
+const TAG_SCORE = 3;
+
+const GENERIC_TAGS = new Set([
+  'rock',
+  'metal',
+  'alternative',
+  'alternative rock',
+  'hard rock',
+  'heavy metal',
+  'music',
+  'pop',
+  'indie',
+  '00s',
+  '90s',
+  '80s',
+  '70s',
+  'seen live',
+  'american',
+  'british',
+  'female vocalists',
+  'male vocalists',
+  'classic rock',
+  'classic',
+  'soundtrack',
+  'instrumental',
+]);
+
+const TOP_TAGS_TO_USE = 5;
+
+const ARTISTS_PER_TAG = 50;
 
 let cachedSpotifyToken: { value: string; expiresAt: number } | null = null;
 
@@ -53,6 +86,18 @@ async function getSimilarFromLastfm(artistName: string): Promise<string[]> {
   return (data.similarartists?.artist ?? []).map((a: any) => a.name);
 }
 
+async function getTopArtistsFromTag(tag: string): Promise<string[]> {
+  const url =
+    `https://ws.audioscrobbler.com/2.0/?method=tag.gettopartists` +
+    `&tag=${encodeURIComponent(tag)}` +
+    `&api_key=${LASTFM_API_KEY}` +
+    `&format=json&limit=${ARTISTS_PER_TAG}`;
+  const res = await fetch(url);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data.topartists?.artist ?? []).map((a: any) => a.name);
+}
+
 type BandData = {
   spotify_id: string;
   name: string;
@@ -88,10 +133,7 @@ async function searchSpotifyArtist(
 
   if (res.status === 429 && retryCount < 2) {
     const retryAfter = parseInt(res.headers.get('Retry-After') ?? '2', 10);
-    if (retryAfter > 60) {
-      console.log(`Spotify 429 for "${name}", retry too long (${retryAfter}s), skipping`);
-      return null;
-    }
+    if (retryAfter > 60) return null;
     await new Promise((r) => setTimeout(r, (retryAfter + 0.5) * 1000));
     return searchSpotifyArtist(name, token, admin, retryCount + 1);
   }
@@ -131,15 +173,8 @@ function weightedSample<T>(items: { item: T; weight: number }[], count: number):
   return result;
 }
 
-/**
- * Lanza pre-warming en background para bandas sin caché de miembros.
- * Fire-and-forget: no espera el resultado.
- */
 function triggerPrewarm(bandIds: string[], authHeader: string) {
   if (bandIds.length === 0) return;
-
-  // EdgeRuntime.waitUntil permite que la función siga ejecutando
-  // tras enviar la respuesta al cliente
   const task = fetch(`${SUPABASE_URL}/functions/v1/prewarm-band-members`, {
     method: 'POST',
     headers: {
@@ -151,9 +186,7 @@ function triggerPrewarm(bandIds: string[], authHeader: string) {
     console.warn('Prewarm trigger error:', err);
   });
 
-  // @ts-ignore - EdgeRuntime es global en Supabase Edge Functions
   if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
-    // @ts-ignore
     EdgeRuntime.waitUntil(task);
   }
 }
@@ -179,10 +212,9 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // 1. Bandas seguidas (incluyendo cache de miembros)
     const { data: userBands, error: ubError } = await admin
       .from('user_bands')
-      .select('band:bands(id, name, musicbrainz_mbid, member_names, members_fetched_at)') // ← member_names
+      .select('band:bands(id, name, musicbrainz_mbid, member_names, members_fetched_at, genres)')
       .eq('user_id', user.id);
     if (ubError) throw ubError;
 
@@ -204,13 +236,11 @@ Deno.serve(async (req) => {
       musicbrainz_mbid: string | null;
       member_names: string[] | null;
       members_fetched_at: string | null;
+      genres: string[] | null;
     }[];
 
-    // 2. Recolectar miembros SOLO desde caché. No bloquear nunca con MusicBrainz.
-    //    Las bandas sin caché se anotarán para hacer pre-warming en background.
     const memberExclusions = new Set<string>();
     const needsPrewarm: string[] = [];
-
     const ttlMs = MEMBERS_CACHE_TTL_DAYS * 24 * 60 * 60 * 1000;
     for (const b of followedBands) {
       if (b.member_names && b.members_fetched_at) {
@@ -227,28 +257,75 @@ Deno.serve(async (req) => {
       needsPrewarm.push(b.id);
     }
 
-    console.log(
-      `Member exclusions: ${memberExclusions.size}. Bands needing prewarm: ${needsPrewarm.length}`,
-    );
+    const tagFreq = new Map<string, number>();
+    for (const b of followedBands) {
+      for (const g of b.genres ?? []) {
+        const tag = g.toLowerCase().trim();
+        if (!tag || GENERIC_TAGS.has(tag)) continue;
+        tagFreq.set(tag, (tagFreq.get(tag) ?? 0) + 1);
+      }
+    }
 
-    // 3. Last.fm en paralelo (la parte lenta es Spotify y la teníamos ya bien)
-    const allSimilarLists = await Promise.all(
-      followedArr.map((name) => getSimilarFromLastfm(name)),
-    );
+    const topTags = Array.from(tagFreq.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, TOP_TAGS_TO_USE)
+      .map(([tag]) => tag);
 
-    // 4. Disparar pre-warming en background (no bloquea)
+    console.log(`Top tags: ${topTags.join(', ')}`);
+
+    const [allSimilarLists, allTagLists] = await Promise.all([
+      Promise.all(followedArr.map((name) => getSimilarFromLastfm(name))),
+      Promise.all(topTags.map((tag) => getTopArtistsFromTag(tag))),
+    ]);
+
     if (needsPrewarm.length > 0) {
       triggerPrewarm(needsPrewarm, authHeader);
     }
 
-    // 5. Scoring de candidatos
     const candidateScores = new Map<string, number>();
+
     for (const similar of allSimilarLists) {
       for (const s of similar) {
         const key = s.toLowerCase();
-        if (followedNames.has(key)) continue;
-        if (memberExclusions.has(key)) continue;
-        candidateScores.set(key, (candidateScores.get(key) ?? 0) + 1);
+        if (followedNames.has(key) || memberExclusions.has(key)) continue;
+        candidateScores.set(key, (candidateScores.get(key) ?? 0) + SIMILAR_SCORE);
+      }
+    }
+
+    for (const topArtists of allTagLists) {
+      for (const a of topArtists) {
+        const key = a.toLowerCase();
+        if (followedNames.has(key) || memberExclusions.has(key)) continue;
+        candidateScores.set(key, (candidateScores.get(key) ?? 0) + TAG_SCORE);
+      }
+    }
+
+    const topTagsSet = new Set(topTags);
+
+    const candidateNames = Array.from(candidateScores.keys());
+    const { data: candidateBands } = await admin
+      .from('bands')
+      .select('name, genres')
+      .in('name', candidateNames);
+
+    const genresByName = new Map<string, string[]>();
+    for (const b of candidateBands ?? []) {
+      genresByName.set(
+        b.name.toLowerCase(),
+        (b.genres ?? []).map((g: string) => g.toLowerCase()),
+      );
+    }
+
+    for (const [name, score] of candidateScores.entries()) {
+      const genres = genresByName.get(name) ?? [];
+      if (genres.length === 0) continue;
+
+      const matchingTags = genres.filter((g) => topTagsSet.has(g)).length;
+
+      if (matchingTags > 0) {
+        candidateScores.set(name, score + matchingTags * 3);
+      } else {
+        candidateScores.set(name, Math.floor(score * 0.5));
       }
     }
 
@@ -258,7 +335,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 6. Cuota por banda + muestreo ponderado (igual que antes)
     const guaranteed = new Set<string>();
     for (const similarList of allSimilarLists) {
       let added = 0;
@@ -272,24 +348,28 @@ Deno.serve(async (req) => {
       }
     }
 
+    const guaranteedArray = Array.from(guaranteed)
+      .map((name) => ({ name, score: candidateScores.get(name) ?? 0 }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, MAX_GUARANTEED)
+      .map((x) => x.name);
+
+    const guaranteedFinal = new Set(guaranteedArray);
+
     const poolEntries = Array.from(candidateScores.entries())
-      .filter(([name]) => !guaranteed.has(name))
+      .filter(([name]) => !guaranteedFinal.has(name))
       .sort((a, b) => b[1] - a[1])
       .slice(0, POOL_SIZE);
 
-    const slotsLeft = Math.max(TARGET_RECOMMENDATIONS - guaranteed.size, 0);
+    const slotsLeft = Math.max(TARGET_RECOMMENDATIONS - guaranteedFinal.size, 0);
     const sampled = weightedSample(
       poolEntries.map(([name, score]) => ({ item: name, weight: score })),
       slotsLeft,
     );
 
-    const finalCandidates = [...Array.from(guaranteed), ...sampled].slice(
-      0,
-      TARGET_RECOMMENDATIONS,
-    );
+    const finalCandidates = [...guaranteedArray, ...sampled].slice(0, TARGET_RECOMMENDATIONS);
     const scoresByName = new Map(Array.from(candidateScores.entries()));
 
-    // 7. Resolver desde cache de BD (una sola query, no dos)
     const { data: cachedBands } = await admin
       .from('bands')
       .select('spotify_id, name, image_url, genres')
@@ -309,7 +389,6 @@ Deno.serve(async (req) => {
       else toFetch.push(candidate);
     }
 
-    // 8. Buscar las que falten en Spotify
     let fromSpotify: BandData[] = [];
     if (toFetch.length > 0) {
       const spotifyToken = await getSpotifyToken();
@@ -341,23 +420,33 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 9. Calcular affinity y ordenar
     const all = [...fromCache, ...fromSpotify];
-    const recommendations = all
+    const maxScore = Math.max(...Array.from(scoresByName.values()), 1);
+    let recommendations = all
       .map((b) => {
         const score = scoresByName.get(b.name.toLowerCase()) ?? 1;
-        const affinity = Math.min(95, 75 + score * 6);
+        const normalized = score / maxScore;
+        const affinity = Math.min(95, 70 + Math.round(normalized * 25));
         return { ...b, affinity };
       })
       .sort((a, b) => b.affinity - a.affinity);
+
+    const TOP_SHUFFLE_SIZE = 10;
+    const top = recommendations.slice(0, TOP_SHUFFLE_SIZE);
+    const rest = recommendations.slice(TOP_SHUFFLE_SIZE);
+    for (let i = top.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [top[i], top[j]] = [top[j], top[i]];
+    }
+    recommendations = [...top, ...rest];
 
     return new Response(
       JSON.stringify({
         recommendations,
         cached: fromCache.length,
         fetched: fromSpotify.length,
-        guaranteed: guaranteed.size,
-        prewarmTriggered: needsPrewarm.length,
+        guaranteed: guaranteedFinal.size,
+        topTags,
       }),
       { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
     );
