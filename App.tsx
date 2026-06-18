@@ -108,7 +108,7 @@ export default Sentry.wrap(function App() {
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
         <RootNavigator />
-        <StatusBar style="light" />
+        <StatusBar style="light" backgroundColor={colors.ink} translucent={false} />
       </SafeAreaProvider>
     </QueryClientProvider>
   );

@@ -41,11 +41,7 @@ export default function MapStack() {
       <Stack.Screen
         name="FestivalDetail"
         component={FestivalDetailScreen}
-        options={{
-          headerTitle: '',
-          headerTransparent: true,
-          headerStyle: { backgroundColor: 'transparent' },
-        }}
+        options={{ headerTitle: '' }}
       />
       <Stack.Screen
         name="BandDetail"

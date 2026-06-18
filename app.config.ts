@@ -19,6 +19,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       resizeMode: 'contain',
       backgroundColor: '#0a0a0c',
     },
+    androidStatusBar: {
+      backgroundColor: '#0a0a0c',
+      barStyle: 'light-content',
+      translucent: false,
+    },
     plugins: [
       [
         'expo-location',

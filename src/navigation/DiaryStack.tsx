@@ -54,11 +54,7 @@ export default function DiaryStack() {
       <Stack.Screen
         name="FestivalDetail"
         component={FestivalDetailScreen}
-        options={{
-          title: '',
-          headerTransparent: true,
-          headerStyle: { backgroundColor: 'transparent' },
-        }}
+        options={{ title: '' }}
       />
       <Stack.Screen
         name="BandDetail"
