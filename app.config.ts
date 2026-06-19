@@ -49,7 +49,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ],
       'expo-font',
       [
-        '@sentry/react-native/expo',
+        '@sentry/react-native',
         {
           url: 'https://sentry.io/',
           project: 'react-native',
