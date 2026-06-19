@@ -1,15 +1,15 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
+  Animated,
   Image,
   Linking,
-  ScrollView,
   StyleSheet,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RouteProp, useRoute } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { useFestival } from '../hooks/useFestival';
 import { MapStackParamList } from '../navigation/MapStack';
@@ -18,14 +18,13 @@ import { Text } from '../components/ui';
 import BandImage from '../components/BandImage';
 import { localeFromI18n } from '../i18n';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useEffect, useState } from 'react';
-import { TextInput } from 'react-native';
 import PhotoGallery from '../components/PhotoGallery';
 import FestivalDetailSkeleton from '../components/skeletons/FestivalDetailSkeleton';
 
 type RouteParams = RouteProp<MapStackParamList, 'FestivalDetail'>;
+
+const HERO_HEIGHT = 280;
 
 function formatDateRange(
   start: string,
@@ -61,6 +60,20 @@ export default function FestivalDetailScreen() {
   );
 
   const locale = localeFromI18n(i18n.language);
+
+  const scrollY = useRef(new Animated.Value(0)).current;
+
+  const heroTranslateY = scrollY.interpolate({
+    inputRange: [-HERO_HEIGHT, 0, HERO_HEIGHT],
+    outputRange: [0, 0, -HERO_HEIGHT * 0.5],
+    extrapolateRight: 'clamp',
+  });
+
+  const heroScale = scrollY.interpolate({
+    inputRange: [-HERO_HEIGHT, 0, HERO_HEIGHT],
+    outputRange: [1.5, 1, 1],
+    extrapolateRight: 'clamp',
+  });
 
   const dateInfo = useMemo(() => {
     if (!festival) return null;
@@ -106,11 +119,22 @@ export default function FestivalDetailScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.ink }}>
-      <ScrollView
+      <Animated.ScrollView
         contentContainerStyle={{ paddingBottom: ctaUrl ? 120 : spacing.xxxl }}
         showsVerticalScrollIndicator={false}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+          useNativeDriver: true,
+        })}
+        scrollEventThrottle={16}
       >
-        <View style={styles.hero}>
+        <Animated.View
+          style={[
+            styles.hero,
+            {
+              transform: [{ translateY: heroTranslateY }, { scale: heroScale }],
+            },
+          ]}
+        >
           {festival.image_url ? (
             <Image source={{ uri: festival.image_url }} style={styles.heroImage} />
           ) : (
@@ -149,7 +173,7 @@ export default function FestivalDetailScreen() {
               {isPast ? t('festivalDetail.badgePast') : t('festivalDetail.badgeUpcoming')}
             </Text>
           </View>
-        </View>
+        </Animated.View>
 
         <View style={styles.content}>
           <Text variant="displayLG" style={{ marginBottom: spacing.sm }}>
@@ -357,7 +381,7 @@ export default function FestivalDetailScreen() {
             </TouchableOpacity>
           )}
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
 
       {ctaUrl && !isPast && (
         <View style={[styles.ctaWrapper, { paddingBottom: spacing.md }]}>
@@ -506,7 +530,7 @@ const styles = StyleSheet.create({
   },
   hero: {
     width: '100%',
-    height: 280,
+    height: HERO_HEIGHT,
     position: 'relative',
     overflow: 'hidden',
     backgroundColor: colors.ink,

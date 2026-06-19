@@ -59,7 +59,12 @@ export default function DiaryStack() {
       <Stack.Screen
         name="BandDetail"
         component={BandDetailScreen}
-        options={{ title: t('navigation.band') }}
+        options={{
+          title: '',
+          headerTransparent: true,
+          headerBackVisible: true,
+          headerTintColor: colors.bright,
+        }}
       />
     </Stack.Navigator>
   );

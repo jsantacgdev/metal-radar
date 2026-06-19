@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
+  Animated,
   Linking,
-  ScrollView,
+  Share,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -20,11 +20,12 @@ import PhotoGallery from '../components/PhotoGallery';
 import SetlistView from '../components/Setlist';
 import { useSetlists } from '../hooks/useSetlist';
 import { localeFromI18n } from '../i18n';
-import { Share } from 'react-native';
 import { addEventToCalendar } from '../lib/calendar';
 import ConcertDetailSkeleton from '../components/skeletons/ConcertDetailSkeleton';
 
 type Props = NativeStackScreenProps<MapStackParamList, 'ConcertDetail'>;
+
+const HERO_HEIGHT = 180;
 
 export default function ConcertDetailScreen({ route }: Props) {
   const { t, i18n } = useTranslation();
@@ -33,6 +34,20 @@ export default function ConcertDetailScreen({ route }: Props) {
     useConcert(concertId);
 
   const { data: setlists = [] } = useSetlists(concert ? concert.id : null);
+
+  const scrollY = useRef(new Animated.Value(0)).current;
+
+  const heroTranslateY = scrollY.interpolate({
+    inputRange: [-HERO_HEIGHT, 0, HERO_HEIGHT],
+    outputRange: [0, 0, -HERO_HEIGHT * 0.5],
+    extrapolateRight: 'clamp',
+  });
+
+  const heroScale = scrollY.interpolate({
+    inputRange: [-HERO_HEIGHT, 0, HERO_HEIGHT],
+    outputRange: [1.3, 1, 1],
+    extrapolateRight: 'clamp',
+  });
 
   if (loading) {
     return (
@@ -109,12 +124,9 @@ export default function ConcertDetailScreen({ route }: Props) {
     const lineup = concert.bands.map((b) => b.name).join(', ');
     const notes = t('calendar.eventNotes', { lineup });
 
-    let startDate: Date;
-    let endDate: Date | undefined;
-
     const [year, month, day] = concert.event_date.split('T')[0].split('-').map(Number);
-    startDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
-    endDate = new Date(Date.UTC(year, month - 1, day, 23, 59, 0));
+    const startDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+    const endDate = new Date(Date.UTC(year, month - 1, day, 23, 59, 0));
 
     await addEventToCalendar({
       title,
@@ -129,12 +141,23 @@ export default function ConcertDetailScreen({ route }: Props) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.ink }}>
-      <ScrollView
+      <Animated.ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: 140 }}
         keyboardShouldPersistTaps="handled"
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+          useNativeDriver: true,
+        })}
+        scrollEventThrottle={16}
       >
-        <View style={styles.hero}>
+        <Animated.View
+          style={[
+            styles.hero,
+            {
+              transform: [{ translateY: heroTranslateY }, { scale: heroScale }],
+            },
+          ]}
+        >
           <BandImage
             url={concert.bands[0]?.image_url ?? null}
             size={140}
@@ -154,7 +177,7 @@ export default function ConcertDetailScreen({ route }: Props) {
               </Text>
             )}
           </View>
-        </View>
+        </Animated.View>
 
         <View style={styles.metaStrip}>
           <View style={styles.dateBox}>
@@ -300,7 +323,7 @@ export default function ConcertDetailScreen({ route }: Props) {
             </Text>
           </View>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
 
       {!isPast && (
         <View style={styles.ctaContainer}>
@@ -603,16 +626,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 12,
     elevation: 4,
-  },
-  shareCtaButton: {
-    width: 52,
-    height: 52,
-    borderRadius: radius.lg,
-    backgroundColor: colors.panel,
-    borderWidth: 1,
-    borderColor: colors.line,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   iconCtaButton: {
     width: 52,

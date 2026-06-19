@@ -4,24 +4,17 @@ import { colors, radius, spacing } from '../../theme';
 
 export default function DiarySkeleton() {
   return (
-    <View style={{ padding: spacing.xl }}>
-      {/* Stats banner */}
-      <Skeleton width={'100%' as any} height={80} borderRadius={radius.md} />
-
-      {/* Tabs */}
-      <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xl }}>
-        <Skeleton width={90} height={32} borderRadius={radius.sm} />
-        <Skeleton width={90} height={32} borderRadius={radius.sm} />
-      </View>
-
-      {/* Cards */}
+    <View style={styles.container}>
       {[...Array(4)].map((_, i) => (
         <View key={i} style={styles.card}>
-          <Skeleton width={50} height={50} circle />
+          <Skeleton width={48} height={48} borderRadius={radius.sm} />
           <View style={{ flex: 1, marginLeft: spacing.md }}>
-            <Skeleton width={'70%' as any} height={16} />
-            <Skeleton width={'50%' as any} height={11} style={{ marginTop: 6 }} />
-            <Skeleton width={'40%' as any} height={10} style={{ marginTop: 6 }} />
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Skeleton width={'55%' as any} height={16} />
+              <View style={{ flex: 1 }} />
+              <Skeleton width={60} height={10} />
+            </View>
+            <Skeleton width={'80%' as any} height={11} style={{ marginTop: 8 }} />
           </View>
         </View>
       ))}
@@ -30,14 +23,18 @@ export default function DiarySkeleton() {
 }
 
 const styles = StyleSheet.create({
+  container: {
+    width: '100%',
+    gap: spacing.sm,
+  },
   card: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     padding: spacing.md,
     backgroundColor: colors.panel,
     borderWidth: 1,
     borderColor: colors.line,
     borderRadius: radius.md,
-    marginTop: spacing.md,
+    marginBottom: spacing.sm,
   },
 });

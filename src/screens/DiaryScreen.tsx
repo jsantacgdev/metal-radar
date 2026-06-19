@@ -125,9 +125,7 @@ export default function DiaryScreen() {
       )}
 
       {loading && entries.length === 0 ? (
-        <View style={styles.centered}>
-          <DiarySkeleton />
-        </View>
+        <DiarySkeleton />
       ) : filtered.length === 0 ? (
         <View style={styles.centered}>
           <EmptyState
