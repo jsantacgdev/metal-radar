@@ -28,6 +28,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RadarStackParamList } from '../navigation/RadarStack';
 import { localeFromI18n } from '../i18n';
 import EmptyState from '../components/EmptyState';
+import RadarSkeleton from '../components/skeletons/RadarSkeleton';
 
 type Tab = 'foryou' | 'mybands';
 
@@ -416,7 +417,7 @@ export default function RadarScreen() {
             </Text>
           )}
           {loadingRecs && newForYou.length === 0 ? (
-            <ActivityIndicator color={colors.bloodBright} style={{ marginVertical: spacing.xl }} />
+            <RadarSkeleton />
           ) : newForYou.length === 0 ? (
             <EmptyState
               icon="radio-outline"

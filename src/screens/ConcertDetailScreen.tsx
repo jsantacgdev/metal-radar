@@ -22,6 +22,7 @@ import { useSetlists } from '../hooks/useSetlist';
 import { localeFromI18n } from '../i18n';
 import { Share } from 'react-native';
 import { addEventToCalendar } from '../lib/calendar';
+import ConcertDetailSkeleton from '../components/skeletons/ConcertDetailSkeleton';
 
 type Props = NativeStackScreenProps<MapStackParamList, 'ConcertDetail'>;
 
@@ -35,8 +36,8 @@ export default function ConcertDetailScreen({ route }: Props) {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator color={colors.bloodBright} size="large" />
+      <View style={{ flex: 1, backgroundColor: colors.ink }}>
+        <ConcertDetailSkeleton />
       </View>
     );
   }
@@ -286,7 +287,7 @@ export default function ConcertDetailScreen({ route }: Props) {
             </Section>
 
             <View style={styles.gallerySection}>
-              <PhotoGallery userConcertId={concert.userConcertId} />
+              <PhotoGallery kind="concert" userConcertId={concert.userConcertId} />
             </View>
           </>
         )}

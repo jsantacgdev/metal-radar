@@ -13,6 +13,7 @@ import { Alert, TouchableOpacity } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFollowedBands } from '../hooks/useFollowedBands';
 import { followBand, syncBandConcerts } from '../lib/bands';
+import BandDetailSkeleton from '../components/skeletons/BandDetailSkeleton';
 
 type Props = NativeStackScreenProps<RadarStackParamList, 'BandDetail'>;
 
@@ -162,14 +163,7 @@ export default function BandDetailScreen({ route }: Props) {
         </View>
       )}
 
-      {loading && !info && (
-        <View style={styles.centered}>
-          <ActivityIndicator color={colors.bloodBright} />
-          <Text variant="monoSM" color="muted" style={{ marginTop: spacing.md }}>
-            {t('bandDetail.loadingInfo')}
-          </Text>
-        </View>
-      )}
+      {loading && !info && <BandDetailSkeleton />}
 
       {error && (
         <View style={styles.errorBox}>

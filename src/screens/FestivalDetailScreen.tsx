@@ -23,6 +23,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useEffect, useState } from 'react';
 import { TextInput } from 'react-native';
 import PhotoGallery from '../components/PhotoGallery';
+import FestivalDetailSkeleton from '../components/skeletons/FestivalDetailSkeleton';
 
 type RouteParams = RouteProp<MapStackParamList, 'FestivalDetail'>;
 
@@ -83,8 +84,8 @@ export default function FestivalDetailScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator color={colors.bloodBright} size="large" />
+      <View style={{ flex: 1, backgroundColor: colors.ink }}>
+        <FestivalDetailSkeleton />
       </View>
     );
   }

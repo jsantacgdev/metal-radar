@@ -21,6 +21,7 @@ import { Text } from '../components/ui';
 import BandImage from '../components/BandImage';
 import { localeFromI18n } from '../i18n';
 import EmptyState from '../components/EmptyState';
+import DiarySkeleton from '../components/skeletons/DiarySkeleton';
 
 type Filter = 'upcoming' | 'past';
 
@@ -125,7 +126,7 @@ export default function DiaryScreen() {
 
       {loading && entries.length === 0 ? (
         <View style={styles.centered}>
-          <ActivityIndicator color={colors.bloodBright} size="large" />
+          <DiarySkeleton />
         </View>
       ) : filtered.length === 0 ? (
         <View style={styles.centered}>
