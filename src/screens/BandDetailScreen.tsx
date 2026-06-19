@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -21,6 +21,8 @@ import { Text, Tag } from '../components/ui';
 import BandImage from '../components/BandImage';
 import BandDetailSkeleton from '../components/skeletons/BandDetailSkeleton';
 import { RadarStackParamList } from '../navigation/RadarStack';
+import { useLayoutEffect } from 'react';
+import { useNavigation } from '@react-navigation/native';
 
 type Props = NativeStackScreenProps<RadarStackParamList, 'BandDetail'>;
 
@@ -56,56 +58,54 @@ export default function BandDetailScreen({ route }: Props) {
 
   const scrollY = useRef(new Animated.Value(0)).current;
 
-  // ====== ANIMACIONES SCROLL ======
-
-  // Altura del hero: HERO_MAX_HEIGHT → HERO_MIN_HEIGHT
   const heroHeight = scrollY.interpolate({
     inputRange: [0, HERO_SCROLL_DISTANCE],
-    outputRange: [HERO_MAX_HEIGHT + insets.top, HERO_MIN_HEIGHT + insets.top],
+    outputRange: [HERO_MAX_HEIGHT, HERO_MIN_HEIGHT],
     extrapolate: 'clamp',
   });
 
-  // Opacidad de los textos del hero (fade rápido)
   const heroContentOpacity = scrollY.interpolate({
     inputRange: [0, HERO_SCROLL_DISTANCE * 0.5, HERO_SCROLL_DISTANCE],
     outputRange: [1, 0.5, 0],
     extrapolate: 'clamp',
   });
 
-  // Escala de la imagen
   const imageScale = scrollY.interpolate({
     inputRange: [0, HERO_SCROLL_DISTANCE],
     outputRange: [1, 0.4],
     extrapolate: 'clamp',
   });
 
-  // Translación de la imagen al hacer scroll
   const imageTranslateY = scrollY.interpolate({
     inputRange: [0, HERO_SCROLL_DISTANCE],
     outputRange: [0, -40],
     extrapolate: 'clamp',
   });
 
-  // Mini-header: aparece cuando el hero está casi colapsado
-  const miniHeaderOpacity = scrollY.interpolate({
-    inputRange: [HERO_SCROLL_DISTANCE * 0.6, HERO_SCROLL_DISTANCE],
-    outputRange: [0, 1],
-    extrapolate: 'clamp',
-  });
-
-  // Background del mini-header (para que se vea el fondo cuando colapsa)
   const headerBgOpacity = scrollY.interpolate({
     inputRange: [HERO_SCROLL_DISTANCE * 0.4, HERO_SCROLL_DISTANCE],
     outputRange: [0, 1],
     extrapolate: 'clamp',
   });
 
-  // ====== ESTADO Y HANDLERS ======
+  const titleOpacity = useRef(new Animated.Value(0)).current;
+  const navigation = useNavigation();
 
   const isFollowed = useMemo(
     () => followedBands.some((b) => b.id === bandId),
     [followedBands, bandId],
   );
+
+  useEffect(() => {
+    const id = scrollY.addListener(({ value }) => {
+      const opacity = Math.min(
+        Math.max((value - HERO_SCROLL_DISTANCE * 0.6) / (HERO_SCROLL_DISTANCE * 0.4), 0),
+        1,
+      );
+      titleOpacity.setValue(opacity);
+    });
+    return () => scrollY.removeListener(id);
+  }, [scrollY, titleOpacity]);
 
   function getFlagEmoji(countryCode: string) {
     if (!countryCode || countryCode.length !== 2) return countryCode;
@@ -152,6 +152,25 @@ export default function BandDetailScreen({ route }: Props) {
   const bandName = info?.name ?? basics?.name ?? '...';
   const bandImage = info?.image_url ?? basics?.image_url ?? null;
 
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTitle: () => (
+        <Animated.Text
+          style={{
+            opacity: titleOpacity,
+            color: colors.bright,
+            fontFamily: fontFamily.displayBold,
+            fontSize: 20,
+            // letterSpacing: 0.5,
+          }}
+          numberOfLines={1}
+        >
+          {bandName}
+        </Animated.Text>
+      ),
+    });
+  }, [navigation, bandName, titleOpacity]);
+
   return (
     <View style={styles.container}>
       {/* HERO COLAPSABLE FIJO ARRIBA */}
@@ -160,7 +179,6 @@ export default function BandDetailScreen({ route }: Props) {
           styles.heroContainer,
           {
             height: heroHeight,
-            paddingTop: insets.top,
           },
         ]}
       >
@@ -209,23 +227,13 @@ export default function BandDetailScreen({ route }: Props) {
             )}
           </View>
         </Animated.View>
-
-        {/* Mini-header que aparece al colapsar */}
-        <Animated.View
-          style={[styles.miniHeader, { opacity: miniHeaderOpacity }]}
-          pointerEvents="none"
-        >
-          <Text variant="displaySM" numberOfLines={1} style={{ textAlign: 'center' }}>
-            {bandName}
-          </Text>
-        </Animated.View>
       </Animated.View>
 
       {/* SCROLLABLE CONTENT */}
       <Animated.ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{
-          paddingTop: HERO_MAX_HEIGHT + insets.top,
+          paddingTop: HERO_MAX_HEIGHT,
           paddingBottom: spacing.xxxl,
         }}
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
@@ -442,15 +450,6 @@ const styles = StyleSheet.create({
   heroText: {
     flex: 1,
     minWidth: 0,
-  },
-  miniHeader: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: HERO_MIN_HEIGHT,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xxxl + spacing.md,
   },
   countryRow: {
     flexDirection: 'row',

@@ -48,9 +48,6 @@ export default function MapStack() {
         component={BandDetailScreen}
         options={{
           title: '',
-          headerTransparent: true,
-          headerBackVisible: true,
-          headerTintColor: colors.bright,
         }}
       />
     </Stack.Navigator>

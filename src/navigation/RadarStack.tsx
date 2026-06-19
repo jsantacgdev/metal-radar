@@ -34,9 +34,6 @@ export default function RadarStack() {
         component={BandDetailScreen}
         options={{
           title: '',
-          headerTransparent: true,
-          headerBackVisible: true,
-          headerTintColor: colors.bright,
         }}
       />
     </Stack.Navigator>
