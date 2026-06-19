@@ -365,6 +365,25 @@
     "eventTitle": "Concert: {{band}}",
     "eventNotes": "Full lineup: {{lineup}}"
   },
+  "statsDetail": {
+    "titleConcerts": "Concerts attended",
+    "titleFestivals": "Festivals attended",
+    "titleBands": "Bands seen",
+    "titleCities": "Cities visited",
+    "titleKm": "Distance traveled",
+    "titleTopBand": "Most seen bands",
+    "titleTopGenre": "Top genres",
+    "titleBestYear": "Best year",
+    "noData": "No data to show",
+    "appearanceCount_one": "{{count}} appearance",
+    "appearanceCount_other": "{{count}} appearances",
+    "cityConcerts_one": "{{count}} concert",
+    "cityConcerts_other": "{{count}} concerts",
+    "cityFestivals_one": "{{count}} festival",
+    "cityFestivals_other": "{{count}} festivals",
+    "bestYearEvents_one": "{{count}} event",
+    "bestYearEvents_other": "{{count}} events"
+  },
   "settings": {
     "title": "Settings",
     "locationCategory": "LOCATION",

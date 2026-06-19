@@ -19,7 +19,7 @@ async function fetchRecommendations(): Promise<RecommendedBand[]> {
   });
   const json = await res.json();
   // console.log('[recommendations] HTTP status:', res.status);
-  console.log('[recommendations] response:', JSON.stringify(json, null, 2));
+  // console.log('[recommendations] response:', JSON.stringify(json, null, 2));
   if (json.error) throw new Error(json.error);
   return json.recommendations ?? [];
 }

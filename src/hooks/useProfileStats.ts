@@ -9,9 +9,23 @@ export type ProfileStats = {
   bands: number;
   cities: number;
   km: number;
-  topBand: { name: string; count: number } | null;
+  topBand: { id: string; name: string; image_url: string | null; count: number } | null;
   topGenre: string | null;
   bestYear: { year: number; count: number } | null;
+};
+
+export type StatsEntry = {
+  event_date: string;
+  city: string | null;
+  lat: number | null;
+  lng: number | null;
+  bands: { id: string; name: string; image_url: string | null; genres: string[] }[];
+  kind: 'concert' | 'festival';
+  raw_id: string; // id del user_concert o user_festival
+  parent_id: string; // id del concert o festival (para navegación)
+  parent_name?: string; // nombre del festival si es festival
+  venue_name?: string;
+  image_url?: string | null;
 };
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -25,17 +39,8 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
-type Entry = {
-  event_date: string;
-  city: string | null;
-  lat: number | null;
-  lng: number | null;
-  bands: { id: string; name: string; genres: string[] }[];
-  kind: 'concert' | 'festival';
-};
-
 type RawData = {
-  entries: Entry[];
+  entries: StatsEntry[];
   homeLat: number | null;
   homeLng: number | null;
 };
@@ -51,10 +56,11 @@ async function fetchRawData(): Promise<RawData> {
       .from('user_concerts')
       .select(
         `
+        id, concert_id,
         concert:concerts!inner (
-          event_date,
-          venue:venues!inner ( city, lat, lng ),
-          concert_bands ( band:bands ( id, name, genres ) )
+          id, event_date,
+          venue:venues!inner ( name, city, lat, lng ),
+          concert_bands ( is_headliner, band:bands ( id, name, image_url, genres ) )
         )
       `,
       )
@@ -64,10 +70,11 @@ async function fetchRawData(): Promise<RawData> {
       .from('user_festivals')
       .select(
         `
+        id, festival_id,
         festival:festivals!inner (
-          start_date,
-          venue:venues!inner ( city, lat, lng ),
-          festival_bands ( band:bands ( id, name, genres ) )
+          id, name, start_date, image_url,
+          venue:venues!inner ( name, city, lat, lng ),
+          festival_bands ( is_headliner, band:bands ( id, name, image_url, genres ) )
         )
       `,
       )
@@ -79,30 +86,49 @@ async function fetchRawData(): Promise<RawData> {
   if (concertsRes.error) throw concertsRes.error;
   if (festivalsRes.error) throw festivalsRes.error;
 
-  const concertEntries: Entry[] = (concertsRes.data ?? []).map((row: any) => ({
-    event_date: row.concert.event_date,
-    city: row.concert.venue.city,
-    lat: row.concert.venue.lat,
-    lng: row.concert.venue.lng,
-    bands: (row.concert.concert_bands ?? []).map((cb: any) => ({
-      id: cb.band.id,
-      name: cb.band.name,
-      genres: cb.band.genres ?? [],
-    })),
-    kind: 'concert',
-  }));
+  const concertEntries: StatsEntry[] = (concertsRes.data ?? []).map((row: any) => {
+    const sortedBands = (row.concert.concert_bands ?? [])
+      .sort((a: any, b: any) => Number(b.is_headliner) - Number(a.is_headliner))
+      .map((cb: any) => ({
+        id: cb.band.id,
+        name: cb.band.name,
+        image_url: cb.band.image_url,
+        genres: cb.band.genres ?? [],
+      }));
 
-  const festivalEntries: Entry[] = (festivalsRes.data ?? []).map((row: any) => ({
+    return {
+      event_date: row.concert.event_date,
+      city: row.concert.venue.city,
+      lat: row.concert.venue.lat,
+      lng: row.concert.venue.lng,
+      bands: sortedBands,
+      kind: 'concert' as const,
+      raw_id: row.id,
+      parent_id: row.concert_id,
+      venue_name: row.concert.venue.name,
+      image_url: sortedBands[0]?.image_url ?? null, // imagen del headliner
+    };
+  });
+
+  const festivalEntries: StatsEntry[] = (festivalsRes.data ?? []).map((row: any) => ({
     event_date: `${row.festival.start_date}T00:00:00`,
     city: row.festival.venue.city,
     lat: row.festival.venue.lat,
     lng: row.festival.venue.lng,
-    bands: (row.festival.festival_bands ?? []).map((fb: any) => ({
-      id: fb.band.id,
-      name: fb.band.name,
-      genres: fb.band.genres ?? [],
-    })),
+    bands: (row.festival.festival_bands ?? [])
+      .sort((a: any, b: any) => Number(b.is_headliner) - Number(a.is_headliner))
+      .map((fb: any) => ({
+        id: fb.band.id,
+        name: fb.band.name,
+        image_url: fb.band.image_url,
+        genres: fb.band.genres ?? [],
+      })),
     kind: 'festival',
+    raw_id: row.id,
+    parent_id: row.festival_id,
+    parent_name: row.festival.name,
+    venue_name: row.festival.venue.name,
+    image_url: row.festival.image_url,
   }));
 
   return {
@@ -117,14 +143,42 @@ export type StatsPeriod = 'year' | 'all';
 export function useProfileStats(
   period: StatsPeriod,
   year: number,
-): { stats: ProfileStats; loading: boolean } {
+): {
+  stats: ProfileStats;
+  entries: StatsEntry[];
+  homeLat: number | null;
+  homeLng: number | null;
+  loading: boolean;
+} {
+  console.log('[useProfileStats] CALLED with', { period, year });
+
   const query = useQuery({
     queryKey: ['profileStats'],
-    queryFn: fetchRawData,
+    queryFn: async () => {
+      console.log('[useProfileStats] queryFn ejecutándose...');
+      try {
+        const data = await fetchRawData();
+        console.log('[useProfileStats] raw data OK:', {
+          totalEntries: data.entries.length,
+        });
+        return data;
+      } catch (err) {
+        console.error('[useProfileStats] FETCH ERROR:', err);
+        throw err;
+      }
+    },
     staleTime: 60_000,
   });
 
-  const stats = useMemo<ProfileStats>(() => {
+  console.log('[useProfileStats] query state:', {
+    isLoading: query.isLoading,
+    isError: query.isError,
+    error: query.error?.message,
+    dataExists: !!query.data,
+    entriesInData: query.data?.entries?.length ?? 0,
+  });
+
+  const { stats, filteredEntries } = useMemo(() => {
     const empty: ProfileStats = {
       concerts: 0,
       festivals: 0,
@@ -136,9 +190,8 @@ export function useProfileStats(
       bestYear: null,
     };
 
-    if (!query.data) return empty;
+    if (!query.data) return { stats: empty, filteredEntries: [] };
 
-    // Filtrar por periodo
     let entries = query.data.entries;
     if (period === 'year') {
       const yearStart = new Date(`${year}-01-01T00:00:00Z`).getTime();
@@ -152,25 +205,31 @@ export function useProfileStats(
     const concertEntries = entries.filter((e) => e.kind === 'concert');
     const festivalEntries = entries.filter((e) => e.kind === 'festival');
 
-    // Ciudades únicas (conciertos + festivales)
     const cities = new Set(entries.map((e) => e.city).filter((c): c is string => !!c));
 
-    // Bandas únicas + frecuencia (conciertos + festivales)
-    const bandFreq = new Map<string, { name: string; count: number }>();
+    const bandFreq = new Map<
+      string,
+      { id: string; name: string; image_url: string | null; count: number }
+    >();
     entries.forEach((e) => {
       e.bands.forEach((b) => {
         const existing = bandFreq.get(b.id);
         if (existing) existing.count++;
-        else bandFreq.set(b.id, { name: b.name, count: 1 });
+        else
+          bandFreq.set(b.id, {
+            id: b.id,
+            name: b.name,
+            image_url: b.image_url,
+            count: 1,
+          });
       });
     });
 
-    let topBand: { name: string; count: number } | null = null;
+    let topBand: ProfileStats['topBand'] = null;
     bandFreq.forEach((b) => {
       if (!topBand || b.count > topBand.count) topBand = b;
     });
 
-    // Géneros (sumando todas las apariciones)
     const genreFreq = new Map<string, number>();
     entries.forEach((e) => {
       e.bands.forEach((b) => {
@@ -188,7 +247,6 @@ export function useProfileStats(
       }
     });
 
-    // Km recorridos (suma de conciertos + festivales)
     let km = 0;
     if (query.data.homeLat != null && query.data.homeLng != null) {
       entries.forEach((e) => {
@@ -198,7 +256,6 @@ export function useProfileStats(
       });
     }
 
-    // Mejor año (solo en modo all)
     let bestYear: { year: number; count: number } | null = null;
     if (period === 'all') {
       const yearFreq = new Map<number, number>();
@@ -212,19 +269,25 @@ export function useProfileStats(
     }
 
     return {
-      concerts: concertEntries.length,
-      festivals: festivalEntries.length,
-      bands: bandFreq.size,
-      cities: cities.size,
-      km: Math.round(km),
-      topBand,
-      topGenre,
-      bestYear,
+      stats: {
+        concerts: concertEntries.length,
+        festivals: festivalEntries.length,
+        bands: bandFreq.size,
+        cities: cities.size,
+        km: Math.round(km),
+        topBand,
+        topGenre,
+        bestYear,
+      },
+      filteredEntries: entries,
     };
   }, [query.data, period, year]);
 
   return {
     stats,
+    entries: filteredEntries,
+    homeLat: query.data?.homeLat ?? null,
+    homeLng: query.data?.homeLng ?? null,
     loading: query.isLoading,
   };
 }

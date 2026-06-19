@@ -365,6 +365,25 @@
     "eventTitle": "Concierto: {{band}}",
     "eventNotes": "Cartel completo: {{lineup}}"
   },
+  "statsDetail": {
+    "titleConcerts": "Conciertos asistidos",
+    "titleFestivals": "Festivales asistidos",
+    "titleBands": "Bandas vistas",
+    "titleCities": "Ciudades visitadas",
+    "titleKm": "Km recorridos",
+    "titleTopBand": "Top bandas más vistas",
+    "titleTopGenre": "Géneros principales",
+    "titleBestYear": "Mejor año",
+    "noData": "Sin datos para mostrar",
+    "appearanceCount_one": "{{count}} aparición",
+    "appearanceCount_other": "{{count}} apariciones",
+    "cityConcerts_one": "{{count}} concierto",
+    "cityConcerts_other": "{{count}} conciertos",
+    "cityFestivals_one": "{{count}} festival",
+    "cityFestivals_other": "{{count}} festivales",
+    "bestYearEvents_one": "{{count}} evento",
+    "bestYearEvents_other": "{{count}} eventos"
+  },
   "settings": {
     "title": "Configuración",
     "locationCategory": "UBICACIÓN",

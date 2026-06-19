@@ -9,11 +9,13 @@ import { useAuth } from '../hooks/useAuth';
 import { useProfileStats, StatsPeriod } from '../hooks/useProfileStats';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Button, Text } from '../components/ui';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { ProfileStackParamList } from '../navigation/ProfileStack';
 
 export default function ProfileScreen() {
   const queryClient = useQueryClient();
   const { t, i18n } = useTranslation();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const { session } = useAuth();
 
   const [statsPeriod, setStatsPeriod] = useState<StatsPeriod>('year');
@@ -113,32 +115,89 @@ export default function ProfileScreen() {
               icon="musical-notes"
               value={stats.concerts.toString()}
               label={t('profile.statConcerts')}
+              onPress={() =>
+                navigation.navigate('StatsDetail', {
+                  kind: 'concerts',
+                  period: statsPeriod,
+                  year: currentYear,
+                })
+              }
             />
             <StatRow
               icon="flame"
               value={stats.festivals.toString()}
               label={t('profile.statFestivals')}
+              onPress={() =>
+                navigation.navigate('StatsDetail', {
+                  kind: 'festivals',
+                  period: statsPeriod,
+                  year: currentYear,
+                })
+              }
             />
-            <StatRow icon="people" value={stats.bands.toString()} label={t('profile.statBands')} />
+            <StatRow
+              icon="people"
+              value={stats.bands.toString()}
+              label={t('profile.statBands')}
+              onPress={() =>
+                navigation.navigate('StatsDetail', {
+                  kind: 'bands',
+                  period: statsPeriod,
+                  year: currentYear,
+                })
+              }
+            />
             <StatRow
               icon="location"
               value={stats.cities.toString()}
               label={t('profile.statCities')}
+              onPress={() =>
+                navigation.navigate('StatsDetail', {
+                  kind: 'cities',
+                  period: statsPeriod,
+                  year: currentYear,
+                })
+              }
             />
             <StatRow
               icon="car"
               value={`${stats.km.toLocaleString(i18n.language)} km`}
               label={t('profile.statKm')}
+              onPress={() =>
+                navigation.navigate('StatsDetail', {
+                  kind: 'km',
+                  period: statsPeriod,
+                  year: currentYear,
+                })
+              }
             />
             {stats.topBand && (
               <StatRow
                 icon="heart"
                 value={`${stats.topBand.name} (${stats.topBand.count}x)`}
                 label={t('profile.statTopBand')}
+                onPress={() =>
+                  navigation.navigate('StatsDetail', {
+                    kind: 'topBand',
+                    period: statsPeriod,
+                    year: currentYear,
+                  })
+                }
               />
             )}
             {stats.topGenre && (
-              <StatRow icon="disc" value={stats.topGenre} label={t('profile.statTopGenre')} />
+              <StatRow
+                icon="disc"
+                value={stats.topGenre}
+                label={t('profile.statTopGenre')}
+                onPress={() =>
+                  navigation.navigate('StatsDetail', {
+                    kind: 'topGenre',
+                    period: statsPeriod,
+                    year: currentYear,
+                  })
+                }
+              />
             )}
             {statsPeriod === 'all' && stats.bestYear && (
               <StatRow
@@ -146,6 +205,13 @@ export default function ProfileScreen() {
                 value={`${stats.bestYear.year} (${stats.bestYear.count})`}
                 label={t('profile.statBestYear')}
                 isLast
+                onPress={() =>
+                  navigation.navigate('StatsDetail', {
+                    kind: 'bestYear',
+                    period: statsPeriod,
+                    year: currentYear,
+                  })
+                }
               />
             )}
           </View>
@@ -188,14 +254,16 @@ function StatRow({
   value,
   label,
   isLast,
+  onPress,
 }: {
   icon: any;
   value: string;
   label: string;
   isLast?: boolean;
+  onPress?: () => void;
 }) {
-  return (
-    <View style={[styles.statRow, isLast && { borderBottomWidth: 0 }]}>
+  const content = (
+    <>
       <View style={styles.statIconCircle}>
         <Ionicons name={icon} size={16} color={colors.bloodBright} />
       </View>
@@ -215,8 +283,25 @@ function StatRow({
       >
         {value}
       </Text>
-    </View>
+      {onPress && (
+        <Ionicons name="chevron-forward" size={16} color={colors.muted} style={{ marginLeft: 8 }} />
+      )}
+    </>
   );
+
+  if (onPress) {
+    return (
+      <TouchableOpacity
+        style={[styles.statRow, isLast && { borderBottomWidth: 0 }]}
+        onPress={onPress}
+        activeOpacity={0.7}
+      >
+        {content}
+      </TouchableOpacity>
+    );
+  }
+
+  return <View style={[styles.statRow, isLast && { borderBottomWidth: 0 }]}>{content}</View>;
 }
 
 const styles = StyleSheet.create({

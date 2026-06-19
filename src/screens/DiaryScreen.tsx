@@ -72,9 +72,39 @@ export default function DiaryScreen() {
 
       {/* Stats strip */}
       <View style={styles.statsStrip}>
-        <StatCard value={stats.shows.toString()} label={t('diary.statShows')} accent />
-        <StatCard value={stats.bands.toString()} label={t('diary.statBands')} />
-        <StatCard value={CURRENT_YEAR.toString()} label={t('diary.statYear')} />
+        <StatCard
+          value={stats.shows.toString()}
+          label={t('diary.statShows')}
+          accent
+          onPress={() =>
+            navigation.navigate('StatsDetail', {
+              kind: 'concerts',
+              period: 'year',
+              year: CURRENT_YEAR,
+            })
+          }
+        />
+        <StatCard
+          value={stats.bands.toString()}
+          label={t('diary.statBands')}
+          onPress={() =>
+            navigation.navigate('StatsDetail', {
+              kind: 'bands',
+              period: 'year',
+              year: CURRENT_YEAR,
+            })
+          }
+        />
+        <StatCard
+          value={CURRENT_YEAR.toString()}
+          label={t('diary.statYear')}
+          onPress={() =>
+            navigation.navigate('StatsDetail', {
+              kind: 'bestYear',
+              period: 'all',
+            })
+          }
+        />
       </View>
 
       <View style={styles.tabsRow}>
@@ -175,9 +205,19 @@ export default function DiaryScreen() {
   );
 }
 
-function StatCard({ value, label, accent }: { value: string; label: string; accent?: boolean }) {
-  return (
-    <View style={styles.statCard}>
+function StatCard({
+  value,
+  label,
+  accent,
+  onPress,
+}: {
+  value: string;
+  label: string;
+  accent?: boolean;
+  onPress?: () => void;
+}) {
+  const content = (
+    <>
       <Text
         style={{
           fontFamily: fontFamily.displayBold,
@@ -191,8 +231,18 @@ function StatCard({ value, label, accent }: { value: string; label: string; acce
       <Text variant="monoSM" color="muted" style={{ marginTop: 4 }}>
         {label}
       </Text>
-    </View>
+    </>
   );
+
+  if (onPress) {
+    return (
+      <TouchableOpacity style={styles.statCard} onPress={onPress} activeOpacity={0.7}>
+        {content}
+      </TouchableOpacity>
+    );
+  }
+
+  return <View style={styles.statCard}>{content}</View>;
 }
 
 function TabPill({

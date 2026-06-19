@@ -6,12 +6,15 @@ import ConcertDetailScreen from '../screens/ConcertDetailScreen';
 import FestivalDetailScreen from '../screens/FestivalDetailScreen';
 import BandDetailScreen from '../screens/BandDetailScreen';
 import { colors, fontFamily } from '../theme';
+import StatsDetailScreen from '../screens/StatsDetailScreen';
+import { StatsDetailParams } from '../screens/StatsDetailScreen';
 
 export type DiaryStackParamList = {
   DiaryHome: undefined;
   ConcertDetail: { concertId: string };
   FestivalDetail: { festivalId: string };
   BandDetail: { bandId: string };
+  StatsDetail: StatsDetailParams;
 };
 
 const Stack = createNativeStackNavigator<DiaryStackParamList>();
@@ -62,6 +65,11 @@ export default function DiaryStack() {
         options={{
           headerShown: false,
         }}
+      />
+      <Stack.Screen
+        name="StatsDetail"
+        component={StatsDetailScreen}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );
