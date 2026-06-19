@@ -33,7 +33,7 @@ export default function RadarStack() {
         name="BandDetail"
         component={BandDetailScreen}
         options={{
-          title: '',
+          headerShown: false,
         }}
       />
     </Stack.Navigator>

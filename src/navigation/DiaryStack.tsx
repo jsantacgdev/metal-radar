@@ -49,21 +49,18 @@ export default function DiaryStack() {
       <Stack.Screen
         name="ConcertDetail"
         component={ConcertDetailScreen}
-        options={{ title: t('navigation.concert') }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="FestivalDetail"
         component={FestivalDetailScreen}
-        options={{ title: '' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="BandDetail"
         component={BandDetailScreen}
         options={{
-          title: '',
-          headerTransparent: true,
-          headerBackVisible: true,
-          headerTintColor: colors.bright,
+          headerShown: false,
         }}
       />
     </Stack.Navigator>

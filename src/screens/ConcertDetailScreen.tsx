@@ -11,6 +11,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useTranslation } from 'react-i18next';
+import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useConcert } from '../hooks/useConcert';
 import { MapStackParamList } from '../navigation/MapStack';
 import { colors, fontFamily, radius, spacing } from '../theme';
@@ -25,29 +27,65 @@ import ConcertDetailSkeleton from '../components/skeletons/ConcertDetailSkeleton
 
 type Props = NativeStackScreenProps<MapStackParamList, 'ConcertDetail'>;
 
-const HERO_HEIGHT = 180;
+const HERO_MAX_HEIGHT = 200;
+const HERO_MIN_HEIGHT = 0;
+const HERO_SCROLL_DISTANCE = HERO_MAX_HEIGHT - HERO_MIN_HEIGHT;
+const HEADER_HEIGHT = 0;
 
 export default function ConcertDetailScreen({ route }: Props) {
   const { t, i18n } = useTranslation();
   const { concertId } = route.params;
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
+
   const { concert, loading, error, updateStatus, updateRating, updateNotes } =
     useConcert(concertId);
 
   const { data: setlists = [] } = useSetlists(concert ? concert.id : null);
 
   const scrollY = useRef(new Animated.Value(0)).current;
+  const titleOpacity = useRef(new Animated.Value(0)).current;
 
-  const heroTranslateY = scrollY.interpolate({
-    inputRange: [-HERO_HEIGHT, 0, HERO_HEIGHT],
-    outputRange: [0, 0, -HERO_HEIGHT * 0.5],
-    extrapolateRight: 'clamp',
+  const heroHeight = scrollY.interpolate({
+    inputRange: [0, HERO_SCROLL_DISTANCE],
+    outputRange: [HERO_MAX_HEIGHT, HERO_MIN_HEIGHT],
+    extrapolate: 'clamp',
   });
 
-  const heroScale = scrollY.interpolate({
-    inputRange: [-HERO_HEIGHT, 0, HERO_HEIGHT],
-    outputRange: [1.3, 1, 1],
-    extrapolateRight: 'clamp',
+  const heroContentOpacity = scrollY.interpolate({
+    inputRange: [0, HERO_SCROLL_DISTANCE * 0.5, HERO_SCROLL_DISTANCE],
+    outputRange: [1, 0.5, 0],
+    extrapolate: 'clamp',
   });
+
+  const imageScale = scrollY.interpolate({
+    inputRange: [0, HERO_SCROLL_DISTANCE],
+    outputRange: [1, 0.4],
+    extrapolate: 'clamp',
+  });
+
+  const imageTranslateY = scrollY.interpolate({
+    inputRange: [0, HERO_SCROLL_DISTANCE],
+    outputRange: [0, -40],
+    extrapolate: 'clamp',
+  });
+
+  const headerBgOpacity = scrollY.interpolate({
+    inputRange: [HERO_SCROLL_DISTANCE * 0.4, HERO_SCROLL_DISTANCE],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+
+  useEffect(() => {
+    const id = scrollY.addListener(({ value }) => {
+      const opacity = Math.min(
+        Math.max((value - HERO_SCROLL_DISTANCE * 0.6) / (HERO_SCROLL_DISTANCE * 0.4), 0),
+        1,
+      );
+      titleOpacity.setValue(opacity);
+    });
+    return () => scrollY.removeListener(id);
+  }, [scrollY, titleOpacity]);
 
   if (loading) {
     return (
@@ -68,7 +106,6 @@ export default function ConcertDetailScreen({ route }: Props) {
   }
 
   const isAttended = concert.userStatus === 'attended';
-
   const locale = localeFromI18n(i18n.language);
   const dateObj = new Date(concert.event_date);
   const month = dateObj
@@ -85,12 +122,14 @@ export default function ConcertDetailScreen({ route }: Props) {
   const timeStr = dateObj.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
   const isPast = dateObj.getTime() < Date.now();
 
+  const headliner = concert.bands.find((b) => b.is_headliner) ?? concert.bands[0];
+  const headerTitle = headliner?.name ?? t('concertDetail.noBand');
+
   const openTickets = () => {
     if (concert.ticket_url) Linking.openURL(concert.ticket_url);
   };
 
   const handleShare = async () => {
-    const headliner = concert.bands.find((b) => b.is_headliner) ?? concert.bands[0];
     const bandName = headliner?.name ?? t('concertDetail.noBand');
     const dateText = dateObj.toLocaleDateString(locale, {
       day: 'numeric',
@@ -114,9 +153,7 @@ export default function ConcertDetailScreen({ route }: Props) {
   };
 
   const handleAddToCalendar = async () => {
-    const headliner = concert.bands.find((b) => b.is_headliner) ?? concert.bands[0];
     const bandName = headliner?.name ?? t('concertDetail.noBand');
-
     const title = t('calendar.eventTitle', { band: bandName });
     const location = [concert.venue.name, concert.venue.city, concert.venue.country]
       .filter(Boolean)
@@ -141,35 +178,82 @@ export default function ConcertDetailScreen({ route }: Props) {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.ink }}>
-      <Animated.ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 140 }}
-        keyboardShouldPersistTaps="handled"
-        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-          useNativeDriver: true,
-        })}
-        scrollEventThrottle={16}
+      {/* Header custom compacto */}
+      <View
+        style={[
+          styles.customHeader,
+          {
+            paddingTop: insets.top,
+            height: 40 + insets.top,
+          },
+        ]}
+      >
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+          hitSlop={10}
+        >
+          <Ionicons name="arrow-back" size={22} color={colors.bright} />
+        </TouchableOpacity>
+        <Animated.Text
+          style={[styles.customHeaderTitle, { opacity: titleOpacity }]}
+          numberOfLines={1}
+        >
+          {headerTitle}
+        </Animated.Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      {/* HERO COLAPSABLE FIJO ARRIBA */}
+      <Animated.View
+        style={[
+          styles.heroContainer,
+          {
+            top: HEADER_HEIGHT + insets.top,
+            height: heroHeight,
+          },
+        ]}
       >
         <Animated.View
           style={[
-            styles.hero,
+            StyleSheet.absoluteFillObject,
             {
-              transform: [{ translateY: heroTranslateY }, { scale: heroScale }],
+              backgroundColor: colors.ink,
+              opacity: headerBgOpacity,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.line,
             },
           ]}
+        />
+
+        <Animated.View
+          style={[styles.heroContent, { opacity: heroContentOpacity }]}
+          pointerEvents="none"
         >
-          <BandImage
-            url={concert.bands[0]?.image_url ?? null}
-            size={140}
-            radiusOverride={radius.lg}
-            showTag={!concert.bands[0]?.image_url}
-          />
+          <Animated.View
+            style={{
+              transform: [{ scale: imageScale }, { translateY: imageTranslateY }],
+            }}
+          >
+            <BandImage
+              url={concert.bands[0]?.image_url ?? null}
+              size={130}
+              radiusOverride={radius.lg}
+              showTag={!concert.bands[0]?.image_url}
+            />
+          </Animated.View>
           <View style={styles.heroText}>
             <Text variant="monoMD" color="bloodBright">
               {isPast ? t('concertDetail.pastConcert') : t('concertDetail.upcomingConcert')}
             </Text>
-            <Text variant="displayLG" style={{ marginTop: spacing.sm }} numberOfLines={2}>
-              {concert.bands[0]?.name ?? t('concertDetail.noBand')}
+            <Text
+              variant="displayLG"
+              style={{ marginTop: spacing.sm }}
+              numberOfLines={2}
+              adjustsFontSizeToFit
+              minimumFontScale={0.6}
+            >
+              {headerTitle}
             </Text>
             {concert.bands.length > 1 && (
               <Text variant="monoSM" color="silver" style={{ marginTop: 6 }} numberOfLines={1}>
@@ -178,7 +262,21 @@ export default function ConcertDetailScreen({ route }: Props) {
             )}
           </View>
         </Animated.View>
+      </Animated.View>
 
+      {/* SCROLLABLE CONTENT */}
+      <Animated.ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          paddingTop: HERO_MAX_HEIGHT + HEADER_HEIGHT + insets.top,
+          paddingBottom: 140,
+        }}
+        keyboardShouldPersistTaps="handled"
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+          useNativeDriver: false,
+        })}
+        scrollEventThrottle={16}
+      >
         <View style={styles.metaStrip}>
           <View style={styles.dateBox}>
             <Text
@@ -274,10 +372,8 @@ export default function ConcertDetailScreen({ route }: Props) {
           </Section>
         )}
 
-        {/* Setlists - SIEMPRE visibles. Si no hay datos en BD, el componente muestra el botón "BUSCAR" */}
         <View style={{ paddingHorizontal: spacing.xl }}>
           {(() => {
-            const headliner = concert.bands.find((b) => b.is_headliner) ?? concert.bands[0];
             if (!headliner) return null;
             const setlist = setlists.find((s) => s.band_id === headliner.id) ?? null;
             return (
@@ -292,7 +388,6 @@ export default function ConcertDetailScreen({ route }: Props) {
           })()}
         </View>
 
-        {/* Rating, notes y fotos solo para conciertos a los que asististe */}
         {isAttended && concert.userConcertId && (
           <>
             <Section title={t('concertDetail.ratingTitle')}>
@@ -502,11 +597,48 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.xl,
   },
-  hero: {
+  customHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: spacing.md,
+    paddingBottom: 6,
+    backgroundColor: colors.ink,
+    zIndex: 100,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.line,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  customHeaderTitle: {
+    flex: 1,
+    textAlign: 'center',
+    color: colors.bright,
+    fontFamily: fontFamily.displayBold,
+    fontSize: 18,
+    letterSpacing: 0.5,
+  },
+  heroContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    overflow: 'hidden',
+    backgroundColor: colors.ink,
+    zIndex: 10,
+  },
+  heroContent: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.xl,
     gap: spacing.lg,
+    flex: 1,
   },
   heroText: {
     flex: 1,

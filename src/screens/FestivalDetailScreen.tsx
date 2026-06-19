@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFestival } from '../hooks/useFestival';
 import { MapStackParamList } from '../navigation/MapStack';
 import { colors, fontFamily, radius, spacing } from '../theme';
@@ -24,7 +25,10 @@ import FestivalDetailSkeleton from '../components/skeletons/FestivalDetailSkelet
 
 type RouteParams = RouteProp<MapStackParamList, 'FestivalDetail'>;
 
-const HERO_HEIGHT = 280;
+const HERO_MAX_HEIGHT = 280;
+const HERO_MIN_HEIGHT = 0;
+const HERO_SCROLL_DISTANCE = HERO_MAX_HEIGHT - HERO_MIN_HEIGHT;
+const HEADER_HEIGHT = 0;
 
 function formatDateRange(
   start: string,
@@ -55,6 +59,8 @@ export default function FestivalDetailScreen() {
   const route = useRoute<RouteParams>();
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { t, i18n } = useTranslation();
+  const insets = useSafeAreaInsets();
+
   const { festival, loading, error, updateStatus, updateRating, updateNotes } = useFestival(
     route.params.festivalId,
   );
@@ -62,18 +68,36 @@ export default function FestivalDetailScreen() {
   const locale = localeFromI18n(i18n.language);
 
   const scrollY = useRef(new Animated.Value(0)).current;
+  const titleOpacity = useRef(new Animated.Value(0)).current;
 
-  const heroTranslateY = scrollY.interpolate({
-    inputRange: [-HERO_HEIGHT, 0, HERO_HEIGHT],
-    outputRange: [0, 0, -HERO_HEIGHT * 0.5],
-    extrapolateRight: 'clamp',
+  const heroHeight = scrollY.interpolate({
+    inputRange: [0, HERO_SCROLL_DISTANCE],
+    outputRange: [HERO_MAX_HEIGHT, HERO_MIN_HEIGHT],
+    extrapolate: 'clamp',
+  });
+
+  const heroContentOpacity = scrollY.interpolate({
+    inputRange: [0, HERO_SCROLL_DISTANCE * 0.5, HERO_SCROLL_DISTANCE],
+    outputRange: [1, 0.5, 0],
+    extrapolate: 'clamp',
   });
 
   const heroScale = scrollY.interpolate({
-    inputRange: [-HERO_HEIGHT, 0, HERO_HEIGHT],
-    outputRange: [1.5, 1, 1],
+    inputRange: [-HERO_MAX_HEIGHT, 0, HERO_SCROLL_DISTANCE],
+    outputRange: [1.3, 1, 0.85],
     extrapolateRight: 'clamp',
   });
+
+  useEffect(() => {
+    const id = scrollY.addListener(({ value }) => {
+      const opacity = Math.min(
+        Math.max((value - HERO_SCROLL_DISTANCE * 0.6) / (HERO_SCROLL_DISTANCE * 0.4), 0),
+        1,
+      );
+      titleOpacity.setValue(opacity);
+    });
+    return () => scrollY.removeListener(id);
+  }, [scrollY, titleOpacity]);
 
   const dateInfo = useMemo(() => {
     if (!festival) return null;
@@ -119,62 +143,96 @@ export default function FestivalDetailScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.ink }}>
+      {/* Header custom compacto */}
+      <View
+        style={[
+          styles.customHeader,
+          {
+            paddingTop: insets.top,
+            height: 40 + insets.top,
+          },
+        ]}
+      >
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+          hitSlop={10}
+        >
+          <Ionicons name="arrow-back" size={22} color={colors.bright} />
+        </TouchableOpacity>
+        <Animated.Text
+          style={[styles.customHeaderTitle, { opacity: titleOpacity }]}
+          numberOfLines={1}
+        >
+          {festival.name}
+        </Animated.Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      {/* HERO COLAPSABLE */}
+      <Animated.View
+        style={[
+          styles.heroContainer,
+          {
+            top: HEADER_HEIGHT + insets.top,
+            height: heroHeight,
+            opacity: heroContentOpacity,
+            transform: [{ scale: heroScale }],
+          },
+        ]}
+      >
+        {festival.image_url ? (
+          <Image source={{ uri: festival.image_url }} style={styles.heroImage} />
+        ) : (
+          <View style={[styles.heroImage, styles.heroPlaceholder]}>
+            <View style={styles.placeholderCircle}>
+              <Text
+                style={{
+                  fontFamily: fontFamily.displayBold,
+                  fontSize: 56,
+                  color: colors.bloodBright,
+                  lineHeight: 64,
+                }}
+              >
+                {festival.name.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+            <Ionicons
+              name="flame"
+              size={20}
+              color={colors.bloodBright}
+              style={{ marginTop: spacing.md, opacity: 0.6 }}
+            />
+          </View>
+        )}
+
+        <LinearGradient
+          colors={['transparent', 'rgba(10,10,12,0.4)', colors.ink]}
+          locations={[0.2, 0.6, 1]}
+          style={styles.heroGradient}
+          pointerEvents="none"
+        />
+
+        <View style={styles.festivalBadge}>
+          <Ionicons name="flame" size={12} color={colors.bloodBright} />
+          <Text variant="monoSM" color="bloodBright" style={{ marginLeft: 4 }}>
+            {isPast ? t('festivalDetail.badgePast') : t('festivalDetail.badgeUpcoming')}
+          </Text>
+        </View>
+      </Animated.View>
+
+      {/* SCROLLABLE CONTENT */}
       <Animated.ScrollView
-        contentContainerStyle={{ paddingBottom: ctaUrl ? 120 : spacing.xxxl }}
+        contentContainerStyle={{
+          paddingTop: HERO_MAX_HEIGHT + HEADER_HEIGHT + insets.top,
+          paddingBottom: ctaUrl ? 120 : spacing.xxxl,
+        }}
         showsVerticalScrollIndicator={false}
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-          useNativeDriver: true,
+          useNativeDriver: false,
         })}
         scrollEventThrottle={16}
       >
-        <Animated.View
-          style={[
-            styles.hero,
-            {
-              transform: [{ translateY: heroTranslateY }, { scale: heroScale }],
-            },
-          ]}
-        >
-          {festival.image_url ? (
-            <Image source={{ uri: festival.image_url }} style={styles.heroImage} />
-          ) : (
-            <View style={[styles.heroImage, styles.heroPlaceholder]}>
-              <View style={styles.placeholderCircle}>
-                <Text
-                  style={{
-                    fontFamily: fontFamily.displayBold,
-                    fontSize: 56,
-                    color: colors.bloodBright,
-                    lineHeight: 64,
-                  }}
-                >
-                  {festival.name.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-              <Ionicons
-                name="flame"
-                size={20}
-                color={colors.bloodBright}
-                style={{ marginTop: spacing.md, opacity: 0.6 }}
-              />
-            </View>
-          )}
-
-          <LinearGradient
-            colors={['transparent', 'rgba(10,10,12,0.4)', colors.ink]}
-            locations={[0.2, 0.6, 1]}
-            style={styles.heroGradient}
-            pointerEvents="none"
-          />
-
-          <View style={styles.festivalBadge}>
-            <Ionicons name="flame" size={12} color={colors.bloodBright} />
-            <Text variant="monoSM" color="bloodBright" style={{ marginLeft: 4 }}>
-              {isPast ? t('festivalDetail.badgePast') : t('festivalDetail.badgeUpcoming')}
-            </Text>
-          </View>
-        </Animated.View>
-
         <View style={styles.content}>
           <Text variant="displayLG" style={{ marginBottom: spacing.sm }}>
             {festival.name}
@@ -528,12 +586,41 @@ const styles = StyleSheet.create({
     backgroundColor: colors.ink,
     padding: spacing.xl,
   },
-  hero: {
-    width: '100%',
-    height: HERO_HEIGHT,
-    position: 'relative',
+  customHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: spacing.md,
+    paddingBottom: 6,
+    backgroundColor: colors.ink,
+    zIndex: 100,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.line,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  customHeaderTitle: {
+    flex: 1,
+    textAlign: 'center',
+    color: colors.bright,
+    fontFamily: fontFamily.displayBold,
+    fontSize: 18,
+    letterSpacing: 0.5,
+  },
+  heroContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
     overflow: 'hidden',
     backgroundColor: colors.ink,
+    zIndex: 10,
   },
   heroImage: {
     width: '100%',

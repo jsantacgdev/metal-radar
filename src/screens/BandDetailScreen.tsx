@@ -27,8 +27,9 @@ import { useNavigation } from '@react-navigation/native';
 type Props = NativeStackScreenProps<RadarStackParamList, 'BandDetail'>;
 
 const HERO_MAX_HEIGHT = 220;
-const HERO_MIN_HEIGHT = 60;
+const HERO_MIN_HEIGHT = 0;
 const HERO_SCROLL_DISTANCE = HERO_MAX_HEIGHT - HERO_MIN_HEIGHT;
+const HEADER_HEIGHT = 10;
 
 async function fetchBandBasics(bandId: string) {
   const { data, error } = await supabase
@@ -152,32 +153,38 @@ export default function BandDetailScreen({ route }: Props) {
   const bandName = info?.name ?? basics?.name ?? '...';
   const bandImage = info?.image_url ?? basics?.image_url ?? null;
 
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerTitle: () => (
+  return (
+    <View style={styles.container}>
+      <View
+        style={[
+          styles.customHeader,
+          {
+            paddingTop: insets.top,
+            height: 40 + insets.top,
+          },
+        ]}
+      >
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+          hitSlop={10}
+        >
+          <Ionicons name="arrow-back" size={22} color={colors.bright} />
+        </TouchableOpacity>
         <Animated.Text
-          style={{
-            opacity: titleOpacity,
-            color: colors.bright,
-            fontFamily: fontFamily.displayBold,
-            fontSize: 20,
-            // letterSpacing: 0.5,
-          }}
+          style={[styles.customHeaderTitle, { opacity: titleOpacity }]}
           numberOfLines={1}
         >
           {bandName}
         </Animated.Text>
-      ),
-    });
-  }, [navigation, bandName, titleOpacity]);
-
-  return (
-    <View style={styles.container}>
+        <View style={{ width: 40 }} />
+      </View>
       {/* HERO COLAPSABLE FIJO ARRIBA */}
       <Animated.View
         style={[
           styles.heroContainer,
           {
+            top: HEADER_HEIGHT + insets.top,
             height: heroHeight,
           },
         ]}
@@ -233,7 +240,7 @@ export default function BandDetailScreen({ route }: Props) {
       <Animated.ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{
-          paddingTop: HERO_MAX_HEIGHT,
+          paddingTop: HERO_MAX_HEIGHT + HEADER_HEIGHT + insets.top,
           paddingBottom: spacing.xxxl,
         }}
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
@@ -535,5 +542,33 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: radius.full,
     backgroundColor: colors.faint,
+  },
+  customHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: spacing.md,
+    paddingBottom: 6,
+    backgroundColor: colors.ink,
+    zIndex: 100,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.line,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  customHeaderTitle: {
+    flex: 1,
+    textAlign: 'center',
+    color: colors.bright,
+    fontFamily: fontFamily.displayBold,
+    fontSize: 18,
+    letterSpacing: 0.5,
   },
 });

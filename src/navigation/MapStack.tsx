@@ -36,18 +36,18 @@ export default function MapStack() {
       <Stack.Screen
         name="ConcertDetail"
         component={ConcertDetailScreen}
-        options={{ headerTitle: '' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="FestivalDetail"
         component={FestivalDetailScreen}
-        options={{ headerTitle: '' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="BandDetail"
         component={BandDetailScreen}
         options={{
-          title: '',
+          headerShown: false,
         }}
       />
     </Stack.Navigator>
