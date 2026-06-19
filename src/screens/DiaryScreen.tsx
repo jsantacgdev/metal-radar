@@ -78,7 +78,7 @@ export default function DiaryScreen() {
           accent
           onPress={() =>
             navigation.navigate('StatsDetail', {
-              kind: 'concerts',
+              kind: 'events',
               period: 'year',
               year: CURRENT_YEAR,
             })

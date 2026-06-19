@@ -12,6 +12,7 @@ import BandImage from '../components/BandImage';
 import { localeFromI18n } from '../i18n';
 
 export type StatsDetailKind =
+  | 'events'
   | 'concerts'
   | 'festivals'
   | 'bands'
@@ -69,6 +70,8 @@ export default function StatsDetailScreen() {
 
   const title = useMemo(() => {
     switch (kind) {
+      case 'events':
+        return t('statsDetail.titleEvents');
       case 'concerts':
         return t('statsDetail.titleConcerts');
       case 'festivals':
@@ -158,6 +161,9 @@ function ContentByKind({
   navigation: NativeStackNavigationProp<any>;
   t: (k: string, opts?: any) => string;
 }) {
+  if (kind === 'events') {
+    return <EventList entries={entries} navigation={navigation} locale={locale} t={t} />;
+  }
   if (kind === 'concerts' || kind === 'festivals') {
     const filtered = entries.filter(
       (e) => e.kind === (kind === 'concerts' ? 'concert' : 'festival'),
@@ -346,15 +352,14 @@ function ContentByKind({
           <Text
             style={{
               fontFamily: fontFamily.displayBold,
-              fontSize: 48,
+              fontSize: 56,
+              lineHeight: 68,
               color: colors.bloodBright,
               letterSpacing: -1,
+              paddingVertical: 4,
             }}
           >
             {stats.bestYear.year}
-          </Text>
-          <Text variant="monoMD" color="muted" style={{ marginTop: spacing.sm }}>
-            {t('statsDetail.bestYearEvents', { count: stats.bestYear.count })}
           </Text>
         </View>
         <EventList entries={ofThatYear} navigation={navigation} locale={locale} t={t} />
@@ -602,6 +607,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xxxl,
   },
+
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -632,7 +638,7 @@ const styles = StyleSheet.create({
   },
   yearBanner: {
     alignItems: 'center',
-    paddingVertical: spacing.xl,
+    paddingVertical: spacing.xxl,
     paddingHorizontal: spacing.xl,
     borderBottomWidth: 1,
     borderBottomColor: colors.line,

@@ -382,7 +382,8 @@
     "cityFestivals_one": "{{count}} festival",
     "cityFestivals_other": "{{count}} festivales",
     "bestYearEvents_one": "{{count}} evento",
-    "bestYearEvents_other": "{{count}} eventos"
+    "bestYearEvents_other": "{{count}} eventos",
+    "titleEvents": "Eventos asistidos"
   },
   "settings": {
     "title": "Configuración",
