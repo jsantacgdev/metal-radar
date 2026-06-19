@@ -11,7 +11,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useTranslation } from 'react-i18next';
-import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useConcert } from '../hooks/useConcert';
 import { MapStackParamList } from '../navigation/MapStack';
@@ -24,6 +23,8 @@ import { useSetlists } from '../hooks/useSetlist';
 import { localeFromI18n } from '../i18n';
 import { addEventToCalendar } from '../lib/calendar';
 import ConcertDetailSkeleton from '../components/skeletons/ConcertDetailSkeleton';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 type Props = NativeStackScreenProps<MapStackParamList, 'ConcertDetail'>;
 
@@ -36,7 +37,7 @@ export default function ConcertDetailScreen({ route }: Props) {
   const { t, i18n } = useTranslation();
   const { concertId } = route.params;
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<MapStackParamList>>();
 
   const { concert, loading, error, updateStatus, updateRating, updateNotes } =
     useConcert(concertId);
@@ -357,9 +358,11 @@ export default function ConcertDetailScreen({ route }: Props) {
         {concert.bands.length > 0 && (
           <Section title={t('concertDetail.lineupTitle')}>
             {concert.bands.map((b, i) => (
-              <View
+              <TouchableOpacity
                 key={b.id}
                 style={[styles.bandRow, i === concert.bands.length - 1 && { borderBottomWidth: 0 }]}
+                onPress={() => navigation.navigate('BandDetail', { bandId: b.id })}
+                activeOpacity={0.7}
               >
                 <BandImage url={b.image_url} size={44} showTag={!b.image_url} />
                 <View style={{ flex: 1, marginLeft: spacing.md, minWidth: 0 }}>
@@ -367,7 +370,8 @@ export default function ConcertDetailScreen({ route }: Props) {
                     {b.name}
                   </Text>
                 </View>
-              </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+              </TouchableOpacity>
             ))}
           </Section>
         )}

@@ -296,7 +296,7 @@ function DiaryItem({
           <Text variant="displaySM" numberOfLines={1} style={{ flex: 1 }}>
             {entry.kind === 'festival' && entry.concert.festival_name
               ? entry.concert.festival_name
-              : entry.concert.bands.map((b) => b.name).join(' · ')}
+              : (entry.concert.bands[0]?.name ?? t('concertDetail.noBand'))}
           </Text>
           <Text variant="monoSM" color="muted" style={{ marginLeft: spacing.sm }}>
             {dateLabel}

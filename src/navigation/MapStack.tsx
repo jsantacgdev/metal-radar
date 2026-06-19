@@ -46,9 +46,7 @@ export default function MapStack() {
       <Stack.Screen
         name="BandDetail"
         component={BandDetailScreen}
-        options={{
-          headerShown: false,
-        }}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );

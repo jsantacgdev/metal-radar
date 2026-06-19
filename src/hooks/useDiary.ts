@@ -26,6 +26,7 @@ export type DiaryEntry = {
       id: string;
       name: string;
       image_url: string | null;
+      is_headliner: boolean;
     }[];
     festival_name?: string;
   };
@@ -37,7 +38,6 @@ async function fetchDiary(): Promise<DiaryEntry[]> {
   } = await supabase.auth.getUser();
   if (!user) throw new Error(i18n.t('errors.noSession'));
 
-  // Conciertos en paralelo con festivales
   const [concertsRes, festivalsRes] = await Promise.all([
     supabase
       .from('user_concerts')
@@ -47,7 +47,7 @@ async function fetchDiary(): Promise<DiaryEntry[]> {
         concert:concerts!inner (
           id, event_date,
           venue:venues!inner ( name, city, country, lat, lng ),
-          concert_bands ( band:bands ( id, name, image_url ) )
+          concert_bands ( is_headliner, band:bands ( id, name, image_url ) )
         )
       `,
       )
@@ -61,7 +61,7 @@ async function fetchDiary(): Promise<DiaryEntry[]> {
         festival:festivals!inner (
           id, name, start_date, image_url,
           venue:venues!inner ( name, city, country, lat, lng ),
-          festival_bands ( band:bands ( id, name, image_url ) )
+          festival_bands ( is_headliner, band:bands ( id, name, image_url ) )
         )
       `,
       )
@@ -71,6 +71,10 @@ async function fetchDiary(): Promise<DiaryEntry[]> {
 
   if (concertsRes.error) throw concertsRes.error;
   if (festivalsRes.error) throw festivalsRes.error;
+
+  const sortBands = (
+    bands: { id: string; name: string; image_url: string | null; is_headliner: boolean }[],
+  ) => bands.sort((a, b) => Number(b.is_headliner) - Number(a.is_headliner));
 
   const concertEntries: DiaryEntry[] = (concertsRes.data ?? []).map((row: any) => ({
     id: row.id,
@@ -85,13 +89,20 @@ async function fetchDiary(): Promise<DiaryEntry[]> {
       id: row.concert.id,
       event_date: row.concert.event_date,
       venue: row.concert.venue,
-      bands: row.concert.concert_bands.map((cb: any) => cb.band),
+      bands: sortBands(
+        (row.concert.concert_bands ?? []).map((cb: any) => ({
+          id: cb.band.id,
+          name: cb.band.name,
+          image_url: cb.band.image_url,
+          is_headliner: cb.is_headliner ?? false,
+        })),
+      ),
     },
   }));
 
   const festivalEntries: DiaryEntry[] = (festivalsRes.data ?? []).map((row: any) => ({
     id: row.id,
-    concert_id: row.festival_id, // reutilizamos el campo para navegación
+    concert_id: row.festival_id,
     status: row.status,
     rating: null,
     notes: null,
@@ -100,16 +111,21 @@ async function fetchDiary(): Promise<DiaryEntry[]> {
     kind: 'festival',
     concert: {
       id: row.festival.id,
-      // Los festivales tienen start_date como DATE puro, lo normalizamos a ISO
       event_date: `${row.festival.start_date}T00:00:00`,
       venue: row.festival.venue,
-      bands: (row.festival.festival_bands ?? []).map((fb: any) => fb.band),
+      bands: sortBands(
+        (row.festival.festival_bands ?? []).map((fb: any) => ({
+          id: fb.band.id,
+          name: fb.band.name,
+          image_url: fb.band.image_url,
+          is_headliner: fb.is_headliner ?? false,
+        })),
+      ),
       festival_name: row.festival.name,
       image_url: row.festival.image_url,
     },
   }));
 
-  // Combinar y ordenar por fecha del evento descendente (más recientes primero)
   return [...concertEntries, ...festivalEntries].sort(
     (a, b) => new Date(b.concert.event_date).getTime() - new Date(a.concert.event_date).getTime(),
   );

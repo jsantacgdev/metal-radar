@@ -52,7 +52,11 @@ export default function ProfileScreen() {
           <Text variant="monoMD" color="bloodBright">
             {t('profile.accountLabel')}
           </Text>
-          <Text variant="displaySM" numberOfLines={1} style={{ marginTop: 4 }}>
+          <Text
+            variant="displaySM"
+            numberOfLines={1}
+            style={{ marginTop: 4, lineHeight: 28, paddingBottom: 2 }}
+          >
             {session?.user.email ?? '—'}
           </Text>
         </View>
