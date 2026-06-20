@@ -16,22 +16,21 @@ type Props = {
 const FestivalPoster = forwardRef<View, Props>(({ data, userName }, ref) => {
   return (
     <View ref={ref} style={styles.poster} collapsable={false}>
-      {/* Esquinas decorativas */}
       <View style={[styles.cornerDecoration, styles.topLeft]} />
       <View style={[styles.cornerDecoration, styles.topRight]} />
       <View style={[styles.cornerDecoration, styles.bottomLeft]} />
       <View style={[styles.cornerDecoration, styles.bottomRight]} />
-
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.brandLine}>METAL RADAR PRESENTS</Text>
-        <Text style={styles.title}>MI {data.year}</Text>
+        <Text style={styles.title} numberOfLines={1}>
+          MI <Text style={styles.year}>{data.year}</Text>
+        </Text>
         <View style={styles.divider} />
         <Text style={styles.subtitle}>
           {data.totalShows} SHOWS · {data.totalBands} BANDS
         </Text>
       </View>
-
       {/* Headliners (top 3) */}
       <View style={styles.headlinersSection}>
         {data.headliners.map((b, i) => (
@@ -40,10 +39,8 @@ const FestivalPoster = forwardRef<View, Props>(({ data, userName }, ref) => {
           </Text>
         ))}
       </View>
-
       {/* Divider */}
       <View style={styles.bigDivider} />
-
       {/* Sub-headliners (4-9) */}
       {data.subHeadliners.length > 0 && (
         <View style={styles.subHeadlinerSection}>
@@ -52,7 +49,6 @@ const FestivalPoster = forwardRef<View, Props>(({ data, userName }, ref) => {
           </Text>
         </View>
       )}
-
       {/* Main lineup */}
       {data.mainLineup.length > 0 && (
         <>
@@ -64,7 +60,6 @@ const FestivalPoster = forwardRef<View, Props>(({ data, userName }, ref) => {
           </View>
         </>
       )}
-
       {/* Footer */}
       <View style={styles.footer}>
         <View style={styles.footerDivider} />
@@ -120,6 +115,8 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     paddingTop: 60,
+    paddingHorizontal: 40,
+    width: '100%',
   },
   brandLine: {
     fontFamily: fontFamily.mono,
@@ -130,11 +127,20 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: 'MetalLord',
-    fontSize: 240,
+    fontSize: 180,
     color: '#fff',
     lineHeight: 240,
-    letterSpacing: 2,
     textAlign: 'center',
+    width: '100%',
+  },
+  year: {
+    fontFamily: 'MetalLord',
+    fontSize: 170,
+    color: colors.bloodBright,
+    lineHeight: 200,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+    marginTop: 10,
   },
   divider: {
     width: 200,
