@@ -385,6 +385,15 @@
     "bestYearEvents_other": "{{count}} eventos",
     "titleEvents": "Eventos asistidos"
   },
+  "poster": {
+    "title": "Mi Cartel {{year}}",
+    "shareButton": "Compartir cartel",
+    "shareHint": "Comparte tu año en metal en redes sociales",
+    "shareDialogTitle": "Compartir mi cartel",
+    "shareNotAvailable": "No se puede compartir en este dispositivo",
+    "notEnoughDataTitle": "Aún no hay suficientes datos",
+    "notEnoughDataDesc": "Necesitas al menos 5 bandas asistidas este año para generar tu cartel."
+  },
   "settings": {
     "title": "Configuración",
     "locationCategory": "UBICACIÓN",

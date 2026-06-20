@@ -60,14 +60,6 @@ export default function StatsDetailScreen() {
 
   const { entries, stats, homeLat, homeLng, loading } = useProfileStats(period, targetYear);
 
-  console.log('[StatsDetail]', {
-    kind,
-    period,
-    targetYear,
-    entriesCount: entries.length,
-    stats,
-  });
-
   const title = useMemo(() => {
     switch (kind) {
       case 'events':

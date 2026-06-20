@@ -22,6 +22,7 @@ import BandImage from '../components/BandImage';
 import { localeFromI18n } from '../i18n';
 import EmptyState from '../components/EmptyState';
 import DiarySkeleton from '../components/skeletons/DiarySkeleton';
+import { isPosterAvailable } from '../lib/wrappedAvailability';
 
 type Filter = 'upcoming' | 'past';
 
@@ -57,7 +58,8 @@ export default function DiaryScreen() {
 
   const filtered = filter === 'upcoming' ? upcoming : past;
 
-  const showWrappedBanner = filter === 'past' && stats.shows > 0;
+  const showWrappedBanner = stats.shows > 0;
+  // isPosterAvailable() && stats.shows > 0;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.md }]}>
@@ -125,9 +127,7 @@ export default function DiaryScreen() {
         <TouchableOpacity
           style={styles.wrappedBanner}
           activeOpacity={0.85}
-          onPress={() => {
-            // TODO Fase 3: navegar a Wrapped
-          }}
+          onPress={() => navigation.navigate('Poster')}
         >
           <View style={styles.wrappedFlame}>
             <Ionicons name="flame" size={18} color={colors.bloodBright} />

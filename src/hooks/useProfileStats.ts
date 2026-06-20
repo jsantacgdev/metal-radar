@@ -150,32 +150,17 @@ export function useProfileStats(
   homeLng: number | null;
   loading: boolean;
 } {
-  console.log('[useProfileStats] CALLED with', { period, year });
-
   const query = useQuery({
     queryKey: ['profileStats'],
     queryFn: async () => {
-      console.log('[useProfileStats] queryFn ejecutándose...');
       try {
         const data = await fetchRawData();
-        console.log('[useProfileStats] raw data OK:', {
-          totalEntries: data.entries.length,
-        });
         return data;
       } catch (err) {
-        console.error('[useProfileStats] FETCH ERROR:', err);
         throw err;
       }
     },
     staleTime: 60_000,
-  });
-
-  console.log('[useProfileStats] query state:', {
-    isLoading: query.isLoading,
-    isError: query.isError,
-    error: query.error?.message,
-    dataExists: !!query.data,
-    entriesInData: query.data?.entries?.length ?? 0,
   });
 
   const { stats, filteredEntries } = useMemo(() => {
