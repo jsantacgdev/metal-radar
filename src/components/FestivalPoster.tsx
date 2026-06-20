@@ -1,7 +1,7 @@
 import { forwardRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { PosterData } from '../hooks/usePosterData';
-import { colors, fontFamily } from '../theme';
+import { colors, fontFamily, spacing } from '../theme';
 import { Text } from './ui';
 
 // Dimensiones 9:16 (Instagram Stories)
@@ -129,11 +129,11 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   title: {
-    fontFamily: fontFamily.displayBold,
+    fontFamily: 'MetalLord',
     fontSize: 240,
     color: '#fff',
     lineHeight: 240,
-    letterSpacing: -8,
+    letterSpacing: 2,
     textAlign: 'center',
   },
   divider: {
@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   headlinerText: {
-    fontFamily: fontFamily.displayBold,
+    fontFamily: 'MetalLord',
     fontSize: 110,
     color: '#fff',
     letterSpacing: -2,
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   tierLineRow: {
-    fontFamily: fontFamily.displayBold,
+    fontFamily: 'MetalLord',
     fontSize: 56,
     color: '#fff',
     letterSpacing: 2,

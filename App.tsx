@@ -17,6 +17,7 @@ import { initI18n } from './src/i18n';
 import { useEffect, useState } from 'react';
 import * as Sentry from '@sentry/react-native';
 import { supabase } from './src/lib/supabase';
+// import { MetalMania_400Regular } from '@expo-google-fonts/metal-mania';
 
 Sentry.init({
   dsn: 'https://0aefe0af13aade1127859877797d6beb@o4511571709984768.ingest.de.sentry.io/4511571712999504',
@@ -54,6 +55,7 @@ export default Sentry.wrap(function App() {
     HankenGrotesk_700Bold,
     SpaceMono_400Regular,
     SpaceMono_700Bold,
+    MetalLord: require('./assets/fonts/MetalLord.otf'),
   });
 
   const [ready, setReady] = useState(false);
