@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { invalidateUserDataQueries } from '../lib/queryInvalidation';
 
 type Args = {
   userConcertId: string;
@@ -18,7 +19,7 @@ export function useUpdateConcertStatus() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['diary'] });
+      invalidateUserDataQueries(queryClient);
     },
   });
 }

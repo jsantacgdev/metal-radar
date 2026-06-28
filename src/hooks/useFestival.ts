@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import i18n from '../i18n';
+import { invalidateUserDataQueries } from '../lib/queryInvalidation';
 
 export type FestivalDetail = {
   id: string;
@@ -113,6 +114,11 @@ export function useFestival(festivalId: string) {
     enabled: !!festivalId,
   });
 
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ['festival', festivalId] });
+    invalidateUserDataQueries(queryClient);
+  };
+
   const updateStatusMutation = useMutation({
     mutationFn: async (status: 'interested' | 'going' | 'attended' | null) => {
       const {
@@ -140,11 +146,7 @@ export function useFestival(festivalId: string) {
         if (error) throw error;
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['festival', festivalId] });
-      queryClient.invalidateQueries({ queryKey: ['nearbyConcerts'] });
-      queryClient.invalidateQueries({ queryKey: ['diary'] });
-    },
+    onSuccess: invalidateAll,
   });
 
   const updateRatingMutation = useMutation({
@@ -171,9 +173,7 @@ export function useFestival(festivalId: string) {
     onError: (_err, _vars, ctx) => {
       if (ctx?.prev) queryClient.setQueryData(['festival', festivalId], ctx.prev);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['festival', festivalId] });
-    },
+    onSuccess: invalidateAll,
   });
 
   const updateNotesMutation = useMutation({
@@ -204,9 +204,7 @@ export function useFestival(festivalId: string) {
     onError: (_err, _vars, ctx) => {
       if (ctx?.prev) queryClient.setQueryData(['festival', festivalId], ctx.prev);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['festival', festivalId] });
-    },
+    onSuccess: invalidateAll,
   });
 
   return {

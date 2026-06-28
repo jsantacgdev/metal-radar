@@ -17,7 +17,12 @@ import { initI18n } from './src/i18n';
 import { useEffect, useState } from 'react';
 import * as Sentry from '@sentry/react-native';
 import { supabase } from './src/lib/supabase';
-// import { MetalMania_400Regular } from '@expo-google-fonts/metal-mania';
+import { BebasNeue_400Regular } from '@expo-google-fonts/bebas-neue';
+import { Anton_400Regular } from '@expo-google-fonts/anton';
+import { Oswald_400Regular, Oswald_500Medium } from '@expo-google-fonts/oswald';
+import { SpecialElite_400Regular } from '@expo-google-fonts/special-elite';
+import { UnifrakturMaguntia_400Regular } from '@expo-google-fonts/unifrakturmaguntia';
+import { Cinzel_400Regular, Cinzel_600SemiBold, Cinzel_900Black } from '@expo-google-fonts/cinzel';
 
 Sentry.init({
   dsn: 'https://0aefe0af13aade1127859877797d6beb@o4511571709984768.ingest.de.sentry.io/4511571712999504',
@@ -55,7 +60,15 @@ export default Sentry.wrap(function App() {
     HankenGrotesk_700Bold,
     SpaceMono_400Regular,
     SpaceMono_700Bold,
-    MetalLord: require('./assets/fonts/MetalLord.otf'),
+    BebasNeue_400Regular,
+    Anton_400Regular,
+    Oswald_400Regular,
+    Oswald_500Medium,
+    SpecialElite_400Regular,
+    UnifrakturMaguntia_400Regular,
+    Cinzel_400Regular,
+    Cinzel_600SemiBold,
+    Cinzel_900Black,
   });
 
   const [ready, setReady] = useState(false);

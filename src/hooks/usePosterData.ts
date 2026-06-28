@@ -1,17 +1,16 @@
 import { useMemo } from 'react';
 import { useProfileStats } from './useProfileStats';
 
-export type PosterTier = {
-  bands: { id: string; name: string; count: number }[];
-};
+export type PosterBand = { id: string; name: string; count: number };
 
 export type PosterData = {
   year: number;
   totalShows: number;
   totalBands: number;
-  headliners: { id: string; name: string; count: number }[]; // Top 3
-  subHeadliners: { id: string; name: string; count: number }[]; // 4-9
-  mainLineup: { id: string; name: string; count: number }[]; // 10-30
+  headliners: PosterBand[]; // Top 4
+  specialGuests: PosterBand[]; // 5-12 (8 bandas)
+  featuredActs: PosterBand[]; // 13-28 (16 bandas)
+  alsoPerforming: PosterBand[]; // 29-60 (32 bandas)
   hasEnoughData: boolean;
 };
 
@@ -19,7 +18,7 @@ export function usePosterData(year: number): { data: PosterData; loading: boolea
   const { stats, entries, loading } = useProfileStats('year', year);
 
   const data = useMemo<PosterData>(() => {
-    const bandMap = new Map<string, { id: string; name: string; count: number }>();
+    const bandMap = new Map<string, PosterBand>();
     entries.forEach((e) => {
       e.bands.forEach((b) => {
         const ex = bandMap.get(b.id);
@@ -33,18 +32,20 @@ export function usePosterData(year: number): { data: PosterData; loading: boolea
       return a.name.localeCompare(b.name);
     });
 
-    const headliners = sorted.slice(0, 3);
-    const subHeadliners = sorted.slice(3, 9);
-    const mainLineup = sorted.slice(9, 30);
+    const headliners = sorted.slice(0, 4);
+    const specialGuests = sorted.slice(4, 12);
+    const featuredActs = sorted.slice(12, 28);
+    const alsoPerforming = sorted.slice(28, 60);
 
     return {
       year,
       totalShows: stats.concerts + stats.festivals,
       totalBands: stats.bands,
       headliners,
-      subHeadliners,
-      mainLineup,
-      hasEnoughData: sorted.length >= 5,
+      specialGuests,
+      featuredActs,
+      alsoPerforming,
+      hasEnoughData: sorted.length >= 4,
     };
   }, [stats, entries, year]);
 

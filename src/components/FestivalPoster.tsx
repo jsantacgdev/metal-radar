@@ -1,70 +1,143 @@
-import { forwardRef } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { PosterData } from '../hooks/usePosterData';
-import { colors, fontFamily, spacing } from '../theme';
-import { Text } from './ui';
+import { forwardRef, Fragment } from 'react';
+import { StyleSheet, View, Text as RNText } from 'react-native';
+import { PosterBand, PosterData } from '../hooks/usePosterData';
+import { colors } from '../theme';
 
-// Dimensiones 9:16 (Instagram Stories)
 const POSTER_WIDTH = 1080;
 const POSTER_HEIGHT = 1920;
+
+const FONT = {
+  bebas: 'BebasNeue_400Regular',
+  anton: 'Anton_400Regular',
+  oswald: 'Oswald_400Regular',
+  oswaldMedium: 'Oswald_500Medium',
+  specialElite: 'SpecialElite_400Regular',
+  unifraktur: 'UnifrakturMaguntia_400Regular',
+  cinzel: 'Cinzel_400Regular',
+  cinzelSemiBold: 'Cinzel_600SemiBold',
+  cinzelBlack: 'Cinzel_900Black',
+};
 
 type Props = {
   data: PosterData;
   userName?: string;
 };
 
+function BandsWithSeps({
+  bands,
+  textStyle,
+  sepStyle,
+}: {
+  bands: PosterBand[];
+  textStyle: any;
+  sepStyle: any;
+}) {
+  return (
+    <RNText style={textStyle}>
+      {bands.map((b, i) => (
+        <Fragment key={b.id}>
+          {i > 0 && <RNText style={sepStyle}>{'  ·  '}</RNText>}
+          <RNText>{b.name.toUpperCase()}</RNText>
+        </Fragment>
+      ))}
+    </RNText>
+  );
+}
+
+function TierDivider({ label }: { label: string }) {
+  return (
+    <View style={styles.tierDivider}>
+      <View style={styles.tierDividerLine} />
+      <RNText style={styles.tierDividerLabel}>{label}</RNText>
+      <View style={styles.tierDividerLine} />
+    </View>
+  );
+}
+
 const FestivalPoster = forwardRef<View, Props>(({ data, userName }, ref) => {
+  const displayUser = (userName || 'metalhead').toUpperCase();
+
   return (
     <View ref={ref} style={styles.poster} collapsable={false}>
-      <View style={[styles.cornerDecoration, styles.topLeft]} />
-      <View style={[styles.cornerDecoration, styles.topRight]} />
-      <View style={[styles.cornerDecoration, styles.bottomLeft]} />
-      <View style={[styles.cornerDecoration, styles.bottomRight]} />
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.brandLine}>METAL RADAR PRESENTS</Text>
-        <Text style={styles.title} numberOfLines={1}>
-          MI <Text style={styles.year}>{data.year}</Text>
-        </Text>
-        <View style={styles.divider} />
-        <Text style={styles.subtitle}>
-          {data.totalShows} SHOWS · {data.totalBands} BANDS
-        </Text>
-      </View>
-      {/* Headliners (top 3) */}
-      <View style={styles.headlinersSection}>
-        {data.headliners.map((b, i) => (
-          <Text key={b.id} style={styles.headlinerText} numberOfLines={1} adjustsFontSizeToFit>
-            {b.name.toUpperCase()}
-          </Text>
-        ))}
-      </View>
-      {/* Divider */}
-      <View style={styles.bigDivider} />
-      {/* Sub-headliners (4-9) */}
-      {data.subHeadliners.length > 0 && (
-        <View style={styles.subHeadlinerSection}>
-          <Text style={styles.tierLineRow} adjustsFontSizeToFit numberOfLines={2}>
-            {data.subHeadliners.map((b) => b.name.toUpperCase()).join('  ·  ')}
-          </Text>
+      <View style={[styles.corner, styles.cornerTL]} />
+      <View style={[styles.corner, styles.cornerTR]} />
+      <View style={[styles.corner, styles.cornerBL]} />
+      <View style={[styles.corner, styles.cornerBR]} />
+
+      <View style={styles.content}>
+        <RNText style={styles.brandStamp}>METAL RADAR · PRESENTS</RNText>
+
+        <RNText style={styles.usernameLine} adjustsFontSizeToFit numberOfLines={1}>
+          {displayUser}
+          <RNText style={styles.usernameDot}>{'  ·  '}</RNText>
+          <RNText style={styles.usernameYear}>{data.year}</RNText>
+        </RNText>
+
+        <RNText style={styles.statsHeader}>
+          {data.totalShows} SHOWS
+          <RNText style={styles.statsSep}>{'  ·  '}</RNText>
+          {data.totalBands} BANDS
+        </RNText>
+
+        {data.headliners.length > 0 && (
+          <>
+            <TierDivider label="HEADLINERS" />
+            <View style={styles.tierHeadliners}>
+              {data.headliners.map((b) => (
+                <RNText
+                  key={b.id}
+                  style={styles.headlinerText}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                >
+                  {b.name.toUpperCase()}
+                </RNText>
+              ))}
+            </View>
+          </>
+        )}
+
+        {data.specialGuests.length > 0 && (
+          <>
+            <TierDivider label="SPECIAL GUESTS" />
+            <BandsWithSeps
+              bands={data.specialGuests}
+              textStyle={styles.tierSub}
+              sepStyle={styles.tierSubSep}
+            />
+          </>
+        )}
+
+        {data.featuredActs.length > 0 && (
+          <>
+            <TierDivider label="FEATURED ACTS" />
+            <BandsWithSeps
+              bands={data.featuredActs}
+              textStyle={styles.tierMid}
+              sepStyle={styles.tierMidSep}
+            />
+          </>
+        )}
+
+        {data.alsoPerforming.length > 0 && (
+          <>
+            <TierDivider label="ALSO PERFORMING" />
+            <BandsWithSeps
+              bands={data.alsoPerforming}
+              textStyle={styles.tierSupporting}
+              sepStyle={styles.tierSupportingSep}
+            />
+          </>
+        )}
+
+        <View style={styles.footer}>
+          <View style={styles.footerDivider} />
+          <RNText style={styles.footerBrand}>
+            METAL RADAR
+            <RNText style={styles.footerBrandSep}>{'  ·  '}</RNText>
+            A.D. {toRoman(data.year)}
+          </RNText>
         </View>
-      )}
-      {/* Main lineup */}
-      {data.mainLineup.length > 0 && (
-        <>
-          <View style={styles.smallDivider} />
-          <View style={styles.mainLineupSection}>
-            <Text style={styles.mainLineupText}>
-              {data.mainLineup.map((b) => b.name.toUpperCase()).join('  ·  ')}
-            </Text>
-          </View>
-        </>
-      )}
-      {/* Footer */}
-      <View style={styles.footer}>
-        <View style={styles.footerDivider} />
-        {userName && <Text style={styles.userName}>{userName.toUpperCase()}</Text>}
-        <Text style={styles.footerBrand}>METAL RADAR · {data.year}</Text>
       </View>
     </View>
   );
@@ -72,159 +145,231 @@ const FestivalPoster = forwardRef<View, Props>(({ data, userName }, ref) => {
 
 FestivalPoster.displayName = 'FestivalPoster';
 
+function toRoman(year: number): string {
+  const map: [number, string][] = [
+    [1000, 'M'],
+    [900, 'CM'],
+    [500, 'D'],
+    [400, 'CD'],
+    [100, 'C'],
+    [90, 'XC'],
+    [50, 'L'],
+    [40, 'XL'],
+    [10, 'X'],
+    [9, 'IX'],
+    [5, 'V'],
+    [4, 'IV'],
+    [1, 'I'],
+  ];
+  let result = '';
+  let n = year;
+  for (const [val, sym] of map) {
+    while (n >= val) {
+      result += sym;
+      n -= val;
+    }
+  }
+  return result;
+}
+
 export default FestivalPoster;
+
+const RED = colors.bloodBright;
+const RED_DEEP = colors.blood;
+const WHITE = '#edeff2';
+const SILVER = '#d8dade';
+const SILVER_MUTED = '#b8bbc2';
+const GREY = '#a8abb4';
 
 const styles = StyleSheet.create({
   poster: {
     width: POSTER_WIDTH,
     height: POSTER_HEIGHT,
     backgroundColor: '#0a0a0c',
-    padding: 80,
-    justifyContent: 'space-between',
+    position: 'relative',
   },
-  cornerDecoration: {
+
+  corner: {
     position: 'absolute',
-    width: 80,
-    height: 80,
-    borderColor: colors.bloodBright,
+    width: 90,
+    height: 90,
+    borderColor: RED,
   },
-  topLeft: {
-    top: 40,
-    left: 40,
+
+  cornerTL: {
+    top: 60,
+    left: 60,
     borderTopWidth: 6,
     borderLeftWidth: 6,
   },
-  topRight: {
-    top: 40,
-    right: 40,
+
+  cornerTR: {
+    top: 60,
+    right: 60,
     borderTopWidth: 6,
     borderRightWidth: 6,
   },
-  bottomLeft: {
-    bottom: 40,
-    left: 40,
+
+  cornerBL: {
+    bottom: 60,
+    left: 60,
     borderBottomWidth: 6,
     borderLeftWidth: 6,
   },
-  bottomRight: {
-    bottom: 40,
-    right: 40,
+
+  cornerBR: {
+    bottom: 60,
+    right: 60,
     borderBottomWidth: 6,
     borderRightWidth: 6,
   },
-  header: {
+
+  content: {
+    flex: 1,
+    paddingTop: 140,
+    paddingBottom: 130,
+    paddingHorizontal: 100,
     alignItems: 'center',
-    paddingTop: 60,
-    paddingHorizontal: 40,
-    width: '100%',
   },
-  brandLine: {
-    fontFamily: fontFamily.mono,
-    fontSize: 28,
-    color: colors.bloodBright,
-    letterSpacing: 8,
-    marginBottom: 30,
+
+  brandStamp: {
+    fontFamily: FONT.specialElite,
+    fontSize: 24,
+    color: '#c7cad0',
+    letterSpacing: 10,
+    marginBottom: 32,
+    opacity: 0.85,
   },
-  title: {
-    fontFamily: 'MetalLord',
-    fontSize: 180,
-    color: '#fff',
-    lineHeight: 240,
-    textAlign: 'center',
-    width: '100%',
-  },
-  year: {
-    fontFamily: 'MetalLord',
-    fontSize: 170,
-    color: colors.bloodBright,
-    lineHeight: 200,
-    textAlign: 'center',
-    paddingHorizontal: 20,
-    marginTop: 10,
-  },
-  divider: {
-    width: 200,
-    height: 4,
-    backgroundColor: colors.bloodBright,
-    marginVertical: 40,
-  },
-  subtitle: {
-    fontFamily: fontFamily.mono,
-    fontSize: 32,
-    color: '#fff',
-    letterSpacing: 6,
-  },
-  headlinersSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 30,
-    paddingHorizontal: 40,
-  },
-  headlinerText: {
-    fontFamily: 'MetalLord',
-    fontSize: 110,
-    color: '#fff',
-    letterSpacing: -2,
-    textAlign: 'center',
-    lineHeight: 110,
-  },
-  bigDivider: {
-    width: '60%',
-    height: 3,
-    backgroundColor: colors.bloodBright,
-    alignSelf: 'center',
-    marginVertical: 40,
-  },
-  subHeadlinerSection: {
-    paddingHorizontal: 20,
-  },
-  tierLineRow: {
-    fontFamily: 'MetalLord',
-    fontSize: 56,
-    color: '#fff',
-    letterSpacing: 2,
-    textAlign: 'center',
-    lineHeight: 70,
-  },
-  smallDivider: {
-    width: '30%',
-    height: 2,
-    backgroundColor: colors.bloodBright,
-    alignSelf: 'center',
-    marginVertical: 30,
-  },
-  mainLineupSection: {
-    paddingHorizontal: 60,
-  },
-  mainLineupText: {
-    fontFamily: fontFamily.bodyBold,
-    fontSize: 36,
-    color: '#ccc',
-    letterSpacing: 1,
-    textAlign: 'center',
-    lineHeight: 50,
-  },
-  footer: {
-    alignItems: 'center',
-    paddingBottom: 60,
-  },
-  footerDivider: {
-    width: 150,
-    height: 2,
-    backgroundColor: colors.bloodBright,
-    marginBottom: 30,
-  },
-  userName: {
-    fontFamily: fontFamily.displayBold,
-    fontSize: 40,
-    color: '#fff',
+
+  usernameLine: {
+    fontFamily: FONT.cinzelBlack,
+    fontSize: 96,
+    color: WHITE,
+    lineHeight: 100,
     letterSpacing: 4,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+
+  usernameDot: {
+    color: RED,
+  },
+
+  usernameYear: {
+    color: RED,
+  },
+
+  statsHeader: {
+    fontFamily: FONT.specialElite,
+    fontSize: 26,
+    color: '#c7cad0',
+    letterSpacing: 8,
+    marginTop: 12,
     marginBottom: 12,
   },
+
+  statsSep: {
+    color: RED,
+  },
+
+  tierDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    marginTop: 38,
+    marginBottom: 26,
+    gap: 22,
+  },
+
+  tierDividerLine: {
+    flex: 1,
+    height: 2,
+    backgroundColor: RED_DEEP,
+  },
+
+  tierDividerLabel: {
+    fontFamily: FONT.specialElite,
+    fontSize: 22,
+    color: RED,
+    letterSpacing: 10,
+  },
+
+  tierHeadliners: {
+    width: '100%',
+    alignItems: 'center',
+  },
+
+  headlinerText: {
+    fontFamily: FONT.anton,
+    fontSize: 86,
+    color: WHITE,
+    lineHeight: 96,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+
+    textShadowRadius: 16,
+  },
+
+  tierSub: {
+    fontFamily: FONT.bebas,
+    fontSize: 42,
+    color: WHITE,
+    lineHeight: 56,
+    letterSpacing: 2,
+    textAlign: 'center',
+  },
+
+  tierSubSep: {
+    color: RED,
+  },
+
+  tierMid: {
+    fontFamily: FONT.bebas,
+    fontSize: 38,
+    color: SILVER,
+    lineHeight: 46,
+    letterSpacing: 2,
+    textAlign: 'center',
+  },
+
+  tierMidSep: {
+    color: RED_DEEP,
+  },
+
+  tierSupporting: {
+    fontFamily: FONT.anton,
+    fontSize: 26,
+    color: GREY,
+    lineHeight: 36,
+    letterSpacing: 1,
+    textAlign: 'center',
+  },
+
+  tierSupportingSep: {
+    color: RED_DEEP,
+  },
+
+  footer: {
+    marginTop: 'auto',
+    alignItems: 'center',
+    paddingTop: 40,
+  },
+
+  footerDivider: {
+    width: 200,
+    height: 2,
+    backgroundColor: RED_DEEP,
+    marginBottom: 20,
+  },
+
   footerBrand: {
-    fontFamily: fontFamily.mono,
-    fontSize: 24,
-    color: colors.bloodBright,
-    letterSpacing: 6,
+    fontFamily: FONT.specialElite,
+    fontSize: 22,
+    color: '#82858d',
+    letterSpacing: 8,
+  },
+
+  footerBrandSep: {
+    color: RED,
   },
 });

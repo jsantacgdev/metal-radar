@@ -11,8 +11,8 @@ const CRON_SECRET = Deno.env.get('CRON_SECRET')!;
 const HEAVY_GENRE_REGEX =
   /metal|rock|ska|hardcore|punk|metalcore|deathcore|grunge|emo|screamo|thrash|doom|sludge|stoner|industrial|gothic|prog|alternative|nu.?metal|post.?punk|psychedelic|garage|indie/i;
 
-const BATCH_SIZE = 100;
-const SPOTIFY_DELAY_MS = 300;
+const BATCH_SIZE = 150;
+const SPOTIFY_DELAY_MS = 200;
 
 let cachedToken: { value: string; expiresAt: number } | null = null;
 

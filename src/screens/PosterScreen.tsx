@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import ViewShot from 'react-native-view-shot';
@@ -20,10 +20,13 @@ import { useAuth } from '../hooks/useAuth';
 import { getPosterYear } from '../lib/wrappedAvailability';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from '../components/ui';
+import { useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function PosterScreen() {
+  const queryClient = useQueryClient();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
@@ -35,8 +38,23 @@ export default function PosterScreen() {
   const viewShotRef = useRef<ViewShot>(null);
   const [sharing, setSharing] = useState(false);
 
-  // Nombre derivado del email (parte antes del @)
   const userName = session?.user.email?.split('@')[0] ?? '';
+
+  useFocusEffect(
+    useCallback(() => {
+      queryClient.invalidateQueries({
+        predicate: (q) => {
+          const key = String(q.queryKey[0] ?? '');
+          return (
+            key.includes('profileStats') ||
+            key.includes('userConcerts') ||
+            key.includes('user-concerts') ||
+            key.includes('concerts')
+          );
+        },
+      });
+    }, [queryClient]),
+  );
 
   const handleShare = async () => {
     if (!viewShotRef.current) return;
@@ -92,7 +110,6 @@ export default function PosterScreen() {
     );
   }
 
-  // Preview escalado del poster
   const POSTER_NATIVE_WIDTH = 1080;
   const previewWidth = SCREEN_WIDTH - spacing.xl * 2;
   const scale = previewWidth / POSTER_NATIVE_WIDTH;
@@ -114,7 +131,7 @@ export default function PosterScreen() {
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: spacing.xl,
-          paddingBottom: spacing.xxxl,
+          paddingBottom: spacing.xxxl + 80,
           alignItems: 'center',
         }}
       >
@@ -145,39 +162,30 @@ export default function PosterScreen() {
             <FestivalPoster data={data} userName={userName} />
           </View>
         </View>
-
-        {/* Botón compartir */}
-        <TouchableOpacity
-          style={[styles.shareButton, sharing && { opacity: 0.7 }]}
-          onPress={handleShare}
-          disabled={sharing}
-          activeOpacity={0.85}
-        >
-          {sharing ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <>
-              <Ionicons name="share-social" size={20} color="#fff" />
-              <Text
-                style={{
-                  fontFamily: fontFamily.displayBold,
-                  fontSize: 15,
-                  color: '#fff',
-                  letterSpacing: 1,
-                  textTransform: 'uppercase',
-                  marginLeft: spacing.sm,
-                }}
-              >
-                {t('poster.shareButton')}
-              </Text>
-            </>
-          )}
-        </TouchableOpacity>
-
-        <Text variant="bodySM" color="muted" style={{ marginTop: spacing.md, textAlign: 'center' }}>
-          {t('poster.shareHint')}
-        </Text>
       </ScrollView>
+
+      {/* FAB flotante de compartir */}
+      <TouchableOpacity
+        style={[
+          styles.fabShare,
+          {
+            bottom: insets.bottom + spacing.xl,
+            opacity: sharing ? 0.7 : 1,
+          },
+        ]}
+        onPress={handleShare}
+        disabled={sharing}
+        activeOpacity={0.85}
+      >
+        {sharing ? (
+          <ActivityIndicator color="#fff" size="small" />
+        ) : (
+          <>
+            <Ionicons name="share-social" size={18} color="#fff" />
+            <Text style={styles.fabShareText}>{t('poster.shareButton')}</Text>
+          </>
+        )}
+      </TouchableOpacity>
     </View>
   );
 }
@@ -227,17 +235,33 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.line,
   },
-  shareButton: {
+
+  fabShare: {
+    position: 'absolute',
+    right: spacing.xl,
+    height: 52,
+    paddingHorizontal: 22,
+    borderRadius: 26,
+    backgroundColor: colors.blood,
+    borderWidth: 2,
+    borderColor: colors.bloodBright,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.blood,
-    borderWidth: 1,
-    borderColor: colors.bloodBright,
-    borderRadius: radius.lg,
-    paddingVertical: 16,
-    paddingHorizontal: spacing.xxl,
-    marginTop: spacing.xl,
-    minWidth: 200,
+    gap: 8,
+
+    shadowColor: colors.blood,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+
+    elevation: 8,
+  },
+  fabShareText: {
+    fontFamily: fontFamily.displayBold,
+    fontSize: 13,
+    color: '#fff',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
   },
 });
