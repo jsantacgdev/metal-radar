@@ -69,6 +69,7 @@ export default Sentry.wrap(function App() {
     Cinzel_400Regular,
     Cinzel_600SemiBold,
     Cinzel_900Black,
+    MetalLord: require('./assets/fonts/MetalLord.otf'),
   });
 
   const [ready, setReady] = useState(false);

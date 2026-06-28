@@ -18,7 +18,6 @@ const HEAVY_GENRE_REGEX =
 const BATCH_SIZE = 50;
 const SPOTIFY_DELAY_MS = 250;
 
-// NUEVO: detector de imágenes "pobres" (Ticketmaster) que conviene sobreescribir
 function isPoorImage(url: string | null): boolean {
   if (!url) return true;
   return /ticketm\.net|s1\.ticketm/i.test(url);
@@ -62,29 +61,44 @@ async function searchSpotifyArtist(name: string, token: string) {
     spotify_id: exact.id,
     image_url: exact.images?.[0]?.url ?? null,
     genres: exact.genres ?? [],
+    popularity: typeof exact.popularity === 'number' ? exact.popularity : null,
   };
 }
 
-async function getLastfmTags(artistName: string): Promise<string[]> {
+// NUEVO: artist.getInfo devuelve tags + listeners + playcount en 1 llamada
+async function getLastfmInfo(artistName: string): Promise<{
+  tags: string[];
+  listeners: number | null;
+  playcount: number | null;
+}> {
   try {
     const url =
-      `https://ws.audioscrobbler.com/2.0/?method=artist.gettoptags` +
+      `https://ws.audioscrobbler.com/2.0/?method=artist.getInfo` +
       `&artist=${encodeURIComponent(artistName)}` +
       `&api_key=${LASTFM_API_KEY}` +
       `&format=json&autocorrect=1`;
     const res = await fetch(url);
-    if (!res.ok) return [];
+    if (!res.ok) return { tags: [], listeners: null, playcount: null };
     const data = await res.json();
-    return (data.toptags?.tag ?? []).slice(0, 5).map((t: any) => t.name.toLowerCase());
+    const artist = data.artist;
+    if (!artist) return { tags: [], listeners: null, playcount: null };
+
+    const tags = (artist.tags?.tag ?? []).slice(0, 5).map((t: any) => t.name.toLowerCase());
+    const listeners = artist.stats?.listeners ? parseInt(artist.stats.listeners, 10) : null;
+    const playcount = artist.stats?.playcount ? parseInt(artist.stats.playcount, 10) : null;
+
+    return {
+      tags,
+      listeners: Number.isFinite(listeners) ? listeners : null,
+      playcount: Number.isFinite(playcount) ? playcount : null,
+    };
   } catch {
-    return [];
+    return { tags: [], listeners: null, playcount: null };
   }
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// NUEVO: query base reutilizable - filtra pendientes (sin imagen O imagen de Ticketmaster)
-// y que no se hayan intentado en los últimos 7 días
 function buildPendingQuery(admin: any, sevenDaysAgo: string) {
   return admin
     .from('bands')
@@ -105,7 +119,6 @@ Deno.serve(async (req) => {
     const today = new Date().toISOString().slice(0, 10);
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    // NUEVO: 1. IDs de bandas con festivales o conciertos próximos (prioritarias)
     const [{ data: priorityFest }, { data: priorityConc }] = await Promise.all([
       admin
         .from('festival_bands')
@@ -124,7 +137,6 @@ Deno.serve(async (req) => {
       ]),
     );
 
-    // 2. Coger prioritarias primero
     let pending: any[] = [];
     if (priorityIds.length > 0) {
       const { data: priority } = await buildPendingQuery(admin, sevenDaysAgo)
@@ -133,7 +145,6 @@ Deno.serve(async (req) => {
       pending = priority ?? [];
     }
 
-    // 3. Rellenar con el resto si queda hueco
     if (pending.length < batchSize) {
       const fill = batchSize - pending.length;
       const usedIds = pending.map((b) => b.id);
@@ -171,14 +182,21 @@ Deno.serve(async (req) => {
       }
 
       try {
+        // SIEMPRE traer info de Last.fm primero (tags + listeners + playcount)
+        const lastfm = await getLastfmInfo(band.name);
+
         const spotifyData = await searchSpotifyArtist(band.name, token);
 
         if (!spotifyData) {
+          // Aunque Spotify no encuentre, guardamos lo de Last.fm
           await admin
             .from('bands')
             .update({
               enrichment_attempted_at: new Date().toISOString(),
               enrichment_found: false,
+              lastfm_listeners: lastfm.listeners,
+              lastfm_playcount: lastfm.playcount,
+              listeners_updated_at: new Date().toISOString(),
             })
             .eq('id', band.id);
           results.not_found++;
@@ -191,8 +209,7 @@ Deno.serve(async (req) => {
           finalGenres.length > 0 && finalGenres.some((g) => HEAVY_GENRE_REGEX.test(g));
 
         if (!spotifyIsHeavy) {
-          const lastfmTags = await getLastfmTags(band.name);
-          const allGenres = Array.from(new Set([...spotifyData.genres, ...lastfmTags]));
+          const allGenres = Array.from(new Set([...spotifyData.genres, ...lastfm.tags]));
           const passesGenre = allGenres.some((g) => HEAVY_GENRE_REGEX.test(g));
 
           if (!passesGenre) {
@@ -202,6 +219,9 @@ Deno.serve(async (req) => {
                 enrichment_attempted_at: new Date().toISOString(),
                 enrichment_found: false,
                 genres: allGenres,
+                lastfm_listeners: lastfm.listeners,
+                lastfm_playcount: lastfm.playcount,
+                listeners_updated_at: new Date().toISOString(),
               })
               .eq('id', band.id);
             console.log(`Rechazada "${band.name}": ${JSON.stringify(allGenres)}`);
@@ -213,8 +233,6 @@ Deno.serve(async (req) => {
           finalGenres = allGenres;
         }
 
-        // NUEVO: decidir si actualizar imagen
-        // Sobreescribimos si la actual era pobre (null o de Ticketmaster) y Spotify trae una
         const shouldUpdateImage = spotifyData.image_url && isPoorImage(band.image_url);
 
         const updatePayload: any = {
@@ -222,6 +240,11 @@ Deno.serve(async (req) => {
           genres: finalGenres,
           enrichment_attempted_at: new Date().toISOString(),
           enrichment_found: true,
+          spotify_popularity: spotifyData.popularity,
+          popularity_updated_at: new Date().toISOString(),
+          lastfm_listeners: lastfm.listeners,
+          lastfm_playcount: lastfm.playcount,
+          listeners_updated_at: new Date().toISOString(),
         };
         if (shouldUpdateImage) {
           updatePayload.image_url = spotifyData.image_url;

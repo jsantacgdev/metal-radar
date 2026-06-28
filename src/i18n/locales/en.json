@@ -142,7 +142,7 @@
     "statShows": "SHOWS",
     "statBands": "BANDS",
     "statYear": "YEAR",
-    "wrappedTitle": "Your {{year}} Wrapped is ready",
+    "wrappedTitle": "Your {{year}} Poster is ready",
     "wrappedKm": "{{km}} km of live music",
     "tabPast": "Past",
     "tabUpcoming": "Upcoming",
@@ -392,7 +392,7 @@
     "shareDialogTitle": "Share my poster",
     "shareNotAvailable": "Sharing not available on this device",
     "notEnoughDataTitle": "Not enough data yet",
-    "notEnoughDataDesc": "You need at least 5 bands attended this year to generate your poster."
+    "notEnoughDataDesc": "You need at least 4 bands seen this year to generate your poster."
   },
   "settings": {
     "title": "Settings",

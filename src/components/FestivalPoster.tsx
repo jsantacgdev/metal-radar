@@ -3,9 +3,11 @@ import { StyleSheet, View, Text as RNText } from 'react-native';
 import { PosterBand, PosterData } from '../hooks/usePosterData';
 import { colors } from '../theme';
 
+// Dimensiones 9:16 (Instagram Stories)
 const POSTER_WIDTH = 1080;
 const POSTER_HEIGHT = 1920;
 
+// Font families (registradas en App.tsx)
 const FONT = {
   bebas: 'BebasNeue_400Regular',
   anton: 'Anton_400Regular',
@@ -16,6 +18,7 @@ const FONT = {
   cinzel: 'Cinzel_400Regular',
   cinzelSemiBold: 'Cinzel_600SemiBold',
   cinzelBlack: 'Cinzel_900Black',
+  metalLord: 'MetalLord',
 };
 
 type Props = {
@@ -54,20 +57,67 @@ function TierDivider({ label }: { label: string }) {
   );
 }
 
+// Headliners en grid 2x2
+function HeadlinersGrid({ bands }: { bands: PosterBand[] }) {
+  const row1 = bands.slice(0, 2);
+  const row2 = bands.slice(2, 4);
+  return (
+    <View style={styles.tierHeadliners}>
+      <View style={styles.headlinerRow}>
+        {row1.map((b) => (
+          <View key={b.id} style={styles.headlinerCell}>
+            <RNText
+              style={styles.headlinerText}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.5}
+            >
+              {b.name.toUpperCase()}
+            </RNText>
+          </View>
+        ))}
+      </View>
+      {row2.length > 0 && (
+        <View style={styles.headlinerRow}>
+          {row2.map((b) => (
+            <View key={b.id} style={styles.headlinerCell}>
+              <RNText
+                style={styles.headlinerText}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.5}
+              >
+                {b.name.toUpperCase()}
+              </RNText>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
 const FestivalPoster = forwardRef<View, Props>(({ data, userName }, ref) => {
   const displayUser = (userName || 'metalhead').toUpperCase();
 
   return (
     <View ref={ref} style={styles.poster} collapsable={false}>
+      {/* Esquinas en L rojas */}
       <View style={[styles.corner, styles.cornerTL]} />
       <View style={[styles.corner, styles.cornerTR]} />
       <View style={[styles.corner, styles.cornerBL]} />
       <View style={[styles.corner, styles.cornerBR]} />
 
       <View style={styles.content}>
+        {/* Header */}
         <RNText style={styles.brandStamp}>METAL RADAR · PRESENTS</RNText>
 
-        <RNText style={styles.usernameLine} adjustsFontSizeToFit numberOfLines={1}>
+        <RNText
+          style={styles.usernameLine}
+          adjustsFontSizeToFit
+          numberOfLines={1}
+          minimumFontScale={0.5}
+        >
           {displayUser}
           <RNText style={styles.usernameDot}>{'  ·  '}</RNText>
           <RNText style={styles.usernameYear}>{data.year}</RNText>
@@ -79,24 +129,15 @@ const FestivalPoster = forwardRef<View, Props>(({ data, userName }, ref) => {
           {data.totalBands} BANDS
         </RNText>
 
+        {/* TIER 1 — Headliners (2x2) */}
         {data.headliners.length > 0 && (
           <>
             <TierDivider label="HEADLINERS" />
-            <View style={styles.tierHeadliners}>
-              {data.headliners.map((b) => (
-                <RNText
-                  key={b.id}
-                  style={styles.headlinerText}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                >
-                  {b.name.toUpperCase()}
-                </RNText>
-              ))}
-            </View>
+            <HeadlinersGrid bands={data.headliners} />
           </>
         )}
 
+        {/* TIER 2 — Special Guests */}
         {data.specialGuests.length > 0 && (
           <>
             <TierDivider label="SPECIAL GUESTS" />
@@ -108,6 +149,7 @@ const FestivalPoster = forwardRef<View, Props>(({ data, userName }, ref) => {
           </>
         )}
 
+        {/* TIER 3 — Featured Acts */}
         {data.featuredActs.length > 0 && (
           <>
             <TierDivider label="FEATURED ACTS" />
@@ -119,6 +161,7 @@ const FestivalPoster = forwardRef<View, Props>(({ data, userName }, ref) => {
           </>
         )}
 
+        {/* TIER 4 — Also Performing */}
         {data.alsoPerforming.length > 0 && (
           <>
             <TierDivider label="ALSO PERFORMING" />
@@ -130,6 +173,7 @@ const FestivalPoster = forwardRef<View, Props>(({ data, userName }, ref) => {
           </>
         )}
 
+        {/* Footer */}
         <View style={styles.footer}>
           <View style={styles.footerDivider} />
           <RNText style={styles.footerBrand}>
@@ -178,7 +222,6 @@ const RED = colors.bloodBright;
 const RED_DEEP = colors.blood;
 const WHITE = '#edeff2';
 const SILVER = '#d8dade';
-const SILVER_MUTED = '#b8bbc2';
 const GREY = '#a8abb4';
 
 const styles = StyleSheet.create({
@@ -189,40 +232,17 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
 
+  // Esquinas en L
   corner: {
     position: 'absolute',
     width: 90,
     height: 90,
     borderColor: RED,
   },
-
-  cornerTL: {
-    top: 60,
-    left: 60,
-    borderTopWidth: 6,
-    borderLeftWidth: 6,
-  },
-
-  cornerTR: {
-    top: 60,
-    right: 60,
-    borderTopWidth: 6,
-    borderRightWidth: 6,
-  },
-
-  cornerBL: {
-    bottom: 60,
-    left: 60,
-    borderBottomWidth: 6,
-    borderLeftWidth: 6,
-  },
-
-  cornerBR: {
-    bottom: 60,
-    right: 60,
-    borderBottomWidth: 6,
-    borderRightWidth: 6,
-  },
+  cornerTL: { top: 60, left: 60, borderTopWidth: 6, borderLeftWidth: 6 },
+  cornerTR: { top: 60, right: 60, borderTopWidth: 6, borderRightWidth: 6 },
+  cornerBL: { bottom: 60, left: 60, borderBottomWidth: 6, borderLeftWidth: 6 },
+  cornerBR: { bottom: 60, right: 60, borderBottomWidth: 6, borderRightWidth: 6 },
 
   content: {
     flex: 1,
@@ -232,6 +252,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
+  // Header
   brandStamp: {
     fontFamily: FONT.specialElite,
     fontSize: 24,
@@ -241,20 +262,19 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
 
+  // Username · Año en MetalLord
   usernameLine: {
-    fontFamily: FONT.cinzelBlack,
-    fontSize: 96,
+    fontFamily: FONT.metalLord,
+    fontSize: 130,
     color: WHITE,
-    lineHeight: 100,
-    letterSpacing: 4,
+    lineHeight: 140,
+    letterSpacing: 0,
     marginBottom: 16,
     textAlign: 'center',
   },
-
   usernameDot: {
     color: RED,
   },
-
   usernameYear: {
     color: RED,
   },
@@ -267,11 +287,11 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 12,
   },
-
   statsSep: {
     color: RED,
   },
 
+  // Tier divider con label inline
   tierDivider: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -280,13 +300,11 @@ const styles = StyleSheet.create({
     marginBottom: 26,
     gap: 22,
   },
-
   tierDividerLine: {
     flex: 1,
     height: 2,
     backgroundColor: RED_DEEP,
   },
-
   tierDividerLabel: {
     fontFamily: FONT.specialElite,
     fontSize: 22,
@@ -294,35 +312,45 @@ const styles = StyleSheet.create({
     letterSpacing: 10,
   },
 
+  // Tier 1 — Headliners (2x2)
   tierHeadliners: {
     width: '100%',
+    gap: 30,
+  },
+  headlinerRow: {
+    flexDirection: 'row',
+    gap: 40,
+  },
+  headlinerCell: {
+    flex: 1,
     alignItems: 'center',
   },
-
   headlinerText: {
-    fontFamily: FONT.anton,
-    fontSize: 86,
+    fontFamily: FONT.oswald,
+    fontSize: 78,
+    fontWeight: '700',
     color: WHITE,
-    lineHeight: 96,
+    lineHeight: 86,
+    letterSpacing: -1,
     textShadowColor: 'rgba(0,0,0,0.5)',
     textShadowOffset: { width: 0, height: 2 },
-
     textShadowRadius: 16,
   },
 
+  // Tier 2 — Special Guests
   tierSub: {
-    fontFamily: FONT.bebas,
+    fontFamily: FONT.cinzelSemiBold,
     fontSize: 42,
     color: WHITE,
     lineHeight: 56,
     letterSpacing: 2,
     textAlign: 'center',
   },
-
   tierSubSep: {
     color: RED,
   },
 
+  // Tier 3 — Featured Acts
   tierMid: {
     fontFamily: FONT.bebas,
     fontSize: 38,
@@ -331,11 +359,11 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     textAlign: 'center',
   },
-
   tierMidSep: {
     color: RED_DEEP,
   },
 
+  // Tier 4 — Also Performing
   tierSupporting: {
     fontFamily: FONT.anton,
     fontSize: 26,
@@ -344,31 +372,28 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textAlign: 'center',
   },
-
   tierSupportingSep: {
     color: RED_DEEP,
   },
 
+  // Footer
   footer: {
     marginTop: 'auto',
     alignItems: 'center',
     paddingTop: 40,
   },
-
   footerDivider: {
     width: 200,
     height: 2,
     backgroundColor: RED_DEEP,
     marginBottom: 20,
   },
-
   footerBrand: {
     fontFamily: FONT.specialElite,
     fontSize: 22,
     color: '#82858d',
     letterSpacing: 8,
   },
-
   footerBrandSep: {
     color: RED,
   },

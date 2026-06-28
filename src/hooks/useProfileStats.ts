@@ -14,16 +14,25 @@ export type ProfileStats = {
   bestYear: { year: number; count: number } | null;
 };
 
+export type StatsBand = {
+  id: string;
+  name: string;
+  image_url: string | null;
+  genres: string[];
+  popularity: number | null;
+  listeners: number | null;
+};
+
 export type StatsEntry = {
   event_date: string;
   city: string | null;
   lat: number | null;
   lng: number | null;
-  bands: { id: string; name: string; image_url: string | null; genres: string[] }[];
+  bands: StatsBand[];
   kind: 'concert' | 'festival';
-  raw_id: string; // id del user_concert o user_festival
-  parent_id: string; // id del concert o festival (para navegación)
-  parent_name?: string; // nombre del festival si es festival
+  raw_id: string;
+  parent_id: string;
+  parent_name?: string;
   venue_name?: string;
   image_url?: string | null;
 };
@@ -60,7 +69,7 @@ async function fetchRawData(): Promise<RawData> {
         concert:concerts!inner (
           id, event_date,
           venue:venues!inner ( name, city, lat, lng ),
-          concert_bands ( is_headliner, band:bands ( id, name, image_url, genres ) )
+          concert_bands ( is_headliner, band:bands ( id, name, image_url, genres, spotify_popularity, lastfm_listeners ) )
         )
       `,
       )
@@ -74,7 +83,7 @@ async function fetchRawData(): Promise<RawData> {
         festival:festivals!inner (
           id, name, start_date, image_url,
           venue:venues!inner ( name, city, lat, lng ),
-          festival_bands ( is_headliner, band:bands ( id, name, image_url, genres ) )
+          festival_bands ( is_headliner, band:bands ( id, name, image_url, genres, spotify_popularity, lastfm_listeners ) )
         )
       `,
       )
@@ -94,6 +103,8 @@ async function fetchRawData(): Promise<RawData> {
         name: cb.band.name,
         image_url: cb.band.image_url,
         genres: cb.band.genres ?? [],
+        popularity: cb.band.spotify_popularity ?? null,
+        listeners: cb.band.lastfm_listeners ?? null,
       }));
 
     return {
@@ -106,7 +117,7 @@ async function fetchRawData(): Promise<RawData> {
       raw_id: row.id,
       parent_id: row.concert_id,
       venue_name: row.concert.venue.name,
-      image_url: sortedBands[0]?.image_url ?? null, // imagen del headliner
+      image_url: sortedBands[0]?.image_url ?? null,
     };
   });
 
@@ -122,6 +133,8 @@ async function fetchRawData(): Promise<RawData> {
         name: fb.band.name,
         image_url: fb.band.image_url,
         genres: fb.band.genres ?? [],
+        popularity: fb.band.spotify_popularity ?? null,
+        listeners: fb.band.lastfm_listeners ?? null,
       })),
     kind: 'festival',
     raw_id: row.id,
