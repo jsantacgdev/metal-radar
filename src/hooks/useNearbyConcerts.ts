@@ -175,6 +175,7 @@ export function useNearbyConcerts(
     concerts,
     farConcerts,
     loading: query.isLoading,
+    isFetching: query.isFetching, // NUEVO: para feedback de refetch en background
     error: query.error?.message ?? null,
   };
 }

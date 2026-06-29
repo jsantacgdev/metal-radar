@@ -22,7 +22,6 @@ import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from '../components/ui';
 import BandImage from '../components/BandImage';
 import LeafletMap, { LeafletMarker } from '../components/LeafletMap';
-import { useFocusEffect } from '@react-navigation/native';
 import { localeFromI18n } from '../i18n';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
@@ -58,17 +57,24 @@ export default function MapScreen() {
     venue: ConcertWithDetails['venue'];
     concerts: ConcertWithDetails[];
   } | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
   const [typeFilter, setTypeFilter] = useState<ConcertTypeFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const radiusKm = profile?.search_radius_km ?? 500;
 
+  const { concerts, farConcerts, loading, isFetching, error } = useNearbyConcerts(
+    location?.lat ?? null,
+    location?.lng ?? null,
+    radiusKm,
+  );
+
   const spinValue = useRef(new Animated.Value(0)).current;
 
+  // La animación del refresh se vincula a isFetching de la query
+  // (en vez de un estado manual), así refleja exactamente lo que pasa
   useEffect(() => {
-    if (refreshing) {
+    if (isFetching) {
       Animated.loop(
         Animated.timing(spinValue, {
           toValue: 1,
@@ -81,7 +87,7 @@ export default function MapScreen() {
       spinValue.stopAnimation();
       spinValue.setValue(0);
     }
-  }, [refreshing, spinValue]);
+  }, [isFetching, spinValue]);
 
   useEffect(() => {
     AsyncStorage.getItem(FILTERS_CACHE_KEY)
@@ -106,12 +112,6 @@ export default function MapScreen() {
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
   });
-
-  const { concerts, farConcerts, loading, error } = useNearbyConcerts(
-    location?.lat ?? null,
-    location?.lng ?? null,
-    radiusKm,
-  );
 
   const visible = useMemo(() => {
     let all = [...concerts, ...farConcerts];
@@ -246,27 +246,46 @@ export default function MapScreen() {
     loadLocation();
   }, [loadLocation]);
 
-  const handleManualRefresh = useCallback(async () => {
-    setRefreshing(true);
+  // Lanza sync-concerts en background (puede tardar 30s-2min con Ticketmaster).
+  // Cuando termina, reinvalida la query para que aparezcan los conciertos nuevos.
+  const triggerBackgroundSync = useCallback(async () => {
     try {
-      await loadLocation(true);
-
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      if (session?.access_token) {
-        await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/sync-concerts`, {
+      if (!session?.access_token) return;
+
+      const res = await fetch(
+        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/sync-concerts`,
+        {
           method: 'POST',
           headers: { Authorization: `Bearer ${session.access_token}` },
-        });
-      }
+        },
+      );
 
-      await queryClient.invalidateQueries({ queryKey: ['nearbyConcerts'] });
-      await queryClient.invalidateQueries({ queryKey: ['concerts'] });
-    } finally {
-      setRefreshing(false);
+      if (res.ok) {
+        // Refetch para mostrar lo que haya traído el sync
+        queryClient.invalidateQueries({ queryKey: ['nearbyConcerts'] });
+        queryClient.invalidateQueries({ queryKey: ['concerts'] });
+      }
+    } catch (err) {
+      console.warn('Background sync failed:', err);
     }
-  }, [loadLocation, queryClient]);
+  }, [queryClient]);
+
+  // Refresh "ligero": invalida cache (refetch instantáneo desde BD).
+  // El sync con Ticketmaster va aparte, en background, sin bloquear.
+  const handleManualRefresh = useCallback(() => {
+    // 1. Invalida → query refetchea en background, muestra spinner via isFetching
+    queryClient.invalidateQueries({ queryKey: ['nearbyConcerts'] });
+    queryClient.invalidateQueries({ queryKey: ['concerts'] });
+
+    // 2. Refresca ubicación en background (no espera)
+    loadLocation(true).catch(() => {});
+
+    // 3. Sync con Ticketmaster en background (no espera)
+    triggerBackgroundSync();
+  }, [queryClient, loadLocation, triggerBackgroundSync]);
 
   function FilterPill({
     label,
@@ -379,7 +398,6 @@ export default function MapScreen() {
           <TouchableOpacity
             style={styles.refreshBtn}
             onPress={handleManualRefresh}
-            disabled={refreshing}
             activeOpacity={0.7}
             hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
           >
@@ -387,7 +405,7 @@ export default function MapScreen() {
               <Ionicons
                 name="refresh"
                 size={18}
-                color={refreshing ? colors.bloodBright : colors.silver}
+                color={isFetching ? colors.bloodBright : colors.silver}
               />
             </Animated.View>
           </TouchableOpacity>
