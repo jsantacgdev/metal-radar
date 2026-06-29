@@ -39,7 +39,7 @@ function BandsWithSeps({
     <RNText style={textStyle}>
       {bands.map((b, i) => (
         <Fragment key={b.id}>
-          {i > 0 && <RNText style={sepStyle}>{'  ·  '}</RNText>}
+          {i > 0 && <RNText style={sepStyle}>{'\u00A0\u00A0·  '}</RNText>}
           <RNText>{b.name.toUpperCase()}</RNText>
         </Fragment>
       ))}
