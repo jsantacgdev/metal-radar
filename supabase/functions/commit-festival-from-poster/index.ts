@@ -10,8 +10,8 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-// Nominatim recomienda identificar la app con User-Agent
 const NOMINATIM_UA = 'MetalRadar/1.0 (https://metalradar.app)';
+const POSTERS_BUCKET = 'festival-posters';
 
 type Payload = {
   festival: {
@@ -33,6 +33,8 @@ type Payload = {
     matched_band_id: string | null;
     tier: 'headliner' | 'subheadliner' | 'lineup';
   }[];
+  imageBase64?: string;
+  mediaType?: string;
 };
 
 // --- Geocoding ---
@@ -61,26 +63,21 @@ async function geocodeVenue(
   city: string | null,
   country: string | null,
 ): Promise<{ lat: number; lng: number; strategy: 'venue' | 'city' } | null> {
-  // Estrategia 1: venue + ciudad + país (si tenemos nombre de recinto real)
   if (venueName && venueName !== 'TBD' && city) {
     const q1 = [venueName, city, country].filter(Boolean).join(', ');
     const r1 = await tryGeocode(q1);
     if (r1) return { ...r1, strategy: 'venue' };
-    // Espera para respetar rate limit antes de la segunda llamada
     await sleep(1100);
   }
-
-  // Estrategia 2: solo ciudad + país (fallback)
   if (city) {
     const q2 = [city, country].filter(Boolean).join(', ');
     const r2 = await tryGeocode(q2);
     if (r2) return { ...r2, strategy: 'city' };
   }
-
   return null;
 }
 
-// --- Banda resolver ---
+// --- Band resolver ---
 
 async function resolveOrCreateBand(
   admin: any,
@@ -112,6 +109,41 @@ async function resolveOrCreateBand(
   return { bandId: null, created: false, error: insertErr?.message ?? 'unknown error' };
 }
 
+// --- Upload cartel ---
+
+async function uploadPosterImage(
+  admin: any,
+  festivalId: string,
+  imageBase64: string,
+  mediaType: string,
+): Promise<{ publicUrl: string | null; error: string | null }> {
+  try {
+    // Nombre fijo: {festivalId}/festival.jpg (con upsert sobrescribe en re-subidas)
+    const ext = mediaType.split('/')[1] ?? 'jpg';
+    const fileName = `${festivalId}/festival.${ext}`;
+
+    const binary = Uint8Array.from(atob(imageBase64), (c) => c.charCodeAt(0));
+
+    const { error: uploadErr } = await admin.storage.from(POSTERS_BUCKET).upload(fileName, binary, {
+      contentType: mediaType,
+      upsert: true, // sobrescribir si ya existe (re-subida)
+    });
+
+    if (uploadErr) return { publicUrl: null, error: uploadErr.message };
+
+    const {
+      data: { publicUrl },
+    } = admin.storage.from(POSTERS_BUCKET).getPublicUrl(fileName);
+
+    // Añadir query param para invalidar caché de RN/CDN cuando se sobrescribe
+    const cacheBustedUrl = `${publicUrl}?v=${Date.now()}`;
+
+    return { publicUrl: cacheBustedUrl, error: null };
+  } catch (err) {
+    return { publicUrl: null, error: (err as Error).message };
+  }
+}
+
 // --- Handler ---
 
 Deno.serve(async (req) => {
@@ -120,7 +152,7 @@ Deno.serve(async (req) => {
   try {
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const body = (await req.json()) as Payload;
-    const { festival, bands } = body;
+    const { festival, bands, imageBase64, mediaType } = body;
 
     if (!festival?.name) {
       return new Response(JSON.stringify({ error: 'festival.name required' }), {
@@ -141,6 +173,8 @@ Deno.serve(async (req) => {
       bands_reused: 0,
       bands_skipped: 0,
       skipped_details: [] as string[],
+      image_url: null as string | null,
+      image_upload_error: null as string | null,
     };
 
     // 1. VENUE
@@ -151,7 +185,6 @@ Deno.serve(async (req) => {
       let lat = festival.venue.lat ?? 0;
       let lng = festival.venue.lng ?? 0;
 
-      // Si no hay lat/lng explícitas, geocodificar
       const needsGeocoding = !festival.venue.lat || !festival.venue.lng;
       if (needsGeocoding) {
         const geo = await geocodeVenue(
@@ -210,7 +243,26 @@ Deno.serve(async (req) => {
     }
     results.festival_id = festivalId;
 
-    // 3. BANDAS
+    // 3. UPLOAD CARTEL
+    if (imageBase64) {
+      const uploaded = await uploadPosterImage(
+        admin,
+        festivalId,
+        imageBase64,
+        mediaType ?? 'image/jpeg',
+      );
+      if (uploaded.publicUrl) {
+        await admin
+          .from('festivals')
+          .update({ image_url: uploaded.publicUrl })
+          .eq('id', festivalId);
+        results.image_url = uploaded.publicUrl;
+      } else {
+        results.image_upload_error = uploaded.error;
+      }
+    }
+
+    // 4. BANDAS
     const seenBandIds = new Set<string>();
     const rowsToInsert: { festival_id: string; band_id: string; is_headliner: boolean }[] = [];
 

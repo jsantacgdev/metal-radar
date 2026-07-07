@@ -50,6 +50,8 @@ type CommitResult = {
   bands_created: number;
   bands_reused: number;
   bands_skipped: number;
+  image_url: string | null;
+  image_upload_error: string | null;
 };
 
 export default function PosterAdminScreen() {
@@ -152,6 +154,8 @@ export default function PosterAdminScreen() {
           matched_band_id: b.matched_band_id,
           tier: b.tier,
         })),
+        imageBase64, // <-- NUEVO: enviamos la imagen al commit
+        mediaType: 'image/jpeg',
       };
 
       const { data, error } = await supabase.functions.invoke('commit-festival-from-poster', {
@@ -265,6 +269,7 @@ export default function PosterAdminScreen() {
                 ) : (
                   <Badge text="SIN VENUE" tint="muted" />
                 )}
+                <Badge text="CARTEL SE GUARDARÁ" tint="muted" />
               </View>
             </View>
 
@@ -323,7 +328,7 @@ export default function PosterAdminScreen() {
           <Centered>
             <ActivityIndicator color={colors.bloodBright} size="large" />
             <Text variant="body" color="muted" style={styles.processingHint}>
-              Guardando en base de datos...{'\n'}Geocodificando venue si es nuevo.
+              Guardando en base de datos...{'\n'}Subiendo cartel y geocodificando.
             </Text>
           </Centered>
         )}
@@ -347,6 +352,16 @@ export default function PosterAdminScreen() {
                       ? `Creado (geo: ${result.venue_geocode_strategy === 'venue' ? 'recinto' : 'ciudad'})`
                       : 'Creado (sin geo)'
                     : 'Reutilizado'
+                }
+              />
+              <ResultRow
+                label="Cartel"
+                value={
+                  result.image_url
+                    ? 'Subido'
+                    : result.image_upload_error
+                      ? `Error: ${result.image_upload_error.slice(0, 30)}`
+                      : 'No subido'
                 }
               />
               <ResultRow label="Bandas añadidas" value={result.bands_added.toString()} />
