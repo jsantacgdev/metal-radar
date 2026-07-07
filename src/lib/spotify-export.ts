@@ -22,7 +22,7 @@ export type ExportSong = {
 async function searchTrack(token: string, title: string, artist: string): Promise<string | null> {
   const query = encodeURIComponent(`track:${title} artist:${artist}`);
 
-  const url = `https://api.spotify.com/v1/search?q=$${query}&type=track&limit=1`;
+  const url = `https://api.spotify.com/v1/search?q=${query}&type=track&limit=1`;
 
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },

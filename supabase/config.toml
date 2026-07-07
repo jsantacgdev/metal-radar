@@ -609,3 +609,9 @@ entrypoint = "./functions/commit-festival-from-poster/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/commit-festival-from-poster/*.html" ]
+
+[functions.fix-concert-headliners]
+enabled = true
+verify_jwt = false
+import_map = "./functions/fix-concert-headliners/deno.json"
+entrypoint = "./functions/fix-concert-headliners/index.ts"

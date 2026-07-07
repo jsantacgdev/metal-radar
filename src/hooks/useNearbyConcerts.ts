@@ -17,7 +17,7 @@ export type ConcertWithDetails = {
     lat: number;
     lng: number;
   };
-  bands: { id: string; name: string; image_url: string | null }[];
+  bands: { id: string; name: string; image_url: string | null; is_headliner: boolean }[];
   distance_km: number;
   is_festival: boolean;
   festival_name?: string;
@@ -41,43 +41,61 @@ async function fetchNearbyConcerts(userLat: number, userLng: number) {
   } = await supabase.auth.getUser();
   if (!user) throw new Error(i18n.t('errors.noSession'));
 
-  const { data: concertsData, error: cError } = await supabase
+  // 1. IDs de conciertos/festivales que tienen al menos una banda seguida por el usuario.
+  // Se hace en dos pasos porque un filtro sobre un embed (`concert_bands.band.user_bands`)
+  // recorta también las filas embebidas devueltas: si se pidiera el lineup completo en
+  // esta misma query, solo vendrían las bandas seguidas (perdiendo el resto del cartel,
+  // incluido el headliner si no se sigue).
+  const { data: followedConcertRows, error: fcError } = await supabase
     .from('concerts')
-    .select(
-      `
+    .select('id, concert_bands!inner ( band:bands!inner ( user_bands!inner ( user_id ) ) )')
+    .gte('event_date', new Date().toISOString())
+    .eq('concert_bands.band.user_bands.user_id', user.id);
+
+  if (fcError) throw fcError;
+  const concertIds = (followedConcertRows ?? []).map((c: any) => c.id);
+
+  const { data: followedFestivalRows, error: ffError } = await supabase
+    .from('festivals')
+    .select('id, festival_bands!inner ( band:bands!inner ( user_bands!inner ( user_id ) ) )')
+    .gte('end_date', new Date().toISOString().split('T')[0])
+    .eq('festival_bands.band.user_bands.user_id', user.id);
+
+  if (ffError) throw ffError;
+  const festivalIds = (followedFestivalRows ?? []).map((f: any) => f.id);
+
+  if (concertIds.length === 0 && festivalIds.length === 0) return [];
+
+  // 2. Datos completos (cartel entero, sin filtrar por bandas seguidas) para esos IDs.
+  const { data: concertsData, error: cError } = concertIds.length
+    ? await supabase
+        .from('concerts')
+        .select(
+          `
       id, event_date, ticket_url, price_min, price_max, currency,
       venue:venues!inner ( id, name, city, country, lat, lng ),
-      concert_bands!inner (
-        band:bands!inner (
-          id, name, image_url,
-          user_bands!inner ( user_id )
-        )
-      )
+      concert_bands ( is_headliner, band:bands ( id, name, image_url ) )
     `,
-    )
-    .gte('event_date', new Date().toISOString())
-    .eq('concert_bands.band.user_bands.user_id', user.id)
-    .order('event_date', { ascending: true });
+        )
+        .in('id', concertIds)
+        .order('event_date', { ascending: true })
+    : { data: [] as any[], error: null };
 
   if (cError) throw cError;
 
-  const { data: festivalsData, error: fError } = await supabase
-    .from('festivals')
-    .select(
-      `
+  const { data: festivalsData, error: fError } = festivalIds.length
+    ? await supabase
+        .from('festivals')
+        .select(
+          `
       id, name, description, start_date, end_date, ticket_url,
       venue:venues!inner ( id, name, city, country, lat, lng ),
-      festival_bands!inner (
-        band:bands!inner (
-          id, name, image_url,
-          user_bands!inner ( user_id )
-        )
-      )
+      festival_bands ( is_headliner, band:bands ( id, name, image_url ) )
     `,
-    )
-    .gte('end_date', new Date().toISOString().split('T')[0])
-    .eq('festival_bands.band.user_bands.user_id', user.id)
-    .order('start_date', { ascending: true });
+        )
+        .in('id', festivalIds)
+        .order('start_date', { ascending: true })
+    : { data: [] as any[], error: null };
 
   if (fError) throw fError;
 
@@ -101,6 +119,10 @@ async function fetchNearbyConcerts(userLat: number, userLng: number) {
     statusByFestivalId.set(uf.festival_id, uf.status);
   }
 
+  const sortBands = (
+    bands: { id: string; name: string; image_url: string | null; is_headliner: boolean }[],
+  ) => [...bands].sort((a, b) => Number(b.is_headliner) - Number(a.is_headliner));
+
   const concerts: ConcertWithDetails[] = (concertsData ?? [])
     .filter((c: any) => c.venue?.lat && c.venue?.lng)
     .map((c: any) => ({
@@ -111,7 +133,14 @@ async function fetchNearbyConcerts(userLat: number, userLng: number) {
       price_max: c.price_max,
       currency: c.currency,
       venue: c.venue,
-      bands: c.concert_bands.map((cb: any) => cb.band),
+      bands: sortBands(
+        (c.concert_bands ?? []).map((cb: any) => ({
+          id: cb.band.id,
+          name: cb.band.name,
+          image_url: cb.band.image_url,
+          is_headliner: !!cb.is_headliner,
+        })),
+      ),
       distance_km: haversine(userLat, userLng, c.venue.lat, c.venue.lng),
       is_festival: false,
       user_status: statusByConcertId.get(c.id) ?? null,
@@ -127,7 +156,14 @@ async function fetchNearbyConcerts(userLat: number, userLng: number) {
       price_max: null,
       currency: null,
       venue: f.venue,
-      bands: f.festival_bands.map((fb: any) => fb.band),
+      bands: sortBands(
+        (f.festival_bands ?? []).map((fb: any) => ({
+          id: fb.band.id,
+          name: fb.band.name,
+          image_url: fb.band.image_url,
+          is_headliner: !!fb.is_headliner,
+        })),
+      ),
       distance_km: haversine(userLat, userLng, f.venue.lat, f.venue.lng),
       is_festival: true,
       festival_name: f.name,

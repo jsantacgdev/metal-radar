@@ -237,10 +237,10 @@ export default function ConcertDetailScreen({ route }: Props) {
             }}
           >
             <BandImage
-              url={concert.bands[0]?.image_url ?? null}
+              url={headliner?.image_url ?? null}
               size={130}
               radiusOverride={radius.lg}
-              showTag={!concert.bands[0]?.image_url}
+              showTag={!headliner?.image_url}
             />
           </Animated.View>
           <View style={styles.heroText}>

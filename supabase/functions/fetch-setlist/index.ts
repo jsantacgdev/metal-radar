@@ -110,17 +110,17 @@ async function searchSetlistfmByDate(
 }
 
 /**
- * Llama al endpoint search/setlists filtrando por mbid + tourName.
+ * Llama al endpoint search/setlists filtrando por mbid (+ tourName si se indica).
  * Devuelve el setlist más reciente con canciones, o null si no hay ninguno.
  */
 async function fetchTourSetlistRaw(
   artistMbid: string,
-  tourName: string,
+  tourName?: string,
 ): Promise<SetlistfmSetlist | null> {
   const url =
     `https://api.setlist.fm/rest/1.0/search/setlists?` +
     `artistMbid=${encodeURIComponent(artistMbid)}` +
-    `&tourName=${encodeURIComponent(tourName)}`;
+    (tourName ? `&tourName=${encodeURIComponent(tourName)}` : '');
 
   const res = await fetch(url, {
     headers: {
@@ -132,7 +132,7 @@ async function fetchTourSetlistRaw(
   if (res.status === 404) return null;
   if (res.status === 429) throw new Error('SETLISTFM_RATE_LIMITED');
   if (!res.ok) {
-    console.log(`[setlistfm] tour HTTP ${res.status} mbid=${artistMbid} tour="${tourName}"`);
+    console.log(`[setlistfm] tour HTTP ${res.status} mbid=${artistMbid} tour="${tourName ?? ''}"`);
     return null;
   }
 
@@ -155,24 +155,31 @@ async function fetchTourSetlistRaw(
 }
 
 /**
- * Busca setlist por gira. Hace hasta 2 intentos:
- * 1. Con el tourName tal cual
- * 2. Si no hay resultados, sin el año al final ("Tour Name 2026" → "Tour Name")
+ * Busca un setlist "de predicción" para un headliner con mbid. Si hay tour_name,
+ * intenta primero con el nombre exacto y luego sin el año al final ("Tour Name 2026"
+ * → "Tour Name"). Si no hay tour_name (Ticketmaster no siempre lo incluye en el
+ * título del evento, sobre todo en giras grandes) o ninguno de esos intentos
+ * encuentra nada, cae de vuelta al setlist más reciente conocido del artista
+ * (sin filtrar por gira) como última alternativa.
  */
 async function searchSetlistfmByTour(
   artistMbid: string,
-  tourName: string,
+  tourName: string | null,
 ): Promise<SetlistfmSetlist | null> {
-  let setlist = await fetchTourSetlistRaw(artistMbid, tourName);
-  if (setlist) return setlist;
-  await sleep(SETLISTFM_DELAY_MS);
-
-  const cleaned = stripTrailingYear(tourName);
-  if (cleaned && cleaned !== tourName) {
-    setlist = await fetchTourSetlistRaw(artistMbid, cleaned);
+  if (tourName) {
+    let setlist = await fetchTourSetlistRaw(artistMbid, tourName);
     if (setlist) return setlist;
+    await sleep(SETLISTFM_DELAY_MS);
+
+    const cleaned = stripTrailingYear(tourName);
+    if (cleaned && cleaned !== tourName) {
+      setlist = await fetchTourSetlistRaw(artistMbid, cleaned);
+      if (setlist) return setlist;
+      await sleep(SETLISTFM_DELAY_MS);
+    }
   }
-  return null;
+
+  return fetchTourSetlistRaw(artistMbid);
 }
 
 function flattenSongs(setlist: SetlistfmSetlist): Song[] {
@@ -265,9 +272,13 @@ async function processConcertBand(
   let source: 'event' | 'tour' = 'event';
   let sourceEventDate: string | null = null;
 
-  // 2. Si no hay y la banda es headliner con mbid y hay tour_name → buscar por gira
-  if (!setlist && band.isHeadliner && band.mbid && tourName) {
-    console.log(`[fetch-setlist] no event setlist for "${band.name}", trying tour "${tourName}"`);
+  // 2. Si no hay y la banda es headliner con mbid → buscar por gira (o, si no hay
+  // tour_name / no hay match, el setlist más reciente conocido del artista)
+  if (!setlist && band.isHeadliner && band.mbid) {
+    console.log(
+      `[fetch-setlist] no event setlist for "${band.name}", trying tour fallback` +
+        (tourName ? ` "${tourName}"` : ' (sin tour_name)'),
+    );
     setlist = await searchSetlistfmByTour(band.mbid, tourName);
     await sleep(SETLISTFM_DELAY_MS);
     if (setlist) {

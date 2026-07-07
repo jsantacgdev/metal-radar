@@ -36,6 +36,56 @@ function normalizeCountry(name?: string): string | null {
   return name.toLowerCase().trim();
 }
 
+/**
+ * Extrae el nombre del tour del nombre del evento de Ticketmaster.
+ * Patrón típico: "ARTIST - Tour Name 2026" → "Tour Name 2026"
+ */
+function extractTourName(eventName: string, attractionName: string): string | null {
+  if (!eventName || !attractionName) return null;
+
+  const eventLower = eventName.toLowerCase().trim();
+  const artistLower = attractionName.toLowerCase().trim();
+
+  if (!eventLower.startsWith(artistLower)) return null;
+
+  const rest = eventName.slice(attractionName.length).trimStart();
+  const separators = [' - ', ' – ', ' — ', ': ', '- ', '– ', '— ', ':'];
+
+  for (const sep of separators) {
+    if (rest.startsWith(sep)) {
+      const tour = rest.slice(sep.length).trim();
+      return tour.length > 0 ? tour : null;
+    }
+  }
+
+  if (rest.length > 0 && rest !== eventName) {
+    return rest;
+  }
+  return null;
+}
+
+/**
+ * Ticketmaster no garantiza que `_embedded.attractions` venga ordenado por billing:
+ * el orden depende de cómo lo cargó el promotor. El nombre del evento, en cambio,
+ * casi siempre lleva el nombre del headliner, así que lo usamos para desempatar.
+ * Si no hay match claro, se cae de vuelta a la posición 0 (comportamiento previo).
+ */
+function findHeadlinerIndex(eventName: string, attractions: { name?: string }[]): number {
+  const normEvent = normalizeName(eventName);
+
+  const exactIdx = attractions.findIndex(
+    (a) => a.name && normalizeName(a.name) === normEvent,
+  );
+  if (exactIdx !== -1) return exactIdx;
+
+  const containedIdx = attractions.findIndex(
+    (a) => a.name && normEvent.includes(normalizeName(a.name)),
+  );
+  if (containedIdx !== -1) return containedIdx;
+
+  return 0;
+}
+
 async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=3`;
@@ -81,6 +131,9 @@ type TmEvent = {
       id: string;
       name: string;
       images?: { url: string }[];
+      externalLinks?: {
+        musicbrainz?: { id: string; url?: string }[];
+      };
     }[];
   };
 };
@@ -263,6 +316,16 @@ Deno.serve(async (req) => {
             continue;
           }
 
+          // Guardar TODAS las attractions del evento como bandas del cartel
+          const attractions = ev._embedded?.attractions ?? [];
+          const headlinerIdx = attractions.length > 0 ? findHeadlinerIndex(ev.name, attractions) : -1;
+
+          // Nombre del headliner para extraer el tour del nombre del evento
+          // ("ARTIST - Tour Name 2026"). Si no hay attractions, usamos la banda sincronizada.
+          const headlinerNameForTour =
+            headlinerIdx !== -1 ? attractions[headlinerIdx].name : band.name;
+          const tourName = extractTourName(ev.name, headlinerNameForTour);
+
           const priceRange = ev.priceRanges?.[0];
           const { data: concertRow, error: concertError } = await admin
             .from('concerts')
@@ -275,6 +338,7 @@ Deno.serve(async (req) => {
                 price_min: priceRange?.min ?? null,
                 price_max: priceRange?.max ?? null,
                 currency: priceRange?.currency ?? null,
+                tour_name: tourName,
                 last_synced_at: new Date().toISOString(),
               },
               { onConflict: 'ticketmaster_id' },
@@ -286,9 +350,6 @@ Deno.serve(async (req) => {
             console.warn('Concert upsert error:', concertError?.message);
             continue;
           }
-
-          // Guardar TODAS las attractions del evento como bandas del cartel
-          const attractions = ev._embedded?.attractions ?? [];
 
           if (attractions.length === 0) {
             // Fallback: si no hay attractions, al menos asociamos la banda que sincronizamos
@@ -303,10 +364,12 @@ Deno.serve(async (req) => {
               const attr = attractions[idx];
               if (!attr.name) continue;
 
+              const attrMbid: string | null = attr.externalLinks?.musicbrainz?.[0]?.id ?? null;
+
               // Buscar o crear banda en BD
               const { data: existingBand } = await admin
                 .from('bands')
-                .select('id')
+                .select('id, musicbrainz_mbid')
                 .or(`ticketmaster_id.eq.${attr.id},name.ilike.${attr.name.replace(/,/g, '')}`)
                 .limit(1)
                 .maybeSingle();
@@ -315,19 +378,21 @@ Deno.serve(async (req) => {
 
               if (!bandIdInDb) {
                 const imageUrl = attr.images?.[0]?.url ?? null;
+                const insertPayload: Record<string, unknown> = {
+                  name: attr.name,
+                  ticketmaster_id: attr.id,
+                  image_url: imageUrl,
+                };
+                if (attrMbid) insertPayload.musicbrainz_mbid = attrMbid;
+
                 const { data: newBand } = await admin
                   .from('bands')
-                  .upsert(
-                    {
-                      name: attr.name,
-                      ticketmaster_id: attr.id,
-                      image_url: imageUrl,
-                    },
-                    { onConflict: 'ticketmaster_id' },
-                  )
+                  .upsert(insertPayload, { onConflict: 'ticketmaster_id' })
                   .select('id')
                   .single();
                 bandIdInDb = newBand?.id;
+              } else if (attrMbid && !existingBand?.musicbrainz_mbid) {
+                await admin.from('bands').update({ musicbrainz_mbid: attrMbid }).eq('id', bandIdInDb);
               }
 
               if (bandIdInDb) {
@@ -335,7 +400,7 @@ Deno.serve(async (req) => {
                   {
                     concert_id: concertRow.id,
                     band_id: bandIdInDb,
-                    is_headliner: idx === 0,
+                    is_headliner: idx === headlinerIdx,
                   },
                   { onConflict: 'concert_id,band_id' },
                 );
