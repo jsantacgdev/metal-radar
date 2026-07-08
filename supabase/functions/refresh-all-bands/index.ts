@@ -17,7 +17,9 @@ const MB_HEADERS = {
   'User-Agent': 'MetalRadar/1.0 (contacto: jsantacgdev@gmail.com)',
 };
 
-// Rate limit MusicBrainz: 1 req/segundo
+const HEAVY_GENRE_REGEX =
+  /metal|rock|ska|hardcore|punk|metalcore|deathcore|grunge|emo|screamo|thrash|doom|sludge|stoner|industrial|gothic|prog|alternative|nu.?metal|post.?punk|psychedelic|garage|indie/i;
+
 const RATE_LIMIT_MS = 1100;
 
 type Member = {
@@ -154,7 +156,7 @@ async function fetchMusicBrainzDetail(mbid: string) {
 
   const officialGenres = (data.genres || []).map((g: any) => g.name);
   const tags = (data.tags || [])
-    .filter((t: any) => (t.count ?? 0) >= 1)
+    .filter((t: any) => (t.count ?? 0) >= 1 && HEAVY_GENRE_REGEX.test(t.name ?? ''))
     .sort((a: any, b: any) => (b.count ?? 0) - (a.count ?? 0))
     .map((t: any) => t.name);
   const genres = Array.from(new Set([...officialGenres, ...tags]));
@@ -211,7 +213,7 @@ async function fetchLastfmTags(name: string, mbid: string | null): Promise<strin
       .filter((t: any) => {
         const tagName = (t.name ?? '').toLowerCase();
         const count = parseInt(t.count ?? '0', 10);
-        return tagName && !blacklist.has(tagName) && count >= 5;
+        return tagName && !blacklist.has(tagName) && count >= 5 && HEAVY_GENRE_REGEX.test(tagName);
       })
       .slice(0, 6)
       .map((t: any) => t.name.toLowerCase());
@@ -276,7 +278,9 @@ async function refreshBand(admin: any, band: any): Promise<void> {
   ).slice(0, 8);
   updatePayload.genres = combined;
 
-  await admin.from('bands').update(updatePayload).eq('id', band.id);
+  const { error: updateError } = await admin.from('bands').update(updatePayload).eq('id', band.id);
+
+  if (updateError) throw new Error(`No se pudo guardar: ${updateError.message}`);
 }
 
 Deno.serve(async (req) => {
@@ -349,7 +353,6 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Rate limit para MusicBrainz
       await sleep(RATE_LIMIT_MS);
     }
 
