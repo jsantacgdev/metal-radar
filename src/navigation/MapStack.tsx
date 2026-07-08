@@ -12,7 +12,7 @@ export type MapStackParamList = {
   ConcertDetail: { concertId: string };
   FestivalDetail: { festivalId: string };
   BandDetail: { bandId: string };
-  AddConcert: undefined;
+  AddConcert: { concertId?: string } | undefined;
 };
 
 const Stack = createNativeStackNavigator<MapStackParamList>();

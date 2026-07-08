@@ -20,6 +20,7 @@ import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from '../components/ui';
 import BandImage from '../components/BandImage';
 import PhotoGallery from '../components/PhotoGallery';
+import ReportReasonModal from '../components/ReportReasonModal';
 import SetlistView from '../components/Setlist';
 import { useSetlists } from '../hooks/useSetlist';
 import { localeFromI18n } from '../i18n';
@@ -44,6 +45,7 @@ export default function ConcertDetailScreen({ route }: Props) {
   const { concert, loading, error, updateStatus, updateRating, updateNotes } =
     useConcert(concertId);
   const reportConcert = useReportConcert(concertId);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
 
   const { data: setlists = [] } = useSetlists(concert ? concert.id : null);
 
@@ -134,21 +136,16 @@ export default function ConcertDetailScreen({ route }: Props) {
   };
 
   const handleReport = () => {
-    Alert.alert(t('concertDetail.reportConfirmTitle'), t('concertDetail.reportConfirmMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('concertDetail.reportButton'),
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await reportConcert.mutateAsync(undefined);
-            Alert.alert(t('concertDetail.reportThanks'));
-          } catch (err: any) {
-            Alert.alert(t('common.error'), err.message);
-          }
-        },
-      },
-    ]);
+    setReportModalOpen(true);
+  };
+
+  const handleReportSubmit = async (reason: string | null) => {
+    try {
+      await reportConcert.mutateAsync(reason ?? undefined);
+      Alert.alert(t('concertDetail.reportThanks'));
+    } catch (err: any) {
+      Alert.alert(t('common.error'), err.message);
+    }
   };
 
   const handleShare = async () => {
@@ -499,6 +496,12 @@ export default function ConcertDetailScreen({ route }: Props) {
           </View>
         </View>
       )}
+
+      <ReportReasonModal
+        visible={reportModalOpen}
+        onClose={() => setReportModalOpen(false)}
+        onSubmit={handleReportSubmit}
+      />
     </View>
   );
 }

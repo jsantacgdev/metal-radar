@@ -12,6 +12,7 @@ export type Profile = {
   search_radius_km: number;
   push_token: string | null;
   language: SupportedLanguage | null;
+  role: 'user' | 'admin';
 };
 
 async function fetchProfile(): Promise<Profile | null> {

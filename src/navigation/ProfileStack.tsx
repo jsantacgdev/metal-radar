@@ -7,6 +7,8 @@ import ConcertDetailScreen from '../screens/ConcertDetailScreen';
 import FestivalDetailScreen from '../screens/FestivalDetailScreen';
 import BandDetailScreen from '../screens/BandDetailScreen';
 import PosterAdminScreen from '../screens/PosterAdminScreen';
+import ModerationScreen from '../screens/ModerationScreen';
+import AddConcertScreen from '../screens/AddConcertScreen';
 
 export type ProfileStackParamList = {
   ProfileHome: undefined;
@@ -17,6 +19,8 @@ export type ProfileStackParamList = {
   FestivalDetail: { festivalId: string };
   BandDetail: { bandId: string };
   PosterAdmin: undefined;
+  Moderation: undefined;
+  AddConcert: { concertId?: string } | undefined;
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -70,6 +74,16 @@ export default function ProfileStack() {
       <Stack.Screen
         name="PosterAdmin"
         component={PosterAdminScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="Moderation"
+        component={ModerationScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="AddConcert"
+        component={AddConcertScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

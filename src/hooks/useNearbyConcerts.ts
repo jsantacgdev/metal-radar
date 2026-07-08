@@ -66,12 +66,13 @@ async function fetchNearbyConcerts(userLat: number, userLng: number) {
         .from('concerts')
         .select(
           `
-      id, event_date, ticket_url, price_min, price_max, currency,
+      id, event_date, ticket_url, price_min, price_max, currency, report_count,
       venue:venues!inner ( id, name, city, country, lat, lng ),
       concert_bands ( is_headliner, band:bands ( id, name, image_url ) )
     `,
         )
         .in('id', concertIds)
+        .lt('report_count', 2)
         .order('event_date', { ascending: true })
     : { data: [] as any[], error: null };
 

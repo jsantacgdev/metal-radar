@@ -89,6 +89,7 @@ export function useConcert(concertId: string) {
   const query = useQuery({
     queryKey: ['concert', concertId],
     queryFn: () => fetchConcert(concertId),
+    enabled: !!concertId,
   });
 
   const invalidateAll = () => {

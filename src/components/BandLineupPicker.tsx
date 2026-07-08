@@ -19,9 +19,10 @@ type SearchResult = { id: string; name: string; image_url: string | null };
 type Props = {
   bands: SubmitConcertBand[];
   onChange: (bands: SubmitConcertBand[]) => void;
+  showFollowToggle?: boolean;
 };
 
-export default function BandLineupPicker({ bands, onChange }: Props) {
+export default function BandLineupPicker({ bands, onChange, showFollowToggle = true }: Props) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -153,20 +154,22 @@ export default function BandLineupPicker({ bands, onChange }: Props) {
               <Text variant="body" numberOfLines={1} style={{ flex: 1 }}>
                 {band.name}
               </Text>
-              <TouchableOpacity
-                onPress={() => toggleFollow(index)}
-                hitSlop={8}
-                style={styles.followTag}
-              >
-                <Ionicons
-                  name={band.follow ? 'checkbox' : 'square-outline'}
-                  size={16}
-                  color={band.follow ? colors.bloodBright : colors.muted}
-                />
-                <Text variant="monoSM" color={band.follow ? 'bloodBright' : 'muted'}>
-                  {t('addConcert.followBandCheckbox')}
-                </Text>
-              </TouchableOpacity>
+              {showFollowToggle && (
+                <TouchableOpacity
+                  onPress={() => toggleFollow(index)}
+                  hitSlop={8}
+                  style={styles.followTag}
+                >
+                  <Ionicons
+                    name={band.follow ? 'checkbox' : 'square-outline'}
+                    size={16}
+                    color={band.follow ? colors.bloodBright : colors.muted}
+                  />
+                  <Text variant="monoSM" color={band.follow ? 'bloodBright' : 'muted'}>
+                    {t('addConcert.followBandCheckbox')}
+                  </Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 onPress={() => makeHeadliner(index)}
                 style={[

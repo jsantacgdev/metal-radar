@@ -6,37 +6,24 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
+import { useProfile } from '../hooks/useProfile';
 import { useProfileStats, StatsPeriod } from '../hooks/useProfileStats';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Button, Text } from '../components/ui';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ProfileStackParamList } from '../navigation/ProfileStack';
-import { useRef } from 'react';
 
 export default function ProfileScreen() {
   const queryClient = useQueryClient();
   const { t, i18n } = useTranslation();
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const { session } = useAuth();
+  const { profile } = useProfile();
 
   const [statsPeriod, setStatsPeriod] = useState<StatsPeriod>('year');
   const currentYear = new Date().getFullYear();
   const { stats, loading: statsLoading } = useProfileStats(statsPeriod, currentYear);
-  const tapCountRef = useRef(0);
-  const tapResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleSecretTap = () => {
-    tapCountRef.current += 1;
-    if (tapResetTimeoutRef.current) clearTimeout(tapResetTimeoutRef.current);
-    tapResetTimeoutRef.current = setTimeout(() => {
-      tapCountRef.current = 0;
-    }, 2000);
-
-    if (tapCountRef.current >= 5) {
-      tapCountRef.current = 0;
-      navigation.navigate('PosterAdmin');
-    }
-  };
   useFocusEffect(
     useCallback(() => {
       queryClient.invalidateQueries({ queryKey: ['profileStats'] });
@@ -254,12 +241,32 @@ export default function ProfileScreen() {
         </View>
       </View>
 
+      {/* Admin */}
+      {profile?.role === 'admin' && (
+        <View style={styles.section}>
+          <Text variant="monoMD" color="muted" style={{ marginBottom: spacing.md }}>
+            {t('profile.adminSectionTitle')}
+          </Text>
+          <Button
+            label={t('profile.adminPosterButton')}
+            variant="secondary"
+            onPress={() => navigation.navigate('PosterAdmin')}
+            icon={<Ionicons name="image-outline" size={18} color={colors.bright} />}
+          />
+          <View style={{ height: spacing.sm }} />
+          <Button
+            label={t('profile.adminModerationButton')}
+            variant="secondary"
+            onPress={() => navigation.navigate('Moderation')}
+            icon={<Ionicons name="flag-outline" size={18} color={colors.bright} />}
+          />
+        </View>
+      )}
+
       {/* Footer */}
-      <TouchableOpacity activeOpacity={1} onPress={handleSecretTap}>
-        <Text variant="monoSM" color="muted">
-          {t('profile.footerTagline')}
-        </Text>
-      </TouchableOpacity>
+      <Text variant="monoSM" color="muted" style={styles.footer}>
+        {t('profile.footerTagline')}
+      </Text>
     </ScrollView>
   );
 }

@@ -627,3 +627,9 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/report-concert/deno.json"
 entrypoint = "./functions/report-concert/index.ts"
+
+[functions.moderate-concert]
+enabled = true
+verify_jwt = false
+import_map = "./functions/moderate-concert/deno.json"
+entrypoint = "./functions/moderate-concert/index.ts"

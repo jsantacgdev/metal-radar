@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,8 +10,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
@@ -19,8 +18,9 @@ import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from '../components/ui';
 import BandLineupPicker from '../components/BandLineupPicker';
 import { useSubmitConcert, SubmitConcertBand } from '../hooks/useSubmitConcert';
+import { useEditConcert } from '../hooks/useEditConcert';
+import { useConcert } from '../hooks/useConcert';
 import { usePreference } from '../hooks/usePreference';
-import { MapStackParamList } from '../navigation/MapStack';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^\d{2}:\d{2}$/;
@@ -35,10 +35,15 @@ type VenueResult = {
 };
 
 export default function AddConcertScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<MapStackParamList>>();
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+  const concertId: string | undefined = route.params?.concertId;
+  const isEditMode = !!concertId;
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const submitConcert = useSubmitConcert();
+  const editConcert = useEditConcert(concertId ?? '');
+  const { concert: existingConcert, loading: existingLoading } = useConcert(concertId ?? '');
 
   const {
     value: infoSeen,
@@ -59,13 +64,43 @@ export default function AddConcertScreen() {
   const [ticketUrl, setTicketUrl] = useState('');
   const [bands, setBands] = useState<SubmitConcertBand[]>([]);
 
+  const prefilled = useRef(false);
+
   useEffect(() => {
-    if (loaded && !infoSeen) {
-      Alert.alert(t('addConcert.infoDialogTitle'), t('addConcert.infoDialogBody'), [
-        { text: t('addConcert.infoDialogAck'), onPress: () => setInfoSeen(true) },
-      ]);
-    }
-  }, [loaded, infoSeen]);
+    if (!isEditMode || prefilled.current || !existingConcert) return;
+    prefilled.current = true;
+
+    setVenueName(existingConcert.venue.name);
+    setVenueId(existingConcert.venue.id);
+    setVenueLat(existingConcert.venue.lat);
+    setVenueLng(existingConcert.venue.lng);
+    setCity(existingConcert.venue.city ?? '');
+    setCountry(existingConcert.venue.country ?? '');
+
+    const [datePart, timePart] = existingConcert.event_date.split('T');
+    setDate(datePart);
+    const hhmm = timePart?.slice(0, 5);
+    setTime(hhmm && hhmm !== '00:00' ? hhmm : '');
+
+    setTicketUrl(existingConcert.ticket_url ?? '');
+
+    setBands(
+      existingConcert.bands.map((b) => ({
+        name: b.name,
+        matched_band_id: b.id,
+        image_url: b.image_url,
+        is_headliner: b.is_headliner,
+        follow: false,
+      })),
+    );
+  }, [isEditMode, existingConcert]);
+
+  useEffect(() => {
+    if (isEditMode || !loaded || infoSeen) return;
+    Alert.alert(t('addConcert.infoDialogTitle'), t('addConcert.infoDialogBody'), [
+      { text: t('addConcert.infoDialogAck'), onPress: () => setInfoSeen(true) },
+    ]);
+  }, [isEditMode, loaded, infoSeen]);
 
   useEffect(() => {
     if (venueId || venueName.trim().length < 2) {
@@ -126,26 +161,35 @@ export default function AddConcertScreen() {
       return;
     }
 
+    const input = {
+      event_date: date.trim(),
+      event_time: time.trim() ? time.trim() : null,
+      ticket_url: ticketUrl.trim() ? ticketUrl.trim() : null,
+      venue: {
+        id: venueId,
+        name: venueName.trim(),
+        city: city.trim() ? city.trim() : null,
+        country: country.trim() ? country.trim() : null,
+        lat: venueLat,
+        lng: venueLng,
+      },
+      bands,
+    };
+
     try {
-      const result = await submitConcert.mutateAsync({
-        event_date: date.trim(),
-        event_time: time.trim() ? time.trim() : null,
-        ticket_url: ticketUrl.trim() ? ticketUrl.trim() : null,
-        venue: {
-          id: venueId,
-          name: venueName.trim(),
-          city: city.trim() ? city.trim() : null,
-          country: country.trim() ? country.trim() : null,
-          lat: venueLat,
-          lng: venueLng,
-        },
-        bands,
-      });
-      navigation.replace('ConcertDetail', { concertId: result.concert_id });
+      if (isEditMode) {
+        await editConcert.mutateAsync(input);
+        navigation.goBack();
+      } else {
+        const result = await submitConcert.mutateAsync(input);
+        navigation.replace('ConcertDetail', { concertId: result.concert_id });
+      }
     } catch (err: any) {
       Alert.alert(t('common.error'), err.message);
     }
   };
+
+  const isSubmitting = isEditMode ? editConcert.isPending : submitConcert.isPending;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -157,10 +201,17 @@ export default function AddConcertScreen() {
         >
           <Ionicons name="arrow-back" size={22} color={colors.bright} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('addConcert.title')}</Text>
+        <Text style={styles.headerTitle}>
+          {isEditMode ? t('addConcert.editTitle') : t('addConcert.title')}
+        </Text>
         <View style={{ width: 40 }} />
       </View>
 
+      {isEditMode && existingLoading && !existingConcert ? (
+        <View style={styles.centered}>
+          <ActivityIndicator color={colors.bloodBright} size="large" />
+        </View>
+      ) : (
       <ScrollView
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxxl }}
         keyboardShouldPersistTaps="handled"
@@ -229,24 +280,27 @@ export default function AddConcertScreen() {
         <Text variant="monoSM" color="muted" style={styles.sectionLabel}>
           {t('addConcert.bandsLabel')}
         </Text>
-        <BandLineupPicker bands={bands} onChange={setBands} />
+        <BandLineupPicker bands={bands} onChange={setBands} showFollowToggle={!isEditMode} />
 
         <TouchableOpacity
           style={[styles.primaryButton, !canSubmit && styles.primaryButtonDisabled]}
           onPress={handleSubmit}
-          disabled={!canSubmit || submitConcert.isPending}
+          disabled={!canSubmit || isSubmitting}
           activeOpacity={0.8}
         >
-          {submitConcert.isPending ? (
+          {isSubmitting ? (
             <ActivityIndicator color="#fff" />
           ) : (
             <>
               <Ionicons name="checkmark" size={18} color="#fff" />
-              <Text style={styles.primaryButtonText}>{t('addConcert.submitButton')}</Text>
+              <Text style={styles.primaryButtonText}>
+                {isEditMode ? t('addConcert.saveChangesButton') : t('addConcert.submitButton')}
+              </Text>
             </>
           )}
         </TouchableOpacity>
       </ScrollView>
+      )}
     </View>
   );
 }
@@ -282,6 +336,7 @@ function Field({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.ink },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   headerBar: {
     flexDirection: 'row',
     alignItems: 'center',

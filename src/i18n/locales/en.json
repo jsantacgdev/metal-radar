@@ -163,7 +163,10 @@
     "missingDate": "Date is required",
     "invalidDate": "Date must be in YYYY-MM-DD format",
     "missingBands": "Add at least one band",
-    "successTitle": "Concert added"
+    "successTitle": "Concert added",
+    "editTitle": "Edit concert",
+    "saveChangesButton": "Save changes",
+    "savingButton": "Saving..."
   },
   "diary": {
     "title": "Diary",
@@ -210,8 +213,6 @@
     "buyTickets": "Buy tickets",
     "shareMessage": "🤘 Going to see {{band}} on {{date}} in {{place}}. Wanna join?",
     "reportButton": "Report as incorrect",
-    "reportConfirmTitle": "Report concert",
-    "reportConfirmMessage": "Are you sure you want to report this concert as fake or incorrect?",
     "reportThanks": "Thanks, we've logged it"
   },
   "festivalDetail": {
@@ -278,6 +279,9 @@
     "maintenanceLabel": "MAINTENANCE",
     "syncConcerts": "Sync concerts",
     "footerTagline": "METAL RADAR · MVP",
+    "adminSectionTitle": "ADMIN",
+    "adminPosterButton": "Import poster",
+    "adminModerationButton": "Reported concerts",
     "syncDoneTitle": "Sync completed",
     "syncDoneBody": "Concerts: {{synced}}\nDiscarded: {{discarded}}\nBands skipped: {{skipped}}",
     "permissionDeniedTitle": "Permission denied",
@@ -390,7 +394,34 @@
     "libraryPermissionDenied": "Library permission denied",
     "submitRateLimited": "You've reached today's limit of added concerts. Try again tomorrow.",
     "alreadyReported": "You've already reported this concert",
-    "venueGeocodeFailed": "We couldn't locate that venue. Check the name, city, and country."
+    "venueGeocodeFailed": "We couldn't locate that venue. Check the name, city, and country.",
+    "forbidden": "You don't have permission to do this"
+  },
+  "moderation": {
+    "title": "Reported concerts",
+    "emptyTitle": "No pending reports",
+    "emptyDesc": "When someone reports a community-added concert, it'll show up here.",
+    "reportsLabel_one": "{{count}} REPORT",
+    "reportsLabel_other": "{{count}} REPORTS",
+    "noReason": "No reason given",
+    "editButton": "Edit",
+    "deleteButton": "Delete",
+    "deleteConfirmTitle": "Delete concert",
+    "deleteConfirmMessage": "The concert and its lineup will be permanently deleted. This can't be undone.",
+    "deleteSuccess": "Concert deleted",
+    "dismissButton": "Dismiss",
+    "dismissSuccess": "Reports dismissed, the concert is visible again"
+  },
+  "reportReason": {
+    "title": "What's the issue?",
+    "doesNotExist": "The concert doesn't exist",
+    "wrongDate": "The date is wrong",
+    "wrongVenue": "The venue is wrong",
+    "wrongLineup": "The lineup is wrong",
+    "duplicate": "Duplicate concert",
+    "other": "Other",
+    "otherPlaceholder": "Tell us what's wrong...",
+    "submitButton": "Submit"
   },
   "calendar": {
     "permissionDeniedTitle": "Permission denied",

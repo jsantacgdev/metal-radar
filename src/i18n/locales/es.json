@@ -163,7 +163,10 @@
     "missingDate": "Falta la fecha",
     "invalidDate": "La fecha debe tener el formato AAAA-MM-DD",
     "missingBands": "Añade al menos una banda",
-    "successTitle": "Concierto añadido"
+    "successTitle": "Concierto añadido",
+    "editTitle": "Editar concierto",
+    "saveChangesButton": "Guardar cambios",
+    "savingButton": "Guardando..."
   },
   "diary": {
     "title": "Diario",
@@ -210,8 +213,6 @@
     "buyTickets": "Comprar entradas",
     "shareMessage": "🤘 Voy a ver a {{band}} el {{date}} en {{place}}. ¿Te vienes?",
     "reportButton": "Reportar como incorrecto",
-    "reportConfirmTitle": "Reportar concierto",
-    "reportConfirmMessage": "¿Seguro que quieres reportar este concierto como falso o incorrecto?",
     "reportThanks": "Gracias, lo hemos registrado"
   },
   "festivalDetail": {
@@ -278,6 +279,9 @@
     "maintenanceLabel": "MANTENIMIENTO",
     "syncConcerts": "Sincronizar conciertos",
     "footerTagline": "METAL RADAR · MVP",
+    "adminSectionTitle": "ADMIN",
+    "adminPosterButton": "Importar cartel",
+    "adminModerationButton": "Conciertos reportados",
     "syncDoneTitle": "Sincronización completada",
     "syncDoneBody": "Conciertos: {{synced}}\nDescartados: {{discarded}}\nBandas saltadas: {{skipped}}",
     "permissionDeniedTitle": "Permiso denegado",
@@ -390,7 +394,34 @@
     "libraryPermissionDenied": "Permiso de galería denegado",
     "submitRateLimited": "Has alcanzado el límite de conciertos añadidos por hoy. Inténtalo mañana.",
     "alreadyReported": "Ya has reportado este concierto",
-    "venueGeocodeFailed": "No hemos podido localizar esa sala. Revisa el nombre, la ciudad y el país."
+    "venueGeocodeFailed": "No hemos podido localizar esa sala. Revisa el nombre, la ciudad y el país.",
+    "forbidden": "No tienes permiso para hacer esto"
+  },
+  "moderation": {
+    "title": "Conciertos reportados",
+    "emptyTitle": "Sin reportes pendientes",
+    "emptyDesc": "Cuando alguien reporte un concierto añadido por la comunidad, aparecerá aquí.",
+    "reportsLabel_one": "{{count}} REPORTE",
+    "reportsLabel_other": "{{count}} REPORTES",
+    "noReason": "Sin motivo indicado",
+    "editButton": "Editar",
+    "deleteButton": "Eliminar",
+    "deleteConfirmTitle": "Eliminar concierto",
+    "deleteConfirmMessage": "Se borrará el concierto y su cartel de forma permanente. Esta acción no se puede deshacer.",
+    "deleteSuccess": "Concierto eliminado",
+    "dismissButton": "Descartar",
+    "dismissSuccess": "Reportes descartados, el concierto vuelve a ser visible"
+  },
+  "reportReason": {
+    "title": "¿Cuál es el problema?",
+    "doesNotExist": "El concierto no existe",
+    "wrongDate": "La fecha es incorrecta",
+    "wrongVenue": "La sala es incorrecta",
+    "wrongLineup": "El cartel es incorrecto",
+    "duplicate": "Concierto duplicado",
+    "other": "Otro",
+    "otherPlaceholder": "Cuéntanos qué está mal...",
+    "submitButton": "Enviar"
   },
   "calendar": {
     "permissionDeniedTitle": "Permiso denegado",
