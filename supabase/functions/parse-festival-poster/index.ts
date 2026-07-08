@@ -11,7 +11,6 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-// Mismo normalizador que enrich-bands para consistencia en el fuzzy match
 function normalizeName(s: string): string {
   return s
     .toLowerCase()
@@ -65,7 +64,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 1. Llamar a Claude Vision
     const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -104,7 +102,6 @@ Deno.serve(async (req) => {
     const claudeData = await claudeRes.json();
     const rawText = claudeData.content?.[0]?.text ?? '';
 
-    // Limpiar markdown si lo hay y parsear
     const cleanText = rawText
       .replace(/```json\s*/g, '')
       .replace(/```\s*/g, '')
@@ -123,10 +120,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 2. Conectar a BD para fuzzy matching
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // 3. Buscar festival existente por nombre normalizado
     let existingFestivalId: string | null = null;
     if (parsed.festival_name) {
       const { data: festivals } = await admin.from('festivals').select('id, name');
@@ -138,7 +133,6 @@ Deno.serve(async (req) => {
       existingFestivalId = match?.id ?? null;
     }
 
-    // 4. Buscar venue existente por nombre + ciudad
     let existingVenueId: string | null = null;
     if (parsed.venue_name) {
       const { data: venues } = await admin.from('venues').select('id, name, city');
@@ -152,7 +146,6 @@ Deno.serve(async (req) => {
       existingVenueId = match?.id ?? null;
     }
 
-    // 5. Fuzzy match de todas las bandas detectadas contra catálogo
     const { data: allBands } = await admin.from('bands').select('id, name');
     const bandsLookup = new Map<string, { id: string; name: string }>();
     (allBands ?? []).forEach((b: any) => {

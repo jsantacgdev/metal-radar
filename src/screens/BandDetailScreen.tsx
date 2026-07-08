@@ -319,7 +319,7 @@ export default function BandDetailScreen({ route }: Props) {
               {info.genres && info.genres.length > 0 && (
                 <MetaItem
                   label={t('bandDetail.metaGenre')}
-                  value={info.genres.length > 1 ? info.genres[1] : info.genres[0]}
+                  value={info.genres[0]}
                   smallValue
                   center
                 />

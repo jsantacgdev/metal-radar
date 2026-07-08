@@ -28,7 +28,6 @@ function normalizeName(s: string): string {
 }
 
 function formatDate(isoDate: string): string {
-  // setlist.fm quiere DD-MM-YYYY
   const d = new Date(isoDate);
   const dd = String(d.getDate()).padStart(2, '0');
   const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -36,7 +35,6 @@ function formatDate(isoDate: string): string {
   return `${dd}-${mm}-${yyyy}`;
 }
 
-/** Convierte DD-MM-YYYY (formato setlist.fm) → YYYY-MM-DD (formato Postgres DATE) */
 function setlistfmDateToISO(ddmmyyyy: string): string | null {
   const parts = ddmmyyyy.split('-');
   if (parts.length !== 3) return null;
@@ -44,7 +42,6 @@ function setlistfmDateToISO(ddmmyyyy: string): string | null {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-/** Quita un año al final del tour name si está presente. "From Zero World Tour 2026" → "From Zero World Tour" */
 function stripTrailingYear(tour: string): string {
   return tour.replace(/\s+\d{4}$/, '').trim();
 }
@@ -69,7 +66,6 @@ type Song = {
   duration_ms: number | null;
 };
 
-/** Busca el setlist del PROPIO evento (artist + date). Comportamiento original. */
 async function searchSetlistfmByDate(
   artistName: string,
   date: string,
@@ -109,10 +105,6 @@ async function searchSetlistfmByDate(
   return setlists[0];
 }
 
-/**
- * Llama al endpoint search/setlists filtrando por mbid (+ tourName si se indica).
- * Devuelve el setlist más reciente con canciones, o null si no hay ninguno.
- */
 async function fetchTourSetlistRaw(
   artistMbid: string,
   tourName?: string,
@@ -140,13 +132,11 @@ async function fetchTourSetlistRaw(
   const setlists: SetlistfmSetlist[] = data.setlist ?? [];
   if (setlists.length === 0) return null;
 
-  // Ordenar por fecha descendente
   const withDate = setlists
     .map((s) => ({ s, t: setlistfmDateToISO(s.eventDate) }))
     .filter((x) => x.t)
     .sort((a, b) => (a.t! < b.t! ? 1 : -1));
 
-  // Coger el primero con canciones
   for (const { s } of withDate) {
     const total = (s.sets?.set ?? []).reduce((acc, set) => acc + (set.song?.length ?? 0), 0);
     if (total > 0) return s;
@@ -154,14 +144,6 @@ async function fetchTourSetlistRaw(
   return null;
 }
 
-/**
- * Busca un setlist "de predicción" para un headliner con mbid. Si hay tour_name,
- * intenta primero con el nombre exacto y luego sin el año al final ("Tour Name 2026"
- * → "Tour Name"). Si no hay tour_name (Ticketmaster no siempre lo incluye en el
- * título del evento, sobre todo en giras grandes) o ninguno de esos intentos
- * encuentra nada, cae de vuelta al setlist más reciente conocido del artista
- * (sin filtrar por gira) como última alternativa.
- */
 async function searchSetlistfmByTour(
   artistMbid: string,
   tourName: string | null,
@@ -265,15 +247,12 @@ async function processConcertBand(
 ) {
   console.log(`[fetch-setlist] processing "${band.name}" @ ${eventDate}`);
 
-  // 1. Intentar setlist del propio evento
   let setlist = await searchSetlistfmByDate(band.name, eventDate, cityName);
   await sleep(SETLISTFM_DELAY_MS);
 
   let source: 'event' | 'tour' = 'event';
   let sourceEventDate: string | null = null;
 
-  // 2. Si no hay y la banda es headliner con mbid → buscar por gira (o, si no hay
-  // tour_name / no hay match, el setlist más reciente conocido del artista)
   if (!setlist && band.isHeadliner && band.mbid) {
     console.log(
       `[fetch-setlist] no event setlist for "${band.name}", trying tour fallback` +
@@ -303,7 +282,6 @@ async function processConcertBand(
     return { band: band.name, found: false };
   }
 
-  // 3. Aplanar canciones
   const songs = flattenSongs(setlist);
 
   if (songs.length === 0) {
@@ -323,7 +301,6 @@ async function processConcertBand(
     return { band: band.name, found: false, source };
   }
 
-  // 4. Enriquecer duración con Spotify
   for (let i = 0; i < songs.length; i++) {
     songs[i].duration_ms = await enrichSongDuration(songs[i], band.name, spotifyToken);
     if (i < songs.length - 1) await sleep(SPOTIFY_DELAY_MS);
@@ -333,7 +310,6 @@ async function processConcertBand(
   const totalMinutes = totalDurationMs > 0 ? Math.round(totalDurationMs / 60000) : null;
   const encoreCount = songs.filter((s) => s.encore).length;
 
-  // 5. Guardar
   await admin.from('setlists').upsert(
     {
       concert_id: concertId,
@@ -368,7 +344,6 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // 1. Datos del concierto (incluyendo tour_name y mbid + is_headliner por banda)
     const { data: concert, error: cErr } = await admin
       .from('concerts')
       .select(
@@ -399,7 +374,6 @@ Deno.serve(async (req) => {
       isHeadliner: !!cb.is_headliner,
     }));
 
-    // Filtrar por bandId si se pidió
     const bandsToProcess = bandId ? allBands.filter((b) => b.id === bandId) : allBands;
 
     if (bandsToProcess.length === 0) {
@@ -409,7 +383,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 2. Si no es force, saltar las que ya tenemos
     let pendingBands = bandsToProcess;
     if (!force) {
       const { data: existing } = await admin
@@ -427,10 +400,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 3. Token Spotify
     const spotifyToken = await getSpotifyToken();
 
-    // 4. Procesar cada banda
     const results = [];
     for (const band of pendingBands) {
       try {

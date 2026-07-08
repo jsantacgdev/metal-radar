@@ -32,7 +32,6 @@ const LeafletMap = forwardRef<LeafletMapRef, Props>(
 
     useImperativeHandle(ref, () => ({
       setCenter: (lat, lng, z) => {
-        // MapLibre usa [lng, lat], al revés que Leaflet
         webviewRef.current?.injectJavaScript(`
           map.flyTo({ center: [${lng}, ${lat}], zoom: ${z ?? zoom}, essential: true });
           true;
@@ -167,7 +166,7 @@ function buildHtml(
       attributionControl: { compact: true },
     });
 
-    // Forzar etiquetas en español globalmente
+    
     function localizeLabels() {
       const layers = map.getStyle().layers;
       if (!layers) return;
@@ -181,7 +180,7 @@ function buildHtml(
               ['get', 'name']
             ]);
           } catch (e) {
-            // algunos layers pueden no aceptar el cambio, ignorar
+      
           }
         }
       }
@@ -190,7 +189,7 @@ function buildHtml(
     map.on('load', () => {
       localizeLabels();
 
-      // Marker del usuario
+
       const user = ${userJson};
       if (user) {
         const userEl = document.createElement('div');
@@ -200,7 +199,7 @@ function buildHtml(
           .addTo(map);
       }
 
-      // Markers de conciertos
+
       const markers = ${markersJson};
       markers.forEach((m) => {
         const isLight = m.color === '#c7cad0';
@@ -222,7 +221,6 @@ function buildHtml(
       });
     });
 
-    // Si el estilo se recarga (por cambio de viewport, etc.), re-aplicar idioma
     map.on('styledata', () => {
       localizeLabels();
     });

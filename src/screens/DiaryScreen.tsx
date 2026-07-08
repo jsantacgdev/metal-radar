@@ -59,7 +59,6 @@ export default function DiaryScreen() {
   const filtered = filter === 'upcoming' ? upcoming : past;
 
   const showWrappedBanner = stats.shows > 0;
-  // isPosterAvailable() && stats.shows > 0;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.md }]}>

@@ -34,10 +34,6 @@ function normalizeCountry(name?: string): string | null {
   return name.toLowerCase().trim();
 }
 
-/**
- * Extrae el nombre del tour del nombre del evento de Ticketmaster.
- * Patrón típico: "ARTIST - Tour Name 2026" → "Tour Name 2026"
- */
 function extractTourName(eventName: string, attractionName: string): string | null {
   if (!eventName || !attractionName) return null;
 
@@ -117,17 +113,11 @@ type TmEvent = {
   };
 };
 
-/**
- * Si el concierto solo tiene el headliner, intenta copiar el lineup
- * de otro concierto del mismo tour (caso típico: Ticketmaster no rellena
- * teloneros para algunos países pero sí para otros).
- */
 async function inferLineupFromTour(
   admin: any,
   concertId: string,
   tourName: string,
 ): Promise<number> {
-  // Buscar concierto de referencia: mismo tour, distinto concierto, sincronizado recientemente
   const { data: referenceConcerts } = await admin
     .from('concerts')
     .select(
@@ -139,11 +129,10 @@ async function inferLineupFromTour(
     .eq('tour_name', tourName)
     .neq('id', concertId)
     .order('last_synced_at', { ascending: false })
-    .limit(10); // top 10 candidatos para elegir uno con lineup completo
+    .limit(10);
 
   if (!referenceConcerts || referenceConcerts.length === 0) return 0;
 
-  // Elegir el primero con más de 1 banda
   const reference = (referenceConcerts as any[]).find((c) => (c.concert_bands ?? []).length > 1);
   if (!reference) return 0;
 
@@ -152,7 +141,6 @@ async function inferLineupFromTour(
     is_headliner: boolean;
   }[];
 
-  // IDs de bandas ya asociadas a este concierto
   const { data: existing } = await admin
     .from('concert_bands')
     .select('band_id')
@@ -160,8 +148,6 @@ async function inferLineupFromTour(
 
   const existingIds = new Set((existing ?? []).map((r: any) => r.band_id));
 
-  // Insertar las bandas que faltan, siempre como is_headliner = false
-  // (el headliner real ya está, lo que copiamos son teloneros)
   let added = 0;
   for (const rb of refBands) {
     if (existingIds.has(rb.band_id)) continue;
@@ -213,7 +199,6 @@ Deno.serve(async (req) => {
     const band: any = (ub as any)?.band;
     if (!band) throw new Error('Banda no encontrada o no seguida por el usuario');
 
-    // Threshold de 12h (saltable con force=true)
     const STALE_HOURS = 12;
     const staleSince = new Date(Date.now() - STALE_HOURS * 60 * 60 * 1000).toISOString();
     if (!force && band.last_concerts_sync_at && band.last_concerts_sync_at > staleSince) {
@@ -304,7 +289,6 @@ Deno.serve(async (req) => {
       const eventDate = ev.dates.start.dateTime ?? ev.dates.start.localDate;
       if (!eventDate) continue;
 
-      // Extraer tour del nombre del evento
       const headlinerName = ev._embedded?.attractions?.[0]?.name ?? band.name;
       const tourName = extractTourName(ev.name, headlinerName);
 
@@ -385,7 +369,6 @@ Deno.serve(async (req) => {
       const attractions = ev._embedded?.attractions ?? [];
 
       if (attractions.length === 0) {
-        // Fallback: si no hay attractions, al menos asociamos la banda que sincronizamos
         await admin
           .from('concert_bands')
           .upsert(
@@ -399,7 +382,6 @@ Deno.serve(async (req) => {
 
           const attrMbid: string | null = attr.externalLinks?.musicbrainz?.[0]?.id ?? null;
 
-          // Buscar banda existente por TM id o por nombre
           const { data: existingBand } = await admin
             .from('bands')
             .select('id, musicbrainz_mbid')
@@ -441,8 +423,6 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Heurística de lineup inferido: si solo tenemos el headliner y hay tour_name,
-      // intentar copiar teloneros de otro concierto del mismo tour
       if (tourName && attractions.length <= 1) {
         const added = await inferLineupFromTour(admin, concertRow.id, tourName);
         if (added > 0) {

@@ -11,6 +11,8 @@ export type ConcertDetail = {
   price_max: number | null;
   currency: string | null;
   status: string;
+  source: 'ticketmaster' | 'user_submitted';
+  reportCount: number;
   venue: {
     id: string;
     name: string;
@@ -41,7 +43,7 @@ async function fetchConcert(concertId: string): Promise<ConcertDetail> {
     .from('concerts')
     .select(
       `
-      id, event_date, ticket_url, price_min, price_max, currency, status,
+      id, event_date, ticket_url, price_min, price_max, currency, status, source, report_count,
       venue:venues!inner ( id, name, city, country, lat, lng ),
       concert_bands ( is_headliner, band:bands ( id, name, image_url ) )
     `,
@@ -67,6 +69,8 @@ async function fetchConcert(concertId: string): Promise<ConcertDetail> {
     price_max: c.price_max,
     currency: c.currency,
     status: c.status,
+    source: c.source ?? 'ticketmaster',
+    reportCount: c.report_count ?? 0,
     venue: c.venue,
     bands: c.concert_bands.map((cb: any) => ({
       ...cb.band,
@@ -117,8 +121,6 @@ export function useConcert(concertId: string) {
 
         if (upsertError) throw upsertError;
 
-        // Fire-and-forget: en cualquier estado intentamos cachear el setlist
-        // si no existe ya. fetch-setlist es idempotente sin force=true.
         if (status === 'interested' || status === 'going' || status === 'attended') {
           supabase.functions
             .invoke('fetch-setlist', { body: { concertId } })

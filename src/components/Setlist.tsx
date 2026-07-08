@@ -18,7 +18,7 @@ type Props = {
   bandName: string;
 };
 
-const TOUR_ACCENT = '#ffa500'; // Naranja para "predicción de gira"
+const TOUR_ACCENT = '#ffa500';
 
 function useFormatDuration() {
   const { t } = useTranslation();
@@ -66,7 +66,6 @@ export default function SetlistView({ concertId, setlist, bandId, bandName }: Pr
         artist: s.cover_of ?? bandName,
       }));
 
-      // Nombre y descripción según el origen
       const playlistName = t('setlist.playlistName', { band: bandName });
       const description =
         setlist.source === 'tour' && setlist.source_event_date

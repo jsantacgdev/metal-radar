@@ -16,7 +16,6 @@ async function fetchSpotifyUser(): Promise<SpotifyUser> {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
-    // Token inválido, limpiamos
     await clearSpotifyAuth();
     return null;
   }

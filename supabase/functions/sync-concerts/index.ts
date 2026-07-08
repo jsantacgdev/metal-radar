@@ -36,10 +36,6 @@ function normalizeCountry(name?: string): string | null {
   return name.toLowerCase().trim();
 }
 
-/**
- * Extrae el nombre del tour del nombre del evento de Ticketmaster.
- * Patrón típico: "ARTIST - Tour Name 2026" → "Tour Name 2026"
- */
 function extractTourName(eventName: string, attractionName: string): string | null {
   if (!eventName || !attractionName) return null;
 
@@ -64,18 +60,10 @@ function extractTourName(eventName: string, attractionName: string): string | nu
   return null;
 }
 
-/**
- * Ticketmaster no garantiza que `_embedded.attractions` venga ordenado por billing:
- * el orden depende de cómo lo cargó el promotor. El nombre del evento, en cambio,
- * casi siempre lleva el nombre del headliner, así que lo usamos para desempatar.
- * Si no hay match claro, se cae de vuelta a la posición 0 (comportamiento previo).
- */
 function findHeadlinerIndex(eventName: string, attractions: { name?: string }[]): number {
   const normEvent = normalizeName(eventName);
 
-  const exactIdx = attractions.findIndex(
-    (a) => a.name && normalizeName(a.name) === normEvent,
-  );
+  const exactIdx = attractions.findIndex((a) => a.name && normalizeName(a.name) === normEvent);
   if (exactIdx !== -1) return exactIdx;
 
   const containedIdx = attractions.findIndex(
@@ -182,7 +170,6 @@ Deno.serve(async (req) => {
       const band = (ub as any).bands;
       if (!band?.name) continue;
 
-      // Saltar si se sincronizó recientemente
       if (band.last_concerts_sync_at && band.last_concerts_sync_at > staleSince) {
         bandsSkipped++;
         continue;
@@ -191,7 +178,6 @@ Deno.serve(async (req) => {
       bandsProcessed++;
 
       try {
-        // 1. Conseguir attractionId
         let attractionId: string | null = band.ticketmaster_id;
 
         if (!attractionId) {
@@ -221,7 +207,7 @@ Deno.serve(async (req) => {
 
           if (!matched) {
             console.warn(`No attraction match for "${band.name}", skipping`);
-            // Marcamos como sincronizada para no reintentar cada vez
+
             await admin
               .from('bands')
               .update({ last_concerts_sync_at: new Date().toISOString() })
@@ -233,7 +219,6 @@ Deno.serve(async (req) => {
           await admin.from('bands').update({ ticketmaster_id: attractionId }).eq('id', band.id);
         }
 
-        // 2. Eventos por attractionId
         const tmUrl =
           `https://app.ticketmaster.com/discovery/v2/events.json?` +
           `attractionId=${attractionId}` +
@@ -316,12 +301,10 @@ Deno.serve(async (req) => {
             continue;
           }
 
-          // Guardar TODAS las attractions del evento como bandas del cartel
           const attractions = ev._embedded?.attractions ?? [];
-          const headlinerIdx = attractions.length > 0 ? findHeadlinerIndex(ev.name, attractions) : -1;
+          const headlinerIdx =
+            attractions.length > 0 ? findHeadlinerIndex(ev.name, attractions) : -1;
 
-          // Nombre del headliner para extraer el tour del nombre del evento
-          // ("ARTIST - Tour Name 2026"). Si no hay attractions, usamos la banda sincronizada.
           const headlinerNameForTour =
             headlinerIdx !== -1 ? attractions[headlinerIdx].name : band.name;
           const tourName = extractTourName(ev.name, headlinerNameForTour);
@@ -352,7 +335,6 @@ Deno.serve(async (req) => {
           }
 
           if (attractions.length === 0) {
-            // Fallback: si no hay attractions, al menos asociamos la banda que sincronizamos
             await admin
               .from('concert_bands')
               .upsert(
@@ -366,7 +348,6 @@ Deno.serve(async (req) => {
 
               const attrMbid: string | null = attr.externalLinks?.musicbrainz?.[0]?.id ?? null;
 
-              // Buscar o crear banda en BD
               const { data: existingBand } = await admin
                 .from('bands')
                 .select('id, musicbrainz_mbid')
@@ -392,7 +373,10 @@ Deno.serve(async (req) => {
                   .single();
                 bandIdInDb = newBand?.id;
               } else if (attrMbid && !existingBand?.musicbrainz_mbid) {
-                await admin.from('bands').update({ musicbrainz_mbid: attrMbid }).eq('id', bandIdInDb);
+                await admin
+                  .from('bands')
+                  .update({ musicbrainz_mbid: attrMbid })
+                  .eq('id', bandIdInDb);
               }
 
               if (bandIdInDb) {
@@ -411,7 +395,6 @@ Deno.serve(async (req) => {
           totalConcerts++;
         }
 
-        // Marcar banda como sincronizada
         await admin
           .from('bands')
           .update({ last_concerts_sync_at: new Date().toISOString() })

@@ -4,11 +4,11 @@ import { supabase } from '../lib/supabase';
 import { DiaryEntry } from './useDiary';
 
 export type DiaryStats = {
-  shows: number; // conciertos atendidos en el año
-  bands: number; // bandas únicas vistas en el año
-  newBands: number; // bandas vistas por primera vez en el año
-  cities: number; // ciudades únicas en el año
-  km: number; // total km recorridos (ida)
+  shows: number;
+  bands: number;
+  newBands: number;
+  cities: number;
+  km: number;
 };
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -48,18 +48,15 @@ export function useDiaryStats(entries: DiaryEntry[], year: number): DiaryStats {
     const yearStart = new Date(`${year}-01-01T00:00:00Z`).getTime();
     const yearEnd = new Date(`${year + 1}-01-01T00:00:00Z`).getTime();
 
-    // Asistidos en el año
     const attendedThisYear = entries.filter((e) => {
       if (e.status !== 'attended') return false;
       const d = new Date(e.concert.event_date).getTime();
       return d >= yearStart && d < yearEnd;
     });
 
-    // Bandas únicas del año
     const bandIdsThisYear = new Set<string>();
     attendedThisYear.forEach((e) => e.concert.bands.forEach((b) => bandIdsThisYear.add(b.id)));
 
-    // Bandas vistas ANTES del año (para detectar "nuevas")
     const bandIdsBefore = new Set<string>();
     entries.forEach((e) => {
       if (e.status !== 'attended') return;
@@ -68,12 +65,10 @@ export function useDiaryStats(entries: DiaryEntry[], year: number): DiaryStats {
     });
     const newBands = Array.from(bandIdsThisYear).filter((id) => !bandIdsBefore.has(id)).length;
 
-    // Ciudades únicas
     const cities = new Set(
       attendedThisYear.map((e) => e.concert.venue.city).filter((c): c is string => !!c),
     );
 
-    // Km recorridos
     let km = 0;
     if (home?.lat != null && home?.lng != null) {
       attendedThisYear.forEach((e) => {

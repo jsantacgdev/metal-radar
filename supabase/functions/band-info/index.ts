@@ -12,6 +12,9 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const HEAVY_GENRE_REGEX =
+  /metal|rock|ska|hardcore|punk|metalcore|deathcore|grunge|emo|screamo|thrash|doom|sludge|stoner|industrial|gothic|prog|alternative|nu.?metal|post.?punk|psychedelic|garage|indie/i;
+
 const MB_HEADERS = {
   'User-Agent': 'MetalRadar/1.0 (contacto: jsantacgdev@gmail.com)',
 };
@@ -51,10 +54,6 @@ async function getSpotifyToken(): Promise<string> {
   return cachedSpotifyToken.value;
 }
 
-/**
- * Obtiene los datos de un artista por su Spotify ID (no por búsqueda).
- * Devuelve image_url y géneros, garantizado correctos.
- */
 async function fetchSpotifyArtistById(
   spotifyId: string,
 ): Promise<{ image_url: string | null; genres: string[] } | null> {
@@ -75,9 +74,6 @@ async function fetchSpotifyArtistById(
   }
 }
 
-/**
- * Busca el MBID de un artista en MusicBrainz a partir de su Spotify ID.
- */
 async function findMbidBySpotify(spotifyId: string): Promise<string | null> {
   try {
     const spotifyUrl = `https://open.spotify.com/artist/${spotifyId}`;
@@ -96,9 +92,6 @@ async function findMbidBySpotify(spotifyId: string): Promise<string | null> {
   }
 }
 
-/**
- * Extrae el Spotify ID de las relaciones de MusicBrainz.
- */
 async function findSpotifyIdFromMbid(mbid: string): Promise<string | null> {
   try {
     const url = `https://musicbrainz.org/ws/2/artist/${mbid}?inc=url-rels&fmt=json`;
@@ -118,9 +111,6 @@ async function findSpotifyIdFromMbid(mbid: string): Promise<string | null> {
   }
 }
 
-/**
- * Fallback: busca el MBID por nombre.
- */
 async function searchMusicBrainzByName(name: string): Promise<string | null> {
   const url = `https://musicbrainz.org/ws/2/artist?query=${encodeURIComponent(`artist:"${name}"`)}&fmt=json&limit=5`;
   const res = await fetch(url, { headers: MB_HEADERS });
@@ -179,10 +169,6 @@ async function fetchMusicBrainzDetail(mbid: string) {
   };
 }
 
-/**
- * Obtiene la biografía de Last.fm en el idioma indicado.
- * Si se pasa mbid, lo usa para resolver homónimos correctamente.
- */
 async function fetchLastfmBio(
   name: string,
   mbid: string | null,
@@ -228,7 +214,6 @@ async function fetchLastfmTags(name: string, mbid: string | null): Promise<strin
     const data = await res.json();
     const tags = data.toptags?.tag ?? [];
 
-    // Filtrar tags genéricos sin valor descriptivo
     const blacklist = new Set([
       'seen live',
       'favorites',
@@ -246,7 +231,7 @@ async function fetchLastfmTags(name: string, mbid: string | null): Promise<strin
       .filter((t: any) => {
         const name = (t.name ?? '').toLowerCase();
         const count = parseInt(t.count ?? '0', 10);
-        return name && !blacklist.has(name) && count >= 5;
+        return name && !blacklist.has(name) && count >= 5 && HEAVY_GENRE_REGEX.test(name);
       })
       .slice(0, 6)
       .map((t: any) => t.name.toLowerCase());
@@ -265,7 +250,6 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) throw new Error('Falta Authorization header');
 
-    // Si viene con service role key, es una llamada interna (refresh-all-bands)
     const isServiceRole = authHeader === `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`;
 
     if (!isServiceRole) {
@@ -295,7 +279,6 @@ Deno.serve(async (req) => {
 
     if (error || !band) throw new Error('Banda no encontrada');
 
-    // ¿Caché válida?
     const staleSince = new Date(Date.now() - STALE_DAYS * 24 * 60 * 60 * 1000).toISOString();
     const hasRichData =
       band.musicbrainz_mbid &&
@@ -319,7 +302,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Resolver MBID: primero por Spotify ID, fallback a búsqueda por nombre
     let mbid = band.musicbrainz_mbid as string | null;
     let matchQuality: 'verified' | 'unverified' = band.mb_match_quality ?? 'unverified';
 
@@ -347,7 +329,6 @@ Deno.serve(async (req) => {
       fetchLastfmTags(band.name, mbid),
     ]);
 
-    // Detectar discrepancia entre el spotify_id guardado y el verificado por MusicBrainz
     const needsSpotifyRefresh =
       correctSpotifyId && band.spotify_id && correctSpotifyId !== band.spotify_id;
 
@@ -359,7 +340,6 @@ Deno.serve(async (req) => {
 
     const finalSpotifyId = needsSpotifyRefresh ? correctSpotifyId : band.spotify_id;
 
-    // Refrescar imagen y géneros desde Spotify si hay mismatch o si faltan
     const needsImageRefresh =
       needsSpotifyRefresh || !band.image_url || !band.genres || band.genres.length === 0;
 
@@ -390,14 +370,20 @@ Deno.serve(async (req) => {
       ).slice(0, 8);
       updatePayload.genres = combined;
     } else {
-      const existingGenres = band.genres ?? [];
+      const existingGenres = (band.genres ?? []).filter((g: string) => HEAVY_GENRE_REGEX.test(g));
       const combinedGenres = Array.from(
         new Set([...existingGenres, ...(mbDetail.genres ?? []), ...lastfmTags]),
       ).slice(0, 8);
       updatePayload.genres = combinedGenres;
     }
 
-    await admin.from('bands').update(updatePayload).eq('id', band.id);
+    const { error: updateError } = await admin
+      .from('bands')
+      .update(updatePayload)
+      .eq('id', band.id);
+    if (updateError) {
+      console.warn(`No se pudo guardar bands.${band.id}:`, updateError.message);
+    }
 
     return new Response(
       JSON.stringify({

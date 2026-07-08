@@ -13,10 +13,10 @@ export type PosterData = {
   year: number;
   totalShows: number;
   totalBands: number;
-  headliners: PosterBand[]; // Top 4
-  specialGuests: PosterBand[]; // 5-12 (8 bandas)
-  featuredActs: PosterBand[]; // 13-28 (16 bandas)
-  alsoPerforming: PosterBand[]; // 29-60 (32 bandas)
+  headliners: PosterBand[];
+  specialGuests: PosterBand[];
+  featuredActs: PosterBand[];
+  alsoPerforming: PosterBand[];
   hasEnoughData: boolean;
 };
 
@@ -41,17 +41,16 @@ export function usePosterData(year: number): { data: PosterData; loading: boolea
     });
 
     const sorted = Array.from(bandMap.values()).sort((a, b) => {
-      // 1) Más veces vistas primero
       if (b.count !== a.count) return b.count - a.count;
-      // 2) Tiebreaker: Last.fm listeners (proxy de "tamaño" de banda). Null al final.
+
       const lisA = a.listeners ?? -1;
       const lisB = b.listeners ?? -1;
       if (lisB !== lisA) return lisB - lisA;
-      // 3) Si tampoco hay listeners: Spotify popularity como fallback
+
       const popA = a.popularity ?? -1;
       const popB = b.popularity ?? -1;
       if (popB !== popA) return popB - popA;
-      // 4) Fallback final: alfabético
+
       return a.name.localeCompare(b.name);
     });
 

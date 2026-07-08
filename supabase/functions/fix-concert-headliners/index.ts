@@ -26,10 +26,6 @@ function normalizeName(s: string): string {
     .trim();
 }
 
-/**
- * Misma heurística que sync-concerts: `_embedded.attractions` no viene ordenado
- * por billing, pero el nombre del evento casi siempre lleva el del headliner.
- */
 function findHeadlinerIndex(eventName: string, attractions: { name?: string }[]): number {
   const normEvent = normalizeName(eventName);
 
@@ -44,10 +40,6 @@ function findHeadlinerIndex(eventName: string, attractions: { name?: string }[])
   return 0;
 }
 
-/**
- * Extrae el nombre del tour del nombre del evento de Ticketmaster.
- * Patrón típico: "ARTIST - Tour Name 2026" → "Tour Name 2026"
- */
 function extractTourName(eventName: string, attractionName: string): string | null {
   if (!eventName || !attractionName) return null;
 
@@ -78,15 +70,6 @@ type TmAttraction = {
   externalLinks?: { musicbrainz?: { id: string }[] };
 };
 
-/**
- * Backfill: recorre conciertos ya sincronizados, vuelve a pedir el evento a
- * Ticketmaster y corrige lo que `sync-concerts` guardó mal antes del fix:
- * - `concert_bands.is_headliner` (usaba idx===0, no billing real)
- * - `concerts.tour_name` (no se guardaba en el sync masivo, solo en sync-band)
- * - `bands.musicbrainz_mbid` (idem)
- * Sin tour_name + mbid, fetch-setlist nunca puede buscar el setlist por gira.
- * Paginado con offset/batch para poder llamarlo en bucle hasta done=true.
- */
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
 
@@ -168,7 +151,6 @@ Deno.serve(async (req) => {
         const headlinerIdx = findHeadlinerIndex(ev.name, attractions);
         const headlinerAttr = attractions[headlinerIdx];
 
-        // 1. tour_name (fetch-setlist lo necesita para el fallback por gira)
         if (!concert.tour_name) {
           const tourName = extractTourName(ev.name, headlinerAttr.name);
           if (tourName) {
@@ -189,14 +171,12 @@ Deno.serve(async (req) => {
               normalizeName(a.name) === normalizeName(band.name),
           );
 
-          // 2. musicbrainz_mbid (también lo necesita el fallback por gira)
           const attrMbid = attrForBand?.externalLinks?.musicbrainz?.[0]?.id ?? null;
           if (attrMbid && !band.musicbrainz_mbid) {
             await admin.from('bands').update({ musicbrainz_mbid: attrMbid }).eq('id', band.id);
             totals.mbid_updated++;
           }
 
-          // 3. is_headliner (solo tiene sentido corregirlo si hay más de una banda)
           if (attractions.length < 2) continue;
 
           const isHeadlinerBand =

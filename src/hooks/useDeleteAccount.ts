@@ -26,7 +26,6 @@ export function useDeleteAccount() {
   return useMutation({
     mutationFn: deleteAccount,
     onSuccess: async () => {
-      // Limpieza local tras el borrado
       await supabase.auth.signOut();
     },
   });

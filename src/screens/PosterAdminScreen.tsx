@@ -154,7 +154,7 @@ export default function PosterAdminScreen() {
           matched_band_id: b.matched_band_id,
           tier: b.tier,
         })),
-        imageBase64, // <-- NUEVO: enviamos la imagen al commit
+        imageBase64,
         mediaType: 'image/jpeg',
       };
 
@@ -386,8 +386,6 @@ export default function PosterAdminScreen() {
   );
 }
 
-// --- Subcomponentes ---
-
 function SelectStage({
   imageUri,
   onPick,
@@ -558,8 +556,6 @@ function ResultRow({ label, value }: { label: string; value: string }) {
     </View>
   );
 }
-
-// --- Estilos ---
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.ink },

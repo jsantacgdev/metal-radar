@@ -11,7 +11,6 @@ type Lang = 'es' | 'en';
 type SupportedLanguage = Lang;
 const DEFAULT_LANG: Lang = 'es';
 
-// Diccionario de strings de notificaciones
 const I18N: Record<
   Lang,
   {
@@ -44,7 +43,6 @@ type PushPayload = {
 };
 
 async function sendExpoPush(messages: PushPayload[]) {
-  // Expo Push API permite enviar hasta 100 mensajes por request
   const chunks: PushPayload[][] = [];
   for (let i = 0; i < messages.length; i += 100) {
     chunks.push(messages.slice(i, i + 100));
@@ -94,7 +92,6 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Para cada concierto, sacar usuarios a notificar
     const allPending: {
       user_id: string;
       concert_id: string;
@@ -126,7 +123,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Traer el idioma de los usuarios implicados en una sola query
     const uniqueUserIds = Array.from(new Set(allPending.map((r) => r.user_id)));
     const { data: profilesData } = await admin
       .from('profiles')
@@ -139,7 +135,6 @@ Deno.serve(async (req) => {
       languageByUser.set(p.id, lang === 'en' ? 'en' : 'es');
     }
 
-    // Construir payloads
     const messages: PushPayload[] = allPending.map((row) => {
       const lang = languageByUser.get(row.user_id) ?? DEFAULT_LANG;
       const dict = I18N[lang];
@@ -161,10 +156,8 @@ Deno.serve(async (req) => {
       };
     });
 
-    // Enviar
     const results = await sendExpoPush(messages);
 
-    // Marcar como enviadas (idempotencia)
     const sentRecords = allPending.map((row) => ({
       user_id: row.user_id,
       concert_id: row.concert_id,
@@ -178,7 +171,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Detectar tokens invalidados (DeviceNotRegistered) y limpiarlos
     const invalidTokens: string[] = [];
     results.forEach((r: any, idx: number) => {
       if (r.status === 'error' && r.details?.error === 'DeviceNotRegistered') {

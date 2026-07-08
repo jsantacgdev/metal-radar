@@ -65,7 +65,6 @@ async function searchSpotifyArtist(name: string, token: string) {
   };
 }
 
-// NUEVO: artist.getInfo devuelve tags + listeners + playcount en 1 llamada
 async function getLastfmInfo(artistName: string): Promise<{
   tags: string[];
   listeners: number | null;
@@ -182,13 +181,11 @@ Deno.serve(async (req) => {
       }
 
       try {
-        // SIEMPRE traer info de Last.fm primero (tags + listeners + playcount)
         const lastfm = await getLastfmInfo(band.name);
 
         const spotifyData = await searchSpotifyArtist(band.name, token);
 
         if (!spotifyData) {
-          // Aunque Spotify no encuentre, guardamos lo de Last.fm
           await admin
             .from('bands')
             .update({

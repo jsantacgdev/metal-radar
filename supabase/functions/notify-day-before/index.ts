@@ -78,7 +78,6 @@ Deno.serve(async (req) => {
   try {
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Calcular fecha de "mañana" (rango del día completo en UTC)
     const tomorrow = new Date();
     tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
     tomorrow.setUTCHours(0, 0, 0, 0);
@@ -90,7 +89,6 @@ Deno.serve(async (req) => {
       `[notify-day-before] Buscando conciertos entre ${tomorrow.toISOString()} y ${dayAfterTomorrow.toISOString()}`,
     );
 
-    // Buscar user_concerts con status going/attended cuyo concierto es mañana
     const { data: userConcerts, error } = await admin
       .from('user_concerts')
       .select(
@@ -121,7 +119,6 @@ Deno.serve(async (req) => {
 
     console.log(`[notify-day-before] Encontrados ${userConcerts.length} conciertos a notificar`);
 
-    // Cargar push_tokens e idiomas de los usuarios afectados
     const uniqueUserIds = Array.from(new Set(userConcerts.map((uc: any) => uc.user_id)));
     const { data: profiles } = await admin
       .from('profiles')
@@ -137,13 +134,11 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Construir mensajes
     const messages: PushPayload[] = [];
     for (const uc of userConcerts as any[]) {
       const userInfo = userInfoMap.get(uc.user_id);
       if (!userInfo) continue;
 
-      // Determinar headliner o primera banda del lineup
       const bands = uc.concert.concert_bands ?? [];
       const headlinerEntry = bands.find((cb: any) => cb.is_headliner) ?? bands[0];
       const bandName = headlinerEntry?.band?.name ?? '';
@@ -169,10 +164,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Enviar
     const results = await sendExpoPush(messages);
 
-    // Detectar tokens invalidados y limpiarlos
     const invalidTokens: string[] = [];
     results.forEach((r: any, idx: number) => {
       if (r.status === 'error' && r.details?.error === 'DeviceNotRegistered') {

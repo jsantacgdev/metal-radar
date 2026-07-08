@@ -19,7 +19,6 @@ async function fetchPhotos(userConcertId: string): Promise<ConcertPhoto[]> {
   if (error) throw error;
   if (!data || data.length === 0) return [];
 
-  // Firmar todas las URLs en paralelo (válidas 1h)
   const signed = await Promise.all(
     data.map(async (row) => {
       const { data: signedData } = await supabase.storage
@@ -43,6 +42,6 @@ export function useConcertPhotos(userConcertId: string | null) {
     queryKey: ['concert-photos', userConcertId],
     queryFn: () => fetchPhotos(userConcertId!),
     enabled: !!userConcertId,
-    staleTime: 50 * 60 * 1000, // 50 min (las URLs firmadas duran 1h)
+    staleTime: 50 * 60 * 1000,
   });
 }

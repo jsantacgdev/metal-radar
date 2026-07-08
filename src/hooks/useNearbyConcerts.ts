@@ -41,11 +41,6 @@ async function fetchNearbyConcerts(userLat: number, userLng: number) {
   } = await supabase.auth.getUser();
   if (!user) throw new Error(i18n.t('errors.noSession'));
 
-  // 1. IDs de conciertos/festivales que tienen al menos una banda seguida por el usuario.
-  // Se hace en dos pasos porque un filtro sobre un embed (`concert_bands.band.user_bands`)
-  // recorta también las filas embebidas devueltas: si se pidiera el lineup completo en
-  // esta misma query, solo vendrían las bandas seguidas (perdiendo el resto del cartel,
-  // incluido el headliner si no se sigue).
   const { data: followedConcertRows, error: fcError } = await supabase
     .from('concerts')
     .select('id, concert_bands!inner ( band:bands!inner ( user_bands!inner ( user_id ) ) )')
@@ -66,7 +61,6 @@ async function fetchNearbyConcerts(userLat: number, userLng: number) {
 
   if (concertIds.length === 0 && festivalIds.length === 0) return [];
 
-  // 2. Datos completos (cartel entero, sin filtrar por bandas seguidas) para esos IDs.
   const { data: concertsData, error: cError } = concertIds.length
     ? await supabase
         .from('concerts')
@@ -211,7 +205,7 @@ export function useNearbyConcerts(
     concerts,
     farConcerts,
     loading: query.isLoading,
-    isFetching: query.isFetching, // NUEVO: para feedback de refetch en background
+    isFetching: query.isFetching,
     error: query.error?.message ?? null,
   };
 }

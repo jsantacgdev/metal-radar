@@ -13,12 +13,6 @@ export type ExportSong = {
   artist: string;
 };
 
-/**
- * Busca una canción y devuelve el URI de Spotify, o null si no la encuentra.
- */
-/**
- * Busca una canción y devuelve el URI de Spotify, o null si no la encuentra.
- */
 async function searchTrack(token: string, title: string, artist: string): Promise<string | null> {
   const query = encodeURIComponent(`track:${title} artist:${artist}`);
 
@@ -103,9 +97,6 @@ async function addTracksToPlaylist(
   }
 }
 
-/**
- * Exporta un setlist como playlist de Spotify.
- */
 export async function exportSetlistToSpotify(
   playlistName: string,
   description: string,

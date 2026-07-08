@@ -56,9 +56,6 @@ export async function isSpotifyLoggedIn(): Promise<boolean> {
   return !!tokens;
 }
 
-/**
- * Inicia el flujo OAuth con PKCE. Devuelve los tokens al terminar.
- */
 export async function loginToSpotify(): Promise<StoredTokens> {
   const request = new AuthSession.AuthRequest({
     clientId: SPOTIFY_CLIENT_ID,
@@ -74,11 +71,9 @@ export async function loginToSpotify(): Promise<StoredTokens> {
     throw new Error(result.type === 'cancel' ? 'Cancelado' : 'Error en login');
   }
 
-  // expo-auth-session guarda el codeVerifier automáticamente en request.codeVerifier
   const codeVerifier = request.codeVerifier;
   if (!codeVerifier) throw new Error('No se generó code_verifier');
 
-  // Intercambiar código por tokens
   const tokenResponse = await fetch(DISCOVERY.tokenEndpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -108,9 +103,6 @@ export async function loginToSpotify(): Promise<StoredTokens> {
   return tokens;
 }
 
-/**
- * Devuelve un access token válido, refrescándolo si hace falta.
- */
 export async function getValidAccessToken(): Promise<string | null> {
   const tokens = await getStoredTokens();
   if (!tokens) return null;
@@ -119,7 +111,6 @@ export async function getValidAccessToken(): Promise<string | null> {
     return tokens.accessToken;
   }
 
-  // Refresh
   try {
     const res = await fetch(DISCOVERY.tokenEndpoint, {
       method: 'POST',
@@ -132,7 +123,6 @@ export async function getValidAccessToken(): Promise<string | null> {
     });
 
     if (!res.ok) {
-      // Token inválido, limpiar y forzar nuevo login
       await clearSpotifyAuth();
       return null;
     }

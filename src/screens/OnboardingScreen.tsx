@@ -32,14 +32,12 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
   const { t } = useTranslation();
   const [step, setStep] = useState<Step>('bands');
 
-  // Estado paso bandas
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Band[]>([]);
   const [searching, setSearching] = useState(false);
   const [selected, setSelected] = useState<Map<string, Band>>(new Map());
   const [saving, setSaving] = useState(false);
 
-  // Estado paso notificaciones
   const [enablingPush, setEnablingPush] = useState(false);
 
   useEffect(() => {
@@ -124,9 +122,6 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
     onDone();
   };
 
-  // ====================================
-  // RENDER paso 1: bandas
-  // ====================================
   if (step === 'bands') {
     return (
       <View style={styles.container}>
@@ -234,9 +229,6 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
     );
   }
 
-  // ====================================
-  // RENDER paso 2: notificaciones
-  // ====================================
   return (
     <View style={[styles.container, { justifyContent: 'space-between' }]}>
       <View style={styles.notifHeader}>

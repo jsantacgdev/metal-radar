@@ -83,14 +83,12 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // 1. Buscar primero en BD
     const { data: dbBands } = await admin
       .from('bands')
       .select('spotify_id, name, image_url, genres')
       .ilike('name', `${query}%`)
       .limit(20);
 
-    // Deduplicar por nombre, preferir las que tienen spotify_id
     const dedup = new Map<string, Band>();
     for (const b of dbBands ?? []) {
       const key = b.name.toLowerCase();
@@ -101,7 +99,6 @@ Deno.serve(async (req) => {
     }
     const cachedBands = Array.from(dedup.values());
 
-    // Si ya tenemos 5+ con spotify_id, basta con BD
     const withSpotifyId = cachedBands.filter((b) => b.spotify_id);
     if (withSpotifyId.length >= 5) {
       return new Response(JSON.stringify({ bands: cachedBands, source: 'cache' }), {
@@ -109,7 +106,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 2. Complementar con Spotify
     try {
       const token = await getSpotifyToken();
       const searchUrl = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=artist&limit=10`;
@@ -121,7 +117,6 @@ Deno.serve(async (req) => {
         const data = await searchRes.json();
         const queryLower = query.toLowerCase();
 
-        // Filtrado preliminar: relevancia textual + top 5
         const candidates: Band[] = data.artists.items
           .map((artist: any) => ({
             spotify_id: artist.id,
@@ -139,25 +134,20 @@ Deno.serve(async (req) => {
           })
           .slice(0, 5);
 
-        // 3. Cross-check con Last.fm para los que no tienen género heavy claro
         const validated = await Promise.all(
           candidates.map(async (cand) => {
-            // Si Spotify ya nos dice que es heavy, aceptamos directo
             if (isHeavyByGenres(cand.genres)) {
               return cand;
             }
 
-            // Si no, preguntamos a Last.fm
             const lastfmTags = await getLastfmTags(cand.name);
 
-            // Combinar tags de Spotify + Last.fm para cacheo
             const allGenres = Array.from(new Set([...cand.genres, ...lastfmTags]));
 
             if (allGenres.some((g) => HEAVY_GENRE_REGEX.test(g))) {
               return { ...cand, genres: allGenres };
             }
 
-            // Descartar: no es rock/metal/punk/etc
             console.log(`Descartado "${cand.name}": tags = ${JSON.stringify(allGenres)}`);
             return null;
           }),
@@ -165,17 +155,15 @@ Deno.serve(async (req) => {
 
         const spotifyBands = validated.filter((b): b is Band => b !== null);
 
-        // Mergear con BD
         for (const sb of spotifyBands) {
           const key = sb.name.toLowerCase();
           const existing = dedup.get(key);
           if (existing) {
-            // Banda ya en cache, enriquecer con datos nuevos si los tenemos
             dedup.set(key, {
               ...existing,
               spotify_id: existing.spotify_id ?? sb.spotify_id,
               image_url: existing.image_url ?? sb.image_url,
-              // Si los géneros nuevos son más completos, usarlos
+
               genres: sb.genres.length > existing.genres.length ? sb.genres : existing.genres,
             });
           } else {
@@ -183,7 +171,6 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Cachear en BD las nuevas (con géneros enriquecidos)
         const toCache = spotifyBands.filter((b) => b.spotify_id);
         if (toCache.length > 0) {
           for (const b of toCache) {

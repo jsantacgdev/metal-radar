@@ -37,8 +37,6 @@ type Payload = {
   mediaType?: string;
 };
 
-// --- Geocoding ---
-
 async function tryGeocode(query: string): Promise<{ lat: number; lng: number } | null> {
   try {
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`;
@@ -77,8 +75,6 @@ async function geocodeVenue(
   return null;
 }
 
-// --- Band resolver ---
-
 async function resolveOrCreateBand(
   admin: any,
   name: string,
@@ -109,8 +105,6 @@ async function resolveOrCreateBand(
   return { bandId: null, created: false, error: insertErr?.message ?? 'unknown error' };
 }
 
-// --- Upload cartel ---
-
 async function uploadPosterImage(
   admin: any,
   festivalId: string,
@@ -118,7 +112,6 @@ async function uploadPosterImage(
   mediaType: string,
 ): Promise<{ publicUrl: string | null; error: string | null }> {
   try {
-    // Nombre fijo: {festivalId}/festival.jpg (con upsert sobrescribe en re-subidas)
     const ext = mediaType.split('/')[1] ?? 'jpg';
     const fileName = `${festivalId}/festival.${ext}`;
 
@@ -126,7 +119,7 @@ async function uploadPosterImage(
 
     const { error: uploadErr } = await admin.storage.from(POSTERS_BUCKET).upload(fileName, binary, {
       contentType: mediaType,
-      upsert: true, // sobrescribir si ya existe (re-subida)
+      upsert: true,
     });
 
     if (uploadErr) return { publicUrl: null, error: uploadErr.message };
@@ -135,7 +128,6 @@ async function uploadPosterImage(
       data: { publicUrl },
     } = admin.storage.from(POSTERS_BUCKET).getPublicUrl(fileName);
 
-    // Añadir query param para invalidar caché de RN/CDN cuando se sobrescribe
     const cacheBustedUrl = `${publicUrl}?v=${Date.now()}`;
 
     return { publicUrl: cacheBustedUrl, error: null };
@@ -143,8 +135,6 @@ async function uploadPosterImage(
     return { publicUrl: null, error: (err as Error).message };
   }
 }
-
-// --- Handler ---
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
@@ -177,47 +167,63 @@ Deno.serve(async (req) => {
       image_upload_error: null as string | null,
     };
 
-    // 1. VENUE
     let venueId: string;
     if (festival.venue.id) {
       venueId = festival.venue.id;
     } else {
-      let lat = festival.venue.lat ?? 0;
-      let lng = festival.venue.lng ?? 0;
+      const venueName = festival.venue.name || 'TBD';
 
-      const needsGeocoding = !festival.venue.lat || !festival.venue.lng;
-      if (needsGeocoding) {
-        const geo = await geocodeVenue(
-          festival.venue.name,
-          festival.venue.city,
-          festival.venue.country,
-        );
-        if (geo) {
-          lat = geo.lat;
-          lng = geo.lng;
-          results.venue_geocoded = true;
-          results.venue_geocode_strategy = geo.strategy;
-        }
+      let existingVenue = null as { id: string } | null;
+      if (festival.venue.city) {
+        const { data } = await admin
+          .from('venues')
+          .select('id')
+          .ilike('name', venueName)
+          .ilike('city', festival.venue.city)
+          .limit(1)
+          .maybeSingle();
+        existingVenue = data;
       }
 
-      const { data: newVenue, error: venueErr } = await admin
-        .from('venues')
-        .insert({
-          name: festival.venue.name || 'TBD',
-          city: festival.venue.city,
-          country: festival.venue.country,
-          lat,
-          lng,
-        })
-        .select('id')
-        .single();
-      if (venueErr) throw new Error(`Error creando venue: ${venueErr.message}`);
-      venueId = newVenue.id;
-      results.created_venue = true;
+      if (existingVenue) {
+        venueId = existingVenue.id;
+      } else {
+        let lat: number | null = festival.venue.lat ?? null;
+        let lng: number | null = festival.venue.lng ?? null;
+
+        const needsGeocoding = lat == null || lng == null;
+        if (needsGeocoding) {
+          const geo = await geocodeVenue(
+            festival.venue.name,
+            festival.venue.city,
+            festival.venue.country,
+          );
+          if (geo) {
+            lat = geo.lat;
+            lng = geo.lng;
+            results.venue_geocoded = true;
+            results.venue_geocode_strategy = geo.strategy;
+          }
+        }
+
+        const { data: newVenue, error: venueErr } = await admin
+          .from('venues')
+          .insert({
+            name: venueName,
+            city: festival.venue.city,
+            country: festival.venue.country,
+            lat,
+            lng,
+          })
+          .select('id')
+          .single();
+        if (venueErr) throw new Error(`Error creando venue: ${venueErr.message}`);
+        venueId = newVenue.id;
+        results.created_venue = true;
+      }
     }
     results.venue_id = venueId;
 
-    // 2. FESTIVAL
     let festivalId: string;
     if (festival.id) {
       festivalId = festival.id;
@@ -243,7 +249,6 @@ Deno.serve(async (req) => {
     }
     results.festival_id = festivalId;
 
-    // 3. UPLOAD CARTEL
     if (imageBase64) {
       const uploaded = await uploadPosterImage(
         admin,
@@ -262,7 +267,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 4. BANDAS
     const seenBandIds = new Set<string>();
     const rowsToInsert: { festival_id: string; band_id: string; is_headliner: boolean }[] = [];
 

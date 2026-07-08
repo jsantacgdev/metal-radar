@@ -11,13 +11,10 @@ export async function registerForPushNotifications(): Promise<boolean> {
   }
 
   try {
-    // Lazy import: solo cargamos expo-notifications cuando no es Expo Go
     const Notifications = await import('expo-notifications');
     const Device = await import('expo-device');
 
     if (!Device.isDevice) return false;
-
-    // Configurar handler ahora (no al inicio)
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
         shouldShowBanner: true,

@@ -67,7 +67,6 @@ export default function AddConcertScreen() {
     }
   }, [loaded, infoSeen]);
 
-  // Autocompletado de sala: busca coincidencias mientras el usuario escribe.
   useEffect(() => {
     if (venueId || venueName.trim().length < 2) {
       setVenueResults([]);

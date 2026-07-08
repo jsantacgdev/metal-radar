@@ -72,13 +72,14 @@ async function submitConcert(input: SubmitConcertInput): Promise<SubmitConcertRe
 
   const result = json as SubmitConcertResponse;
 
-  // Seguir solo las bandas marcadas por el usuario (mismo patrón que followBand en lib/bands.ts)
   const toFollow = input.bands
     .map((b, i) => ({ follow: b.follow, bandId: result.resolved_bands[i]?.band_id ?? null }))
     .filter((x) => x.follow && x.bandId);
 
   for (const { bandId } of toFollow) {
-    const { error } = await supabase.from('user_bands').insert({ user_id: user.id, band_id: bandId });
+    const { error } = await supabase
+      .from('user_bands')
+      .insert({ user_id: user.id, band_id: bandId });
     if (error && error.code !== '23505') {
       console.warn('Error al seguir banda tras enviar concierto:', error.message);
     }

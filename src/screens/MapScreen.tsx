@@ -71,8 +71,6 @@ export default function MapScreen() {
 
   const spinValue = useRef(new Animated.Value(0)).current;
 
-  // La animación del refresh se vincula a isFetching de la query
-  // (en vez de un estado manual), así refleja exactamente lo que pasa
   useEffect(() => {
     if (isFetching) {
       Animated.loop(
@@ -246,8 +244,6 @@ export default function MapScreen() {
     loadLocation();
   }, [loadLocation]);
 
-  // Lanza sync-concerts en background (puede tardar 30s-2min con Ticketmaster).
-  // Cuando termina, reinvalida la query para que aparezcan los conciertos nuevos.
   const triggerBackgroundSync = useCallback(async () => {
     try {
       const {
@@ -264,7 +260,6 @@ export default function MapScreen() {
       );
 
       if (res.ok) {
-        // Refetch para mostrar lo que haya traído el sync
         queryClient.invalidateQueries({ queryKey: ['nearbyConcerts'] });
         queryClient.invalidateQueries({ queryKey: ['concerts'] });
       }
@@ -273,17 +268,12 @@ export default function MapScreen() {
     }
   }, [queryClient]);
 
-  // Refresh "ligero": invalida cache (refetch instantáneo desde BD).
-  // El sync con Ticketmaster va aparte, en background, sin bloquear.
   const handleManualRefresh = useCallback(() => {
-    // 1. Invalida → query refetchea en background, muestra spinner via isFetching
     queryClient.invalidateQueries({ queryKey: ['nearbyConcerts'] });
     queryClient.invalidateQueries({ queryKey: ['concerts'] });
 
-    // 2. Refresca ubicación en background (no espera)
     loadLocation(true).catch(() => {});
 
-    // 3. Sync con Ticketmaster en background (no espera)
     triggerBackgroundSync();
   }, [queryClient, loadLocation, triggerBackgroundSync]);
 

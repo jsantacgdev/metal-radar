@@ -615,3 +615,15 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/fix-concert-headliners/deno.json"
 entrypoint = "./functions/fix-concert-headliners/index.ts"
+
+[functions.submit-concert]
+enabled = true
+verify_jwt = false
+import_map = "./functions/submit-concert/deno.json"
+entrypoint = "./functions/submit-concert/index.ts"
+
+[functions.report-concert]
+enabled = true
+verify_jwt = false
+import_map = "./functions/report-concert/deno.json"
+entrypoint = "./functions/report-concert/index.ts"

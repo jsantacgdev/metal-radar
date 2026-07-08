@@ -11,7 +11,7 @@ const CORS_HEADERS = {
 };
 
 const NOMINATIM_UA = 'MetalRadar/1.0 (https://metalradar.app)';
-const SUBMIT_LIMIT = 5; // envíos por usuario / 24h
+const SUBMIT_LIMIT = 5;
 
 type Payload = {
   event_date: string;
@@ -27,8 +27,6 @@ type Payload = {
   };
   bands: { name: string; matched_band_id: string | null; is_headliner: boolean }[];
 };
-
-// --- Geocoding (idéntico a commit-festival-from-poster) ---
 
 async function tryGeocode(query: string): Promise<{ lat: number; lng: number } | null> {
   try {
@@ -68,13 +66,15 @@ async function geocodeVenue(
   return null;
 }
 
-// --- Venue resolver (evita duplicar la misma sala real en envíos distintos) ---
-
 async function resolveOrCreateVenue(
   admin: any,
   venue: Payload['venue'],
-): Promise<{ venueId: string; created: boolean; geocoded: boolean; strategy: 'venue' | 'city' | null }> {
-  // El cliente ya eligió una sala existente concreta (autocompletado) — usarla tal cual.
+): Promise<{
+  venueId: string;
+  created: boolean;
+  geocoded: boolean;
+  strategy: 'venue' | 'city' | null;
+}> {
   if (venue.id) {
     return { venueId: venue.id, created: false, geocoded: false, strategy: null };
   }
@@ -105,9 +105,6 @@ async function resolveOrCreateVenue(
     }
   }
 
-  // No crear la sala con coordenadas 0,0 si el geocoding falla — eso deja un
-  // punto fantasma en null-island que rompe cálculos de distancia y
-  // contamina la detección de duplicados por proximidad.
   if (lat == null || lng == null) {
     throw new Error('venue_geocode_failed');
   }
@@ -121,8 +118,6 @@ async function resolveOrCreateVenue(
 
   return { venueId: newVenue.id, created: true, geocoded, strategy };
 }
-
-// --- Band resolver (idéntico a commit-festival-from-poster) ---
 
 async function resolveOrCreateBand(
   admin: any,
@@ -154,8 +149,6 @@ async function resolveOrCreateBand(
   return { bandId: null, created: false, error: insertErr?.message ?? 'unknown error' };
 }
 
-// --- Handler ---
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
 
@@ -174,7 +167,6 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Límite de envíos: máx SUBMIT_LIMIT por usuario en las últimas 24h
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { count, error: countErr } = await admin
       .from('concerts')
@@ -209,13 +201,11 @@ Deno.serve(async (req) => {
       resolved_bands: [] as { name: string; band_id: string | null }[],
     };
 
-    // 1. VENUE
     const venue = await resolveOrCreateVenue(admin, body.venue);
     results.venue_id = venue.venueId;
     results.created_venue = venue.created;
     results.venue_geocode_strategy = venue.strategy;
 
-    // 2. CONCIERTO
     const eventDate = body.event_time
       ? `${body.event_date}T${body.event_time}:00`
       : `${body.event_date}T00:00:00`;
@@ -234,7 +224,6 @@ Deno.serve(async (req) => {
     if (concertErr) throw new Error(`Error creando concierto: ${concertErr.message}`);
     results.concert_id = concertRow.id;
 
-    // 3. BANDAS
     const seenBandIds = new Set<string>();
     const rowsToInsert: { concert_id: string; band_id: string; is_headliner: boolean }[] = [];
 
@@ -254,7 +243,11 @@ Deno.serve(async (req) => {
       if (!bandId || seenBandIds.has(bandId)) continue;
       seenBandIds.add(bandId);
 
-      rowsToInsert.push({ concert_id: concertRow.id, band_id: bandId, is_headliner: b.is_headliner });
+      rowsToInsert.push({
+        concert_id: concertRow.id,
+        band_id: bandId,
+        is_headliner: b.is_headliner,
+      });
     }
 
     if (rowsToInsert.length > 0) {

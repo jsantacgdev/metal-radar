@@ -17,7 +17,6 @@ export function useNotificationResponse() {
       try {
         const Notifications = await import('expo-notifications');
 
-        // Manejar tap cuando la app está cerrada o en background
         subscription = Notifications.addNotificationResponseReceivedListener((response) => {
           const data = response.notification.request.content.data;
           if (data?.concertId) {
@@ -28,7 +27,6 @@ export function useNotificationResponse() {
           }
         });
 
-        // Manejar caso de app abierta desde notificación (cold start)
         const lastResponse = await Notifications.getLastNotificationResponseAsync();
         if (lastResponse && !cancelled) {
           const data = lastResponse.notification.request.content.data;

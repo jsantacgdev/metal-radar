@@ -3,11 +3,9 @@ import { StyleSheet, View, Text as RNText } from 'react-native';
 import { PosterBand, PosterData } from '../hooks/usePosterData';
 import { colors } from '../theme';
 
-// Dimensiones 9:16 (Instagram Stories)
 const POSTER_WIDTH = 1080;
 const POSTER_HEIGHT = 1920;
 
-// Font families (registradas en App.tsx)
 const FONT = {
   bebas: 'BebasNeue_400Regular',
   anton: 'Anton_400Regular',
@@ -57,7 +55,6 @@ function TierDivider({ label }: { label: string }) {
   );
 }
 
-// Headliners en grid 2x2
 function HeadlinersGrid({ bands }: { bands: PosterBand[] }) {
   const row1 = bands.slice(0, 2);
   const row2 = bands.slice(2, 4);
@@ -232,7 +229,6 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
 
-  // Esquinas en L
   corner: {
     position: 'absolute',
     width: 90,
@@ -252,7 +248,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // Header
   brandStamp: {
     fontFamily: FONT.specialElite,
     fontSize: 24,
@@ -262,7 +257,6 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
 
-  // Username · Año en MetalLord
   usernameLine: {
     fontFamily: FONT.metalLord,
     fontSize: 130,
@@ -291,7 +285,6 @@ const styles = StyleSheet.create({
     color: RED,
   },
 
-  // Tier divider con label inline
   tierDivider: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -312,7 +305,6 @@ const styles = StyleSheet.create({
     letterSpacing: 10,
   },
 
-  // Tier 1 — Headliners (2x2)
   tierHeadliners: {
     width: '100%',
     gap: 30,
@@ -337,7 +329,6 @@ const styles = StyleSheet.create({
     textShadowRadius: 16,
   },
 
-  // Tier 2 — Special Guests
   tierSub: {
     fontFamily: FONT.cinzelSemiBold,
     fontSize: 42,
@@ -350,7 +341,6 @@ const styles = StyleSheet.create({
     color: RED,
   },
 
-  // Tier 3 — Featured Acts
   tierMid: {
     fontFamily: FONT.bebas,
     fontSize: 38,
@@ -363,7 +353,6 @@ const styles = StyleSheet.create({
     color: RED_DEEP,
   },
 
-  // Tier 4 — Also Performing
   tierSupporting: {
     fontFamily: FONT.anton,
     fontSize: 26,
@@ -376,7 +365,6 @@ const styles = StyleSheet.create({
     color: RED_DEEP,
   },
 
-  // Footer
   footer: {
     marginTop: 'auto',
     alignItems: 'center',
