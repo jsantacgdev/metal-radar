@@ -409,6 +409,14 @@ export default function MapScreen() {
               />
             </Animated.View>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.refreshBtn}
+            onPress={() => navigation.navigate('AddConcert')}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+          >
+            <Ionicons name="add-circle-outline" size={20} color={colors.silver} />
+          </TouchableOpacity>
         </View>
       </View>
 
