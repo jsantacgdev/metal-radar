@@ -136,6 +136,35 @@
     "filterStatusInterested": "Interested",
     "clearFilters": "Clear filters"
   },
+  "addConcert": {
+    "title": "Add concert",
+    "infoDialogTitle": "Community-added",
+    "infoDialogBody": "This concert will go live immediately and other users will see it. Don't add fake or duplicate concerts — submissions are limited and can be reported.",
+    "infoDialogAck": "Got it",
+    "venueNameLabel": "Venue",
+    "venueNamePlaceholder": "Venue name",
+    "cityLabel": "City",
+    "countryLabel": "Country",
+    "dateLabel": "Date",
+    "timeLabel": "Time",
+    "timePlaceholder": "HH:mm (optional)",
+    "ticketUrlLabel": "Tickets",
+    "bandsLabel": "LINEUP",
+    "bandsHint": "Search band...",
+    "addBandAsNew": "Add \"{{name}}\" as a new band",
+    "headlinerBadge": "HEAD",
+    "supportBadge": "SUPPORT",
+    "makeHeadliner": "Mark as headliner",
+    "followBandCheckbox": "FOLLOW",
+    "removeBand": "Remove",
+    "submitButton": "Publish concert",
+    "submittingButton": "Publishing...",
+    "missingVenueName": "Venue name is required",
+    "missingDate": "Date is required",
+    "invalidDate": "Date must be in YYYY-MM-DD format",
+    "missingBands": "Add at least one band",
+    "successTitle": "Concert added"
+  },
   "diary": {
     "title": "Diary",
     "headerEyebrow": "YOUR HISTORY",
@@ -179,7 +208,11 @@
     "charactersCount_other": "{{count}} characters",
     "statusBanner": "STATUS: {{status}}",
     "buyTickets": "Buy tickets",
-    "shareMessage": "🤘 Going to see {{band}} on {{date}} in {{place}}. Wanna join?"
+    "shareMessage": "🤘 Going to see {{band}} on {{date}} in {{place}}. Wanna join?",
+    "reportButton": "Report as incorrect",
+    "reportConfirmTitle": "Report concert",
+    "reportConfirmMessage": "Are you sure you want to report this concert as fake or incorrect?",
+    "reportThanks": "Thanks, we've logged it"
   },
   "festivalDetail": {
     "notFound": "Festival not found",
@@ -354,7 +387,10 @@
     "bandSaveFailed": "Error saving band",
     "bandFetchFailed": "Error fetching band",
     "cameraPermissionDenied": "Camera permission denied",
-    "libraryPermissionDenied": "Library permission denied"
+    "libraryPermissionDenied": "Library permission denied",
+    "submitRateLimited": "You've reached today's limit of added concerts. Try again tomorrow.",
+    "alreadyReported": "You've already reported this concert",
+    "venueGeocodeFailed": "We couldn't locate that venue. Check the name, city, and country."
   },
   "calendar": {
     "permissionDeniedTitle": "Permission denied",

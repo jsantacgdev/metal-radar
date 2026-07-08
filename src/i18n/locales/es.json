@@ -136,6 +136,35 @@
     "filterStatusInterested": "Me interesa",
     "clearFilters": "Limpiar filtros"
   },
+  "addConcert": {
+    "title": "Añadir concierto",
+    "infoDialogTitle": "Añadido por la comunidad",
+    "infoDialogBody": "Este concierto se publicará al instante y lo verán otros usuarios. No añadas conciertos falsos o duplicados — los envíos están limitados y se pueden reportar.",
+    "infoDialogAck": "Entendido",
+    "venueNameLabel": "Sala",
+    "venueNamePlaceholder": "Nombre del recinto",
+    "cityLabel": "Ciudad",
+    "countryLabel": "País",
+    "dateLabel": "Fecha",
+    "timeLabel": "Hora",
+    "timePlaceholder": "HH:mm (opcional)",
+    "ticketUrlLabel": "Entradas",
+    "bandsLabel": "CARTEL",
+    "bandsHint": "Buscar banda...",
+    "addBandAsNew": "Añadir \"{{name}}\" como banda nueva",
+    "headlinerBadge": "HEAD",
+    "supportBadge": "TELONERO",
+    "makeHeadliner": "Marcar como cabeza de cartel",
+    "followBandCheckbox": "SEGUIR",
+    "removeBand": "Quitar",
+    "submitButton": "Publicar concierto",
+    "submittingButton": "Publicando...",
+    "missingVenueName": "Falta el nombre de la sala",
+    "missingDate": "Falta la fecha",
+    "invalidDate": "La fecha debe tener el formato AAAA-MM-DD",
+    "missingBands": "Añade al menos una banda",
+    "successTitle": "Concierto añadido"
+  },
   "diary": {
     "title": "Diario",
     "headerEyebrow": "TU HISTORIAL",
@@ -179,7 +208,11 @@
     "charactersCount_other": "{{count}} caracteres",
     "statusBanner": "ESTADO: {{status}}",
     "buyTickets": "Comprar entradas",
-    "shareMessage": "🤘 Voy a ver a {{band}} el {{date}} en {{place}}. ¿Te vienes?"
+    "shareMessage": "🤘 Voy a ver a {{band}} el {{date}} en {{place}}. ¿Te vienes?",
+    "reportButton": "Reportar como incorrecto",
+    "reportConfirmTitle": "Reportar concierto",
+    "reportConfirmMessage": "¿Seguro que quieres reportar este concierto como falso o incorrecto?",
+    "reportThanks": "Gracias, lo hemos registrado"
   },
   "festivalDetail": {
     "notFound": "Festival no encontrado",
@@ -354,7 +387,10 @@
     "bandSaveFailed": "Error al guardar banda",
     "bandFetchFailed": "Error al obtener banda",
     "cameraPermissionDenied": "Permiso de cámara denegado",
-    "libraryPermissionDenied": "Permiso de galería denegado"
+    "libraryPermissionDenied": "Permiso de galería denegado",
+    "submitRateLimited": "Has alcanzado el límite de conciertos añadidos por hoy. Inténtalo mañana.",
+    "alreadyReported": "Ya has reportado este concierto",
+    "venueGeocodeFailed": "No hemos podido localizar esa sala. Revisa el nombre, la ciudad y el país."
   },
   "calendar": {
     "permissionDeniedTitle": "Permiso denegado",

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   Linking,
   Share,
@@ -13,6 +14,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useConcert } from '../hooks/useConcert';
+import { useReportConcert } from '../hooks/useReportConcert';
 import { MapStackParamList } from '../navigation/MapStack';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from '../components/ui';
@@ -41,6 +43,7 @@ export default function ConcertDetailScreen({ route }: Props) {
 
   const { concert, loading, error, updateStatus, updateRating, updateNotes } =
     useConcert(concertId);
+  const reportConcert = useReportConcert(concertId);
 
   const { data: setlists = [] } = useSetlists(concert ? concert.id : null);
 
@@ -128,6 +131,24 @@ export default function ConcertDetailScreen({ route }: Props) {
 
   const openTickets = () => {
     if (concert.ticket_url) Linking.openURL(concert.ticket_url);
+  };
+
+  const handleReport = () => {
+    Alert.alert(t('concertDetail.reportConfirmTitle'), t('concertDetail.reportConfirmMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('concertDetail.reportButton'),
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await reportConcert.mutateAsync(undefined);
+            Alert.alert(t('concertDetail.reportThanks'));
+          } catch (err: any) {
+            Alert.alert(t('common.error'), err.message);
+          }
+        },
+      },
+    ]);
   };
 
   const handleShare = async () => {
@@ -421,6 +442,20 @@ export default function ConcertDetailScreen({ route }: Props) {
               {t('concertDetail.statusBanner', { status: concert.status.toUpperCase() })}
             </Text>
           </View>
+        )}
+
+        {concert.source === 'user_submitted' && (
+          <TouchableOpacity
+            onPress={handleReport}
+            disabled={reportConcert.isPending}
+            style={styles.reportBtn}
+            hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+          >
+            <Ionicons name="flag-outline" size={14} color={colors.muted} />
+            <Text variant="monoSM" color="muted" style={{ marginLeft: 6 }}>
+              {t('concertDetail.reportButton')}
+            </Text>
+          </TouchableOpacity>
         )}
       </Animated.ScrollView>
 
@@ -737,6 +772,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.bloodTintBorder,
     borderRadius: radius.md,
+  },
+  reportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginTop: spacing.lg,
   },
   ctaContainer: {
     position: 'absolute',

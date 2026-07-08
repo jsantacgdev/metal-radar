@@ -4,6 +4,7 @@ import MapScreen from '../screens/MapScreen';
 import ConcertDetailScreen from '../screens/ConcertDetailScreen';
 import FestivalDetailScreen from '../screens/FestivalDetailScreen';
 import BandDetailScreen from '../screens/BandDetailScreen';
+import AddConcertScreen from '../screens/AddConcertScreen';
 import { colors, fontFamily } from '../theme';
 
 export type MapStackParamList = {
@@ -11,6 +12,7 @@ export type MapStackParamList = {
   ConcertDetail: { concertId: string };
   FestivalDetail: { festivalId: string };
   BandDetail: { bandId: string };
+  AddConcert: undefined;
 };
 
 const Stack = createNativeStackNavigator<MapStackParamList>();
@@ -46,6 +48,11 @@ export default function MapStack() {
       <Stack.Screen
         name="BandDetail"
         component={BandDetailScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="AddConcert"
+        component={AddConcertScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>
