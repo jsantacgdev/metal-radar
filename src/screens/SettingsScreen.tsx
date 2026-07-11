@@ -1,10 +1,11 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   Image,
   Linking,
   ScrollView,
   StyleSheet,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -16,7 +17,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { useProfile } from '../hooks/useProfile';
+import { useProfile, useUsernameAvailability } from '../hooks/useProfile';
 import { usePreference } from '../hooks/usePreference';
 import { useSpotifyAuth } from '../hooks/useSpotifyAuth';
 import { useLanguage } from '../i18n/useLanguage';
@@ -47,6 +48,10 @@ export default function SettingsScreen() {
   const [syncing, setSyncing] = useState(false);
   const [savingLocation, setSavingLocation] = useState(false);
   const [spotifyBusy, setSpotifyBusy] = useState(false);
+  const [usernameInput, setUsernameInput] = useState('');
+  const [usernameInitialized, setUsernameInitialized] = useState(false);
+  const [savingUsername, setSavingUsername] = useState(false);
+  const usernameAvailability = useUsernameAvailability(usernameInput, profile?.username ?? null);
   const [pushStatus, setPushStatus] = useState<
     'granted' | 'denied' | 'undetermined' | 'unsupported' | 'loading' | null
   >(null);
@@ -61,7 +66,34 @@ export default function SettingsScreen() {
     }, [profile?.push_token]),
   );
 
+  useEffect(() => {
+    if (!usernameInitialized && profile) {
+      setUsernameInput(profile.username ?? '');
+      setUsernameInitialized(true);
+    }
+  }, [profile, usernameInitialized]);
+
   const displayRadius = radius ?? profile?.search_radius_km ?? 500;
+
+  const handleTogglePrivate = async () => {
+    try {
+      await update({ is_private: !profile?.is_private });
+    } catch (err: any) {
+      Alert.alert(t('common.error'), err.message);
+    }
+  };
+
+  const handleSaveUsername = async () => {
+    try {
+      setSavingUsername(true);
+      await update({ username: usernameInput.trim().toLowerCase() });
+      Alert.alert(t('common.done'), t('profile.usernameSaved'));
+    } catch (err: any) {
+      Alert.alert(t('common.error'), err.message);
+    } finally {
+      setSavingUsername(false);
+    }
+  };
 
   const handleSyncConcerts = async () => {
     try {
@@ -198,6 +230,55 @@ export default function SettingsScreen() {
         <Text variant="bodySM" color="muted" style={{ marginTop: 4 }}>
           {session?.user.email}
         </Text>
+      </View>
+
+      {/* CUENTA */}
+      <Text variant="monoMD" color="bloodBright" style={styles.categoryHeader}>
+        {t('settings.accountCategory')}
+      </Text>
+      <View style={styles.section}>
+        <Text variant="bodySM" color="muted" style={styles.sectionDesc}>
+          {t('profile.usernameDesc')}
+        </Text>
+        <TextInput
+          style={styles.usernameInput}
+          value={usernameInput}
+          onChangeText={(text) => setUsernameInput(text.toLowerCase())}
+          autoCapitalize="none"
+          autoCorrect={false}
+          placeholder={t('profile.usernamePlaceholder')}
+          placeholderTextColor={colors.faint}
+          maxLength={20}
+        />
+        {usernameAvailability !== 'idle' && (
+          <Text
+            variant="bodySM"
+            color={
+              usernameAvailability === 'available'
+                ? 'bloodBright'
+                : usernameAvailability === 'checking'
+                  ? 'muted'
+                  : 'faint'
+            }
+            style={{ marginTop: spacing.xs }}
+          >
+            {usernameAvailability === 'checking' && t('profile.usernameChecking')}
+            {usernameAvailability === 'available' && t('profile.usernameAvailable')}
+            {usernameAvailability === 'taken' && t('profile.usernameTaken')}
+            {usernameAvailability === 'invalid' && t('profile.usernameInvalid')}
+            {usernameAvailability === 'error' && t('profile.usernameCheckError')}
+          </Text>
+        )}
+        <View style={{ marginTop: spacing.md }}>
+          <Button
+            label={t('profile.usernameSave')}
+            onPress={handleSaveUsername}
+            loading={savingUsername}
+            disabled={usernameAvailability !== 'available' || savingUsername}
+            icon={<Ionicons name="at" size={18} color="#fff" />}
+            style={usernameAvailability !== 'available' ? { opacity: 0.5 } : undefined}
+          />
+        </View>
       </View>
 
       {/* UBICACIÓN */}
@@ -419,6 +500,22 @@ export default function SettingsScreen() {
             <View style={[styles.toggleKnob, !skipConfirm && styles.toggleKnobActive]} />
           </TouchableOpacity>
         </View>
+
+        <View style={[styles.toggleRow, { marginTop: spacing.lg }]}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text variant="bodyLG">{t('settings.privateAccount')}</Text>
+            <Text variant="bodySM" color="muted" style={{ marginTop: 2 }}>
+              {t('settings.privateAccountDesc')}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.toggle, profile?.is_private && styles.toggleActive]}
+            onPress={handleTogglePrivate}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.toggleKnob, profile?.is_private && styles.toggleKnobActive]} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* MANTENIMIENTO */}
@@ -537,6 +634,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: spacing.xs,
     paddingHorizontal: 4,
+  },
+  usernameInput: {
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    color: colors.bright,
+    fontFamily: fontFamily.mono,
+    fontSize: 15,
+    backgroundColor: colors.panel,
   },
   locationCard: {
     flexDirection: 'row',

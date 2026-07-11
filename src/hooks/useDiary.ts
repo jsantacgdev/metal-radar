@@ -32,12 +32,7 @@ export type DiaryEntry = {
   };
 };
 
-async function fetchDiary(): Promise<DiaryEntry[]> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error(i18n.t('errors.noSession'));
-
+async function fetchDiary(userId: string): Promise<DiaryEntry[]> {
   const [concertsRes, festivalsRes] = await Promise.all([
     supabase
       .from('user_concerts')
@@ -51,7 +46,7 @@ async function fetchDiary(): Promise<DiaryEntry[]> {
         )
       `,
       )
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .order('created_at', { ascending: false }),
     supabase
       .from('user_festivals')
@@ -65,7 +60,7 @@ async function fetchDiary(): Promise<DiaryEntry[]> {
         )
       `,
       )
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .order('created_at', { ascending: false }),
   ]);
 
@@ -131,10 +126,18 @@ async function fetchDiary(): Promise<DiaryEntry[]> {
   );
 }
 
+async function fetchOwnDiary(): Promise<DiaryEntry[]> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error(i18n.t('errors.noSession'));
+  return fetchDiary(user.id);
+}
+
 export function useDiary() {
   const query = useQuery({
     queryKey: ['diary'],
-    queryFn: fetchDiary,
+    queryFn: fetchOwnDiary,
   });
 
   return {
@@ -142,5 +145,23 @@ export function useDiary() {
     loading: query.isLoading,
     error: query.error?.message ?? null,
     reload: query.refetch,
+  };
+}
+
+// Diario de OTRO usuario, visible solo si RLS lo permite (seguidores
+// aceptados de una cuenta pública, o de una privada que te ha aceptado).
+// Un error/lista vacía puede significar tanto "sin entradas" como "sin
+// permiso" — no se distingue a propósito, ver comentario en el select.
+export function useUserDiary(targetUserId: string | null) {
+  const query = useQuery({
+    queryKey: ['diary', targetUserId],
+    queryFn: () => fetchDiary(targetUserId as string),
+    enabled: !!targetUserId,
+  });
+
+  return {
+    entries: query.data ?? [],
+    loading: query.isLoading,
+    error: query.error?.message ?? null,
   };
 }

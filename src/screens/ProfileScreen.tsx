@@ -8,6 +8,8 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { useProfile } from '../hooks/useProfile';
 import { useProfileStats, StatsPeriod } from '../hooks/useProfileStats';
+import { useFollowCounts } from '../hooks/usePublicProfile';
+import { useFollowRequests } from '../hooks/useUserFollows';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Button, Text } from '../components/ui';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -19,6 +21,8 @@ export default function ProfileScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const { session } = useAuth();
   const { profile } = useProfile();
+  const { counts: followCounts } = useFollowCounts(profile?.id ?? null);
+  const { requests: followRequests } = useFollowRequests();
 
   const [statsPeriod, setStatsPeriod] = useState<StatsPeriod>('year');
   const currentYear = new Date().getFullYear();
@@ -63,6 +67,71 @@ export default function ProfileScreen() {
           >
             {session?.user.email ?? '—'}
           </Text>
+        </View>
+      </View>
+
+      {/* SOCIAL */}
+      <View style={styles.section}>
+        <Text variant="monoMD" color="muted" style={{ marginBottom: spacing.md }}>
+          {t('social.sectionTitle')}
+        </Text>
+        <View style={styles.socialRow}>
+          <TouchableOpacity
+            style={styles.socialBtn}
+            onPress={() => navigation.navigate('UserSearch')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="search" size={20} color={colors.bright} />
+            <Text variant="bodySM" color="silver" style={{ marginTop: 6 }}>
+              {t('social.search')}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.socialBtn}
+            onPress={() => navigation.navigate('FollowRequests')}
+            activeOpacity={0.7}
+          >
+            <View>
+              <Ionicons name="person-add-outline" size={20} color={colors.bright} />
+              {followRequests.length > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{followRequests.length}</Text>
+                </View>
+              )}
+            </View>
+            <Text variant="bodySM" color="silver" style={{ marginTop: 6 }}>
+              {t('social.requestsShort')}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.socialBtn}
+            onPress={() =>
+              profile && navigation.navigate('FollowList', { userId: profile.id, mode: 'followers' })
+            }
+            activeOpacity={0.7}
+            disabled={!profile}
+          >
+            <Text variant="displaySM">{followCounts.followers}</Text>
+            <Text variant="bodySM" color="silver" style={{ marginTop: 2 }}>
+              {t('social.followers')}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.socialBtn}
+            onPress={() =>
+              profile && navigation.navigate('FollowList', { userId: profile.id, mode: 'following' })
+            }
+            activeOpacity={0.7}
+            disabled={!profile}
+          >
+            <Text variant="displaySM">{followCounts.following}</Text>
+            <Text variant="bodySM" color="silver" style={{ marginTop: 2 }}>
+              {t('social.following')}
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -327,6 +396,31 @@ function StatRow({
 }
 
 const styles = StyleSheet.create({
+  socialRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  socialBtn: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  badge: {
+    position: 'absolute',
+    top: -6,
+    right: -8,
+    minWidth: 16,
+    height: 16,
+    borderRadius: radius.full,
+    backgroundColor: colors.bloodBright,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontFamily: fontFamily.bodyBold,
+  },
   userBlock: {
     flexDirection: 'row',
     alignItems: 'center',

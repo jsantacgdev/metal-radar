@@ -9,6 +9,10 @@ import BandDetailScreen from '../screens/BandDetailScreen';
 import PosterAdminScreen from '../screens/PosterAdminScreen';
 import ModerationScreen from '../screens/ModerationScreen';
 import AddConcertScreen from '../screens/AddConcertScreen';
+import UserSearchScreen from '../screens/UserSearchScreen';
+import PublicProfileScreen from '../screens/PublicProfileScreen';
+import FollowRequestsScreen from '../screens/FollowRequestsScreen';
+import FollowListScreen from '../screens/FollowListScreen';
 
 export type ProfileStackParamList = {
   ProfileHome: undefined;
@@ -21,6 +25,10 @@ export type ProfileStackParamList = {
   PosterAdmin: undefined;
   Moderation: undefined;
   AddConcert: { concertId?: string } | undefined;
+  UserSearch: undefined;
+  PublicProfile: { userId: string };
+  FollowRequests: undefined;
+  FollowList: { userId: string; mode: 'followers' | 'following' };
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -84,6 +92,26 @@ export default function ProfileStack() {
       <Stack.Screen
         name="AddConcert"
         component={AddConcertScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="UserSearch"
+        component={UserSearchScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="PublicProfile"
+        component={PublicProfileScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="FollowRequests"
+        component={FollowRequestsScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="FollowList"
+        component={FollowListScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

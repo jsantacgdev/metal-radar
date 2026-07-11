@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
@@ -7,13 +7,17 @@ import { setLanguage, SupportedLanguage } from '../i18n';
 export type Profile = {
   id: string;
   display_name: string | null;
+  username: string | null;
   home_lat: number | null;
   home_lng: number | null;
   search_radius_km: number;
   push_token: string | null;
   language: SupportedLanguage | null;
   role: 'user' | 'admin';
+  is_private: boolean;
 };
+
+const USERNAME_FORMAT = /^[a-z0-9_]{3,20}$/;
 
 async function fetchProfile(): Promise<Profile | null> {
   const {
@@ -63,4 +67,47 @@ export function useProfile() {
     update: (patch: Partial<Profile>) => updateMutation.mutateAsync(patch),
     reload: query.refetch,
   };
+}
+
+export type UsernameAvailability = 'idle' | 'invalid' | 'checking' | 'available' | 'taken' | 'error';
+
+export function useUsernameAvailability(username: string, currentUsername: string | null) {
+  const [status, setStatus] = useState<UsernameAvailability>('idle');
+
+  useEffect(() => {
+    const candidate = username.trim().toLowerCase();
+
+    if (!candidate) {
+      setStatus('idle');
+      return;
+    }
+    if (candidate === currentUsername?.toLowerCase()) {
+      setStatus('idle');
+      return;
+    }
+    if (!USERNAME_FORMAT.test(candidate)) {
+      setStatus('invalid');
+      return;
+    }
+
+    setStatus('checking');
+    const timer = setTimeout(async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .ilike('username', candidate)
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        setStatus('error');
+      } else {
+        setStatus(data ? 'taken' : 'available');
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [username, currentUsername]);
+
+  return status;
 }
