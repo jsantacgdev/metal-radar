@@ -9,6 +9,8 @@ import { colors, fontFamily } from '../theme';
 import StatsDetailScreen from '../screens/StatsDetailScreen';
 import { StatsDetailParams } from '../screens/StatsDetailScreen';
 import PosterScreen from '../screens/PosterScreen';
+import PublicProfileScreen from '../screens/PublicProfileScreen';
+import WhoIsGoingScreen from '../screens/WhoIsGoingScreen';
 
 export type DiaryStackParamList = {
   DiaryHome: undefined;
@@ -17,6 +19,8 @@ export type DiaryStackParamList = {
   BandDetail: { bandId: string };
   StatsDetail: StatsDetailParams;
   Poster: undefined;
+  PublicProfile: { userId: string };
+  WhoIsGoing: { targetType: 'concert' | 'festival'; targetId: string };
 };
 
 const Stack = createNativeStackNavigator<DiaryStackParamList>();
@@ -74,6 +78,16 @@ export default function DiaryStack() {
         options={{ headerShown: false }}
       />
       <Stack.Screen name="Poster" component={PosterScreen} options={{ headerShown: false }} />
+      <Stack.Screen
+        name="PublicProfile"
+        component={PublicProfileScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="WhoIsGoing"
+        component={WhoIsGoingScreen}
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   );
 }

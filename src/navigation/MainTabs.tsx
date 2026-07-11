@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import RadarStack from './RadarStack';
 import MapStack from './MapStack';
 import DiaryStack from './DiaryStack';
+import FeedStack from './FeedStack';
 import { colors, fontFamily } from '../theme';
 import { useNotificationResponse } from '../hooks/useNotificationResponse';
 import ProfileStack from './ProfileStack';
@@ -14,6 +15,7 @@ export type MainTabsParamList = {
   Radar: undefined;
   MapTab: undefined;
   DiaryTab: undefined;
+  FeedTab: undefined;
   Profile: undefined;
 };
 
@@ -68,6 +70,16 @@ export default function MainTabs() {
           title: t('navigation.tabDiary'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'book' : 'book-outline'} size={22} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="FeedTab"
+        component={FeedStack}
+        options={{
+          title: t('navigation.tabFeed'),
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'pulse' : 'pulse-outline'} size={22} color={color} />
           ),
         }}
       />
