@@ -6,6 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 import { Comment, CommentTargetType, useComments } from '../hooks/useComments';
 import { useCommentReaction } from '../hooks/useCommentReaction';
 import { useReportComment } from '../hooks/useReportComment';
+import { useBlockUser } from '../hooks/useBlockUser';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from './ui';
 import ReportReasonModal from './ReportReasonModal';
@@ -176,7 +177,27 @@ function CommentRow({
 }) {
   const { t } = useTranslation();
   const { count, reacted, toggle } = useCommentReaction(comment.id);
+  const { block } = useBlockUser(comment.author.id);
   const isOwn = comment.author.id === ownUserId;
+
+  const handleBlock = () => {
+    Alert.alert(t('social.blockTitle'), t('social.blockBody', { username: comment.author.username }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('social.block'),
+        style: 'destructive',
+        onPress: () => block().catch((err: any) => Alert.alert(t('common.error'), err.message)),
+      },
+    ]);
+  };
+
+  const handleMenu = () => {
+    Alert.alert(t('comments.menuTitle'), undefined, [
+      { text: t('comments.report'), onPress: onReport },
+      { text: t('social.block'), style: 'destructive', onPress: handleBlock },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
+  };
 
   return (
     <View style={[styles.commentRow, isReply && styles.replyRow]}>
@@ -216,8 +237,8 @@ function CommentRow({
           <Ionicons name="trash-outline" size={16} color={colors.muted} />
         </TouchableOpacity>
       ) : (
-        <TouchableOpacity onPress={onReport} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
-          <Ionicons name="flag-outline" size={16} color={colors.muted} />
+        <TouchableOpacity onPress={handleMenu} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+          <Ionicons name="ellipsis-horizontal" size={16} color={colors.muted} />
         </TouchableOpacity>
       )}
     </View>

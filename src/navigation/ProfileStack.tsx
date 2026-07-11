@@ -14,6 +14,7 @@ import PublicProfileScreen from '../screens/PublicProfileScreen';
 import FollowRequestsScreen from '../screens/FollowRequestsScreen';
 import FollowListScreen from '../screens/FollowListScreen';
 import WhoIsGoingScreen from '../screens/WhoIsGoingScreen';
+import BlockedUsersScreen from '../screens/BlockedUsersScreen';
 
 export type ProfileStackParamList = {
   ProfileHome: undefined;
@@ -31,6 +32,7 @@ export type ProfileStackParamList = {
   FollowRequests: undefined;
   FollowList: { userId: string; mode: 'followers' | 'following' };
   WhoIsGoing: { targetType: 'concert' | 'festival'; targetId: string };
+  BlockedUsers: undefined;
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -119,6 +121,11 @@ export default function ProfileStack() {
       <Stack.Screen
         name="WhoIsGoing"
         component={WhoIsGoingScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="BlockedUsers"
+        component={BlockedUsersScreen}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

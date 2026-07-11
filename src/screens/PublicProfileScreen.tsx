@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { usePublicProfile, useFollowCounts } from '../hooks/usePublicProfile';
 import { useFollowUser } from '../hooks/useUserFollows';
+import { useBlockUser } from '../hooks/useBlockUser';
 import { DiaryEntry, useUserDiary } from '../hooks/useDiary';
 import { ProfileStackParamList } from '../navigation/ProfileStack';
 import { colors, fontFamily, radius, spacing } from '../theme';
@@ -28,6 +29,7 @@ export default function PublicProfileScreen() {
   const { data, loading, error } = usePublicProfile(userId);
   const { counts } = useFollowCounts(userId);
   const { follow, unfollow, loading: followBusy } = useFollowUser(userId);
+  const { block, loading: blockBusy } = useBlockUser(userId);
   const [confirmingUnfollow, setConfirmingUnfollow] = useState(false);
 
   const canSeeDiary = data?.followState === 'self' || data?.followState === 'accepted';
@@ -59,6 +61,28 @@ export default function PublicProfileScreen() {
               Alert.alert(t('common.error'), err.message);
             } finally {
               setConfirmingUnfollow(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleBlock = () => {
+    Alert.alert(
+      t('social.blockTitle'),
+      t('social.blockBody', { username: data?.profile.username }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('social.block'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await block();
+              navigation.goBack();
+            } catch (err: any) {
+              Alert.alert(t('common.error'), err.message);
             }
           },
         },
@@ -162,6 +186,16 @@ export default function PublicProfileScreen() {
                   icon={<Ionicons name="checkmark" size={18} color={colors.silver} />}
                 />
               )}
+              <TouchableOpacity
+                style={styles.blockLink}
+                onPress={handleBlock}
+                disabled={blockBusy}
+                hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+              >
+                <Text variant="monoSM" color="muted">
+                  {t('social.block')}
+                </Text>
+              </TouchableOpacity>
             </View>
           )}
 

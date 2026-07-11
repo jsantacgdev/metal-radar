@@ -555,6 +555,12 @@ entrypoint = "./functions/notify-day-before/index.ts"
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/notify-day-before/*.html" ]
 
+[functions.notify-social]
+enabled = true
+verify_jwt = false
+import_map = "./functions/notify-social/deno.json"
+entrypoint = "./functions/notify-social/index.ts"
+
 [functions.refresh-all-bands]
 enabled = true
 verify_jwt = false
@@ -633,3 +639,15 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/moderate-concert/deno.json"
 entrypoint = "./functions/moderate-concert/index.ts"
+
+[functions.report-comment]
+enabled = true
+verify_jwt = false
+import_map = "./functions/report-comment/deno.json"
+entrypoint = "./functions/report-comment/index.ts"
+
+[functions.moderate-comment]
+enabled = true
+verify_jwt = false
+import_map = "./functions/moderate-comment/deno.json"
+entrypoint = "./functions/moderate-comment/index.ts"

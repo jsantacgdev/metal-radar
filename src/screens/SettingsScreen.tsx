@@ -279,6 +279,14 @@ export default function SettingsScreen() {
             style={usernameAvailability !== 'available' ? { opacity: 0.5 } : undefined}
           />
         </View>
+        <View style={{ marginTop: spacing.sm }}>
+          <Button
+            label={t('social.blockedUsersTitle')}
+            variant="ghost"
+            onPress={() => navigation.navigate('BlockedUsers' as never)}
+            icon={<Ionicons name="ban-outline" size={18} color={colors.silver} />}
+          />
+        </View>
       </View>
 
       {/* UBICACIÓN */}
