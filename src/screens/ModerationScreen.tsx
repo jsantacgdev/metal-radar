@@ -6,47 +6,91 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useReportedConcerts, ReportedConcert } from '../hooks/useReportedConcerts';
 import { useModerateConcert } from '../hooks/useModerateConcert';
+import { useReportedComments, ReportedComment } from '../hooks/useReportedComments';
+import { useModerateComment } from '../hooks/useModerateComment';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from '../components/ui';
 import EmptyState from '../components/EmptyState';
 import { localeFromI18n } from '../i18n';
+
+type Tab = 'concerts' | 'comments';
 
 export default function ModerationScreen() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { t, i18n } = useTranslation();
   const locale = localeFromI18n(i18n.language);
+  const [tab, setTab] = useState<Tab>('concerts');
 
-  const { concerts, loading, error, reload } = useReportedConcerts();
-  const moderate = useModerateConcert();
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const { concerts, loading: concertsLoading, error: concertsError, reload: reloadConcerts } =
+    useReportedConcerts();
+  const moderateConcert = useModerateConcert();
+  const [busyConcertId, setBusyConcertId] = useState<string | null>(null);
 
-  const handleDismiss = (concert: ReportedConcert) => {
-    setBusyId(concert.id);
-    moderate.mutate(
+  const { comments, loading: commentsLoading, error: commentsError, reload: reloadComments } =
+    useReportedComments();
+  const moderateComment = useModerateComment();
+  const [busyCommentId, setBusyCommentId] = useState<string | null>(null);
+
+  const handleDismissConcert = (concert: ReportedConcert) => {
+    setBusyConcertId(concert.id);
+    moderateConcert.mutate(
       { concertId: concert.id, action: 'dismiss' },
       {
         onSuccess: () => Alert.alert(t('moderation.dismissSuccess')),
         onError: (err: any) => Alert.alert(t('common.error'), err.message),
-        onSettled: () => setBusyId(null),
+        onSettled: () => setBusyConcertId(null),
       },
     );
   };
 
-  const handleDelete = (concert: ReportedConcert) => {
+  const handleDeleteConcert = (concert: ReportedConcert) => {
     Alert.alert(t('moderation.deleteConfirmTitle'), t('moderation.deleteConfirmMessage'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('moderation.deleteButton'),
         style: 'destructive',
         onPress: () => {
-          setBusyId(concert.id);
-          moderate.mutate(
+          setBusyConcertId(concert.id);
+          moderateConcert.mutate(
             { concertId: concert.id, action: 'delete' },
             {
               onSuccess: () => Alert.alert(t('moderation.deleteSuccess')),
               onError: (err: any) => Alert.alert(t('common.error'), err.message),
-              onSettled: () => setBusyId(null),
+              onSettled: () => setBusyConcertId(null),
+            },
+          );
+        },
+      },
+    ]);
+  };
+
+  const handleDismissComment = (comment: ReportedComment) => {
+    setBusyCommentId(comment.id);
+    moderateComment.mutate(
+      { commentId: comment.id, action: 'dismiss' },
+      {
+        onSuccess: () => Alert.alert(t('moderation.dismissCommentSuccess')),
+        onError: (err: any) => Alert.alert(t('common.error'), err.message),
+        onSettled: () => setBusyCommentId(null),
+      },
+    );
+  };
+
+  const handleDeleteComment = (comment: ReportedComment) => {
+    Alert.alert(t('moderation.deleteCommentConfirmTitle'), t('moderation.deleteCommentConfirmMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('moderation.deleteButton'),
+        style: 'destructive',
+        onPress: () => {
+          setBusyCommentId(comment.id);
+          moderateComment.mutate(
+            { commentId: comment.id, action: 'delete' },
+            {
+              onSuccess: () => Alert.alert(t('moderation.deleteCommentSuccess')),
+              onError: (err: any) => Alert.alert(t('common.error'), err.message),
+              onSettled: () => setBusyCommentId(null),
             },
           );
         },
@@ -64,17 +108,142 @@ export default function ModerationScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      {loading ? (
+      <View style={styles.tabsRow}>
+        <TabPill
+          label={t('moderation.concertsTab')}
+          active={tab === 'concerts'}
+          onPress={() => setTab('concerts')}
+        />
+        <TabPill
+          label={t('moderation.commentsTab')}
+          active={tab === 'comments'}
+          onPress={() => setTab('comments')}
+        />
+      </View>
+
+      {tab === 'concerts' ? (
+        concertsLoading ? (
+          <View style={styles.centered}>
+            <ActivityIndicator color={colors.bloodBright} size="large" />
+          </View>
+        ) : concertsError ? (
+          <View style={styles.centered}>
+            <Text
+              variant="bodySM"
+              color="bloodBright"
+              style={{ textAlign: 'center', paddingHorizontal: spacing.xl }}
+            >
+              {concertsError}
+            </Text>
+          </View>
+        ) : concerts.length === 0 ? (
+          <EmptyState
+            icon="checkmark-circle-outline"
+            title={t('moderation.emptyTitle')}
+            description={t('moderation.emptyDesc')}
+          />
+        ) : (
+          <FlatList
+            data={concerts}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxxl }}
+            refreshing={concertsLoading}
+            onRefresh={reloadConcerts}
+            renderItem={({ item }) => {
+              const headliner = item.bands.find((b) => b.is_headliner) ?? item.bands[0];
+              const dateStr = new Date(item.event_date).toLocaleDateString(locale, {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              });
+              const isBusy = busyConcertId === item.id && moderateConcert.isPending;
+
+              return (
+                <View style={styles.card}>
+                  <View style={styles.cardHeader}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text variant="displaySM" numberOfLines={1}>
+                        {headliner?.name ?? t('concertDetail.noBand')}
+                      </Text>
+                      <Text variant="monoSM" color="muted" numberOfLines={1} style={{ marginTop: 2 }}>
+                        {item.venue.name}
+                        {item.venue.city ? ` · ${item.venue.city}` : ''} · {dateStr}
+                      </Text>
+                    </View>
+                    <View style={styles.reportBadge}>
+                      <Ionicons name="flag" size={12} color={colors.bloodBright} />
+                      <Text variant="monoSM" color="bloodBright" style={{ marginLeft: 4 }}>
+                        {t('moderation.reportsLabel', { count: item.report_count })}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {item.reports.length > 0 && (
+                    <View style={styles.reasonsBox}>
+                      {item.reports.map((r, i) => (
+                        <Text key={i} variant="bodySM" color="muted" style={{ marginTop: i > 0 ? 4 : 0 }}>
+                          {r.reason ? `"${r.reason}"` : t('moderation.noReason')}
+                        </Text>
+                      ))}
+                    </View>
+                  )}
+
+                  <View style={styles.actionsRow}>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, styles.dismissBtn]}
+                      onPress={() => navigation.navigate('AddConcert', { concertId: item.id })}
+                      disabled={isBusy}
+                      activeOpacity={0.8}
+                    >
+                      <Text variant="monoSM" color="silver">
+                        {t('moderation.editButton')}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, styles.dismissBtn]}
+                      onPress={() => handleDismissConcert(item)}
+                      disabled={isBusy}
+                      activeOpacity={0.8}
+                    >
+                      {isBusy ? (
+                        <ActivityIndicator color={colors.silver} size="small" />
+                      ) : (
+                        <Text variant="monoSM" color="silver">
+                          {t('moderation.dismissButton')}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, styles.deleteBtn]}
+                      onPress={() => handleDeleteConcert(item)}
+                      disabled={isBusy}
+                      activeOpacity={0.8}
+                    >
+                      <Text variant="monoSM" color="bloodBright">
+                        {t('moderation.deleteButton')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            }}
+          />
+        )
+      ) : commentsLoading ? (
         <View style={styles.centered}>
           <ActivityIndicator color={colors.bloodBright} size="large" />
         </View>
-      ) : error ? (
+      ) : commentsError ? (
         <View style={styles.centered}>
-          <Text variant="bodySM" color="bloodBright" style={{ textAlign: 'center', paddingHorizontal: spacing.xl }}>
-            {error}
+          <Text
+            variant="bodySM"
+            color="bloodBright"
+            style={{ textAlign: 'center', paddingHorizontal: spacing.xl }}
+          >
+            {commentsError}
           </Text>
         </View>
-      ) : concerts.length === 0 ? (
+      ) : comments.length === 0 ? (
         <EmptyState
           icon="checkmark-circle-outline"
           title={t('moderation.emptyTitle')}
@@ -82,30 +251,23 @@ export default function ModerationScreen() {
         />
       ) : (
         <FlatList
-          data={concerts}
+          data={comments}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxxl }}
-          refreshing={loading}
-          onRefresh={reload}
+          refreshing={commentsLoading}
+          onRefresh={reloadComments}
           renderItem={({ item }) => {
-            const headliner = item.bands.find((b) => b.is_headliner) ?? item.bands[0];
-            const dateStr = new Date(item.event_date).toLocaleDateString(locale, {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-            });
-            const isBusy = busyId === item.id && moderate.isPending;
+            const isBusy = busyCommentId === item.id && moderateComment.isPending;
 
             return (
               <View style={styles.card}>
                 <View style={styles.cardHeader}>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text variant="displaySM" numberOfLines={1}>
-                      {headliner?.name ?? t('concertDetail.noBand')}
+                      @{item.author.username}
                     </Text>
                     <Text variant="monoSM" color="muted" numberOfLines={1} style={{ marginTop: 2 }}>
-                      {item.venue.name}
-                      {item.venue.city ? ` · ${item.venue.city}` : ''} · {dateStr}
+                      {item.target.label}
                     </Text>
                   </View>
                   <View style={styles.reportBadge}>
@@ -115,6 +277,10 @@ export default function ModerationScreen() {
                     </Text>
                   </View>
                 </View>
+
+                <Text variant="body" style={{ marginTop: spacing.sm }}>
+                  {item.body}
+                </Text>
 
                 {item.reports.length > 0 && (
                   <View style={styles.reasonsBox}>
@@ -129,17 +295,7 @@ export default function ModerationScreen() {
                 <View style={styles.actionsRow}>
                   <TouchableOpacity
                     style={[styles.actionBtn, styles.dismissBtn]}
-                    onPress={() => navigation.navigate('AddConcert', { concertId: item.id })}
-                    disabled={isBusy}
-                    activeOpacity={0.8}
-                  >
-                    <Text variant="monoSM" color="silver">
-                      {t('moderation.editButton')}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.dismissBtn]}
-                    onPress={() => handleDismiss(item)}
+                    onPress={() => handleDismissComment(item)}
                     disabled={isBusy}
                     activeOpacity={0.8}
                   >
@@ -153,7 +309,7 @@ export default function ModerationScreen() {
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.actionBtn, styles.deleteBtn]}
-                    onPress={() => handleDelete(item)}
+                    onPress={() => handleDeleteComment(item)}
                     disabled={isBusy}
                     activeOpacity={0.8}
                   >
@@ -168,6 +324,36 @@ export default function ModerationScreen() {
         />
       )}
     </View>
+  );
+}
+
+function TabPill({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.tabPill, active && styles.tabPillActive]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <Text
+        style={{
+          fontFamily: fontFamily.mono,
+          fontSize: 10,
+          letterSpacing: 0.8,
+          textTransform: 'uppercase',
+          color: active ? colors.ink : colors.silver,
+        }}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
   );
 }
 
@@ -189,6 +375,24 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.displayBold,
     fontSize: 16,
     letterSpacing: 0.5,
+  },
+  tabsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+  },
+  tabPill: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 7,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: 'transparent',
+  },
+  tabPillActive: {
+    backgroundColor: colors.silver,
+    borderColor: colors.silver,
   },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   card: {

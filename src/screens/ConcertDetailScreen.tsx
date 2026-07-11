@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
+  KeyboardAvoidingView,
   Linking,
+  Platform,
   Share,
   StyleSheet,
   TextInput,
@@ -21,6 +23,9 @@ import { Text } from '../components/ui';
 import BandImage from '../components/BandImage';
 import PhotoGallery from '../components/PhotoGallery';
 import ReportReasonModal from '../components/ReportReasonModal';
+import WhoIsGoingRow from '../components/WhoIsGoingRow';
+import RatingStatsRow from '../components/RatingStatsRow';
+import CommentsSection from '../components/CommentsSection';
 import SetlistView from '../components/Setlist';
 import { useSetlists } from '../hooks/useSetlist';
 import { localeFromI18n } from '../i18n';
@@ -196,7 +201,10 @@ export default function ConcertDetailScreen({ route }: Props) {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.ink }}>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: colors.ink }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       {/* Header custom compacto */}
       <View
         style={[
@@ -363,6 +371,18 @@ export default function ConcertDetailScreen({ route }: Props) {
           </View>
         </Section>
 
+        <View style={{ paddingHorizontal: spacing.xl, marginTop: spacing.lg, marginBottom: spacing.md }}>
+          <WhoIsGoingRow
+            targetType="concert"
+            targetId={concert.id}
+            onPress={() => navigation.navigate('WhoIsGoing', { targetType: 'concert', targetId: concert.id })}
+          />
+        </View>
+
+        <View style={{ paddingHorizontal: spacing.xl, marginBottom: spacing.md }}>
+          <RatingStatsRow targetType="concert" targetId={concert.id} />
+        </View>
+
         {(concert.price_min ?? concert.price_max) != null && (
           <Section title={t('concertDetail.priceTitle')}>
             <Text variant="displaySM">
@@ -431,6 +451,8 @@ export default function ConcertDetailScreen({ route }: Props) {
             </View>
           </>
         )}
+
+        <CommentsSection targetType="concert" targetId={concert.id} />
 
         {concert.status !== 'onsale' && (
           <View style={styles.statusBanner}>
@@ -502,7 +524,7 @@ export default function ConcertDetailScreen({ route }: Props) {
         onClose={() => setReportModalOpen(false)}
         onSubmit={handleReportSubmit}
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

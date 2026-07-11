@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Image,
+  KeyboardAvoidingView,
   Linking,
+  Platform,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -21,6 +23,9 @@ import { localeFromI18n } from '../i18n';
 import { LinearGradient } from 'expo-linear-gradient';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import PhotoGallery from '../components/PhotoGallery';
+import WhoIsGoingRow from '../components/WhoIsGoingRow';
+import RatingStatsRow from '../components/RatingStatsRow';
+import CommentsSection from '../components/CommentsSection';
 import FestivalDetailSkeleton from '../components/skeletons/FestivalDetailSkeleton';
 
 type RouteParams = RouteProp<MapStackParamList, 'FestivalDetail'>;
@@ -142,7 +147,10 @@ export default function FestivalDetailScreen() {
   const isAttended = festival.userStatus === 'attended';
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.ink }}>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: colors.ink }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       {/* Header custom compacto */}
       <View
         style={[
@@ -308,6 +316,20 @@ export default function FestivalDetailScreen() {
             </View>
           </View>
 
+          <View style={{ paddingHorizontal: spacing.xl, marginTop: spacing.lg, marginBottom: spacing.md }}>
+            <WhoIsGoingRow
+              targetType="festival"
+              targetId={festival.id}
+              onPress={() =>
+                navigation.navigate('WhoIsGoing', { targetType: 'festival', targetId: festival.id })
+              }
+            />
+          </View>
+
+          <View style={{ paddingHorizontal: spacing.xl, marginBottom: spacing.md }}>
+            <RatingStatsRow targetType="festival" targetId={festival.id} />
+          </View>
+
           {isAttended && festival.userFestivalId && (
             <>
               <View style={styles.section}>
@@ -425,6 +447,8 @@ export default function FestivalDetailScreen() {
             </View>
           )}
 
+          <CommentsSection targetType="festival" targetId={festival.id} />
+
           {festival.official_url && (
             <TouchableOpacity
               style={styles.officialLink}
@@ -464,7 +488,7 @@ export default function FestivalDetailScreen() {
           </TouchableOpacity>
         </View>
       )}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
