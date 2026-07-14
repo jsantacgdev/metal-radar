@@ -54,7 +54,11 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => navigation.goBack()}
+        accessibilityLabel={t('common.back')}
+      >
         <Ionicons name="chevron-back" size={24} color={colors.bright} />
       </TouchableOpacity>
 

@@ -198,7 +198,12 @@ export default function SetlistView({ concertId, setlist, bandId, bandName }: Pr
             </Text>
           )}
         </View>
-        <TouchableOpacity onPress={handleRefresh} disabled={refresh.isPending} hitSlop={10}>
+        <TouchableOpacity
+          onPress={handleRefresh}
+          disabled={refresh.isPending}
+          hitSlop={10}
+          accessibilityLabel={t('common.refresh')}
+        >
           {refresh.isPending ? (
             <ActivityIndicator size="small" color={colors.silver} />
           ) : (

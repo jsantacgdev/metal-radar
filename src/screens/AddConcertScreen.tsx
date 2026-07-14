@@ -195,6 +195,7 @@ export default function AddConcertScreen() {
           onPress={() => navigation.goBack()}
           style={styles.backButton}
           hitSlop={10}
+          accessibilityLabel={t('common.back')}
         >
           <Ionicons name="arrow-back" size={22} color={colors.bright} />
         </TouchableOpacity>

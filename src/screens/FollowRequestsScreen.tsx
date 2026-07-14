@@ -49,7 +49,12 @@ export default function FollowRequestsScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} hitSlop={10}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+          hitSlop={10}
+          accessibilityLabel={t('common.back')}
+        >
           <Ionicons name="arrow-back" size={22} color={colors.bright} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('social.followRequestsTitle')}</Text>
@@ -103,6 +108,7 @@ export default function FollowRequestsScreen() {
                       style={styles.rejectBtn}
                       onPress={() => handleReject(item.follower_id)}
                       activeOpacity={0.7}
+                      accessibilityLabel={t('social.reject')}
                     >
                       <Ionicons name="close" size={18} color={colors.silver} />
                     </TouchableOpacity>
@@ -110,6 +116,7 @@ export default function FollowRequestsScreen() {
                       style={styles.acceptBtn}
                       onPress={() => handleAccept(item.follower_id)}
                       activeOpacity={0.7}
+                      accessibilityLabel={t('social.accept')}
                     >
                       <Ionicons name="checkmark" size={18} color="#fff" />
                     </TouchableOpacity>

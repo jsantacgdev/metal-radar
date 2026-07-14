@@ -194,6 +194,7 @@ export default function PosterAdminScreen() {
           onPress={() => navigation.goBack()}
           style={styles.backButton}
           hitSlop={10}
+          accessibilityLabel={t('common.back')}
         >
           <Ionicons name="arrow-back" size={22} color={colors.bright} />
         </TouchableOpacity>
@@ -566,7 +567,12 @@ function BandRow({
           {tierLabel}
         </Text>
       </TouchableOpacity>
-      <TouchableOpacity onPress={onRemove} style={styles.removeBtn} hitSlop={10}>
+      <TouchableOpacity
+        onPress={onRemove}
+        style={styles.removeBtn}
+        hitSlop={10}
+        accessibilityLabel={t('common.remove')}
+      >
         <Ionicons name="close" size={18} color={colors.faint} />
       </TouchableOpacity>
     </View>

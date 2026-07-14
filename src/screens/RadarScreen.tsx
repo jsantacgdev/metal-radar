@@ -386,6 +386,7 @@ export default function RadarScreen() {
                       closeSearch();
                     }}
                     disabled={followingId !== null}
+                    accessibilityLabel={t('social.follow')}
                   >
                     {followingId === b.spotify_id ? (
                       <ActivityIndicator color={colors.silver} size="small" />
@@ -472,6 +473,7 @@ export default function RadarScreen() {
                         disabled={followingId !== null}
                         activeOpacity={0.7}
                         hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
+                        accessibilityLabel={t('social.follow')}
                       >
                         {isFollowing ? (
                           <ActivityIndicator color="#fff" size="small" />
@@ -572,6 +574,7 @@ export default function RadarScreen() {
                           onPress={() => handleFollowRec(rec)}
                           disabled={followingId !== null}
                           activeOpacity={0.7}
+                          accessibilityLabel={t('social.follow')}
                         >
                           {followingId === rec.spotify_id ? (
                             <ActivityIndicator color={colors.silver} size="small" />
@@ -653,6 +656,7 @@ export default function RadarScreen() {
                     onPress={() => handleUnfollow(b.id, b.name)}
                     style={styles.removeBtn}
                     hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                    accessibilityLabel={t('common.remove')}
                   >
                     <Ionicons name="close" size={18} color={colors.muted} />
                   </TouchableOpacity>

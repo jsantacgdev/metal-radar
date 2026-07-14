@@ -191,6 +191,7 @@ export default function BandLineupPicker({ bands, onChange, showFollowToggle = t
                 onPress={() => removeBand(index)}
                 style={styles.removeBtn}
                 hitSlop={10}
+                accessibilityLabel={t('common.remove')}
               >
                 <Ionicons name="close" size={18} color={colors.faint} />
               </TouchableOpacity>

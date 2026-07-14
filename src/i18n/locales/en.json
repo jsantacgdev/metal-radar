@@ -12,7 +12,17 @@
     "follow": "Follow",
     "unfollow": "Unfollow",
     "share": "Share",
-    "done": "Done"
+    "done": "Done",
+    "close": "Close",
+    "add": "Add",
+    "remove": "Remove",
+    "filter": "Filter",
+    "refresh": "Refresh",
+    "more": "More options",
+    "like": "Like",
+    "send": "Send",
+    "photo": "Photo",
+    "calendar": "Add to calendar"
   },
   "auth": {
     "signIn": "Sign in",
@@ -531,6 +541,8 @@
     "emptyFollowingTitle": "Not following anyone",
     "emptyFollowingDesc": "This account isn't following anyone yet.",
     "followRequestsTitle": "Follow requests",
+    "accept": "Accept",
+    "reject": "Reject",
     "emptyRequestsTitle": "No requests",
     "emptyRequestsDesc": "You don't have any pending follow requests.",
     "profileTitle": "Profile",

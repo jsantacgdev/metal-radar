@@ -136,6 +136,7 @@ export default function BandSearch({ onFollow, followedSpotifyIds, placeholder }
                     onPress={() => handleFollow(item)}
                     disabled={isLoading}
                     activeOpacity={0.7}
+                    accessibilityLabel={t('social.follow')}
                   >
                     {isLoading ? (
                       <ActivityIndicator color="#fff" size="small" />

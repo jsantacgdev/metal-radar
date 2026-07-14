@@ -149,6 +149,7 @@ export default function PhotoGallery(props: Props) {
                 onPress={handleAdd}
                 activeOpacity={0.7}
                 disabled={isUploading}
+                accessibilityLabel={t('common.photo')}
               >
                 <Ionicons name="add" size={28} color={colors.silver} />
               </TouchableOpacity>
@@ -178,10 +179,18 @@ export default function PhotoGallery(props: Props) {
                 resizeMode="contain"
               />
               <View style={styles.modalActions}>
-                <TouchableOpacity style={styles.modalBtn} onPress={() => handleDelete(viewing)}>
+                <TouchableOpacity
+                  style={styles.modalBtn}
+                  onPress={() => handleDelete(viewing)}
+                  accessibilityLabel={t('common.delete')}
+                >
                   <Ionicons name="trash-outline" size={22} color={colors.bloodBright} />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.modalBtn} onPress={() => setViewing(null)}>
+                <TouchableOpacity
+                  style={styles.modalBtn}
+                  onPress={() => setViewing(null)}
+                  accessibilityLabel={t('common.close')}
+                >
                   <Ionicons name="close" size={22} color={colors.bright} />
                 </TouchableOpacity>
               </View>

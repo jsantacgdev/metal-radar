@@ -376,6 +376,7 @@ export default function MapScreen() {
             onPress={() => setFiltersOpen(true)}
             activeOpacity={0.7}
             hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+            accessibilityLabel={t('common.filter')}
           >
             <Ionicons
               name="options-outline"
@@ -404,6 +405,7 @@ export default function MapScreen() {
             onPress={() => navigation.navigate('AddConcert')}
             activeOpacity={0.7}
             hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+            accessibilityLabel={t('common.add')}
           >
             <Ionicons name="add-circle-outline" size={20} color={colors.silver} />
           </TouchableOpacity>
@@ -454,6 +456,7 @@ export default function MapScreen() {
               onPress={() => setSelectedVenue(null)}
               style={styles.closeBtn}
               hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+              accessibilityLabel={t('common.close')}
             >
               <Ionicons name="close" size={20} color={colors.muted} />
             </TouchableOpacity>
@@ -575,6 +578,7 @@ export default function MapScreen() {
               <TouchableOpacity
                 onPress={() => setFiltersOpen(false)}
                 hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                accessibilityLabel={t('common.close')}
               >
                 <Ionicons name="close" size={22} color={colors.muted} />
               </TouchableOpacity>

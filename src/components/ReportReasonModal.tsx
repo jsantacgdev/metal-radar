@@ -57,7 +57,11 @@ export default function ReportReasonModal({ visible, onClose, onSubmit }: Props)
         <Pressable style={styles.panel} onPress={() => {}}>
           <View style={styles.header}>
             <Text variant="displaySM">{t('reportReason.title')}</Text>
-            <TouchableOpacity onPress={handleClose} hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+            <TouchableOpacity
+              onPress={handleClose}
+              hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+              accessibilityLabel={t('common.close')}
+            >
               <Ionicons name="close" size={22} color={colors.muted} />
             </TouchableOpacity>
           </View>

@@ -12,7 +12,17 @@
     "follow": "Seguir",
     "unfollow": "Dejar de seguir",
     "share": "Compartir",
-    "done": "Listo"
+    "done": "Listo",
+    "close": "Cerrar",
+    "add": "Añadir",
+    "remove": "Quitar",
+    "filter": "Filtrar",
+    "refresh": "Actualizar",
+    "more": "Más opciones",
+    "like": "Me gusta",
+    "send": "Enviar",
+    "photo": "Foto",
+    "calendar": "Añadir al calendario"
   },
   "auth": {
     "signIn": "Iniciar sesión",
@@ -531,6 +541,8 @@
     "emptyFollowingTitle": "No sigue a nadie",
     "emptyFollowingDesc": "Todavía no sigue a ningún usuario.",
     "followRequestsTitle": "Solicitudes de seguimiento",
+    "accept": "Aceptar",
+    "reject": "Rechazar",
     "emptyRequestsTitle": "Sin solicitudes",
     "emptyRequestsDesc": "No tienes solicitudes de seguimiento pendientes.",
     "profileTitle": "Perfil",

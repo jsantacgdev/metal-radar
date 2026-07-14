@@ -122,7 +122,11 @@ export default function CommentsSection({ targetType, targetId }: Props) {
           <Text variant="bodySM" color="muted">
             {t('comments.replyingTo', { username: replyingTo.username })}
           </Text>
-          <TouchableOpacity onPress={() => setReplyingTo(null)} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+          <TouchableOpacity
+            onPress={() => setReplyingTo(null)}
+            hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+            accessibilityLabel={t('common.close')}
+          >
             <Ionicons name="close" size={16} color={colors.muted} />
           </TouchableOpacity>
         </View>
@@ -142,6 +146,7 @@ export default function CommentsSection({ targetType, targetId }: Props) {
           onPress={handlePost}
           disabled={posting || !text.trim()}
           activeOpacity={0.8}
+          accessibilityLabel={t('common.send')}
         >
           {posting ? (
             <ActivityIndicator color="#fff" size="small" />
@@ -213,6 +218,7 @@ function CommentRow({
             style={styles.commentAction}
             onPress={() => toggle().catch(() => {})}
             hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
+            accessibilityLabel={t('common.like')}
           >
             <Ionicons
               name={reacted ? 'heart' : 'heart-outline'}
@@ -233,11 +239,19 @@ function CommentRow({
         </View>
       </View>
       {isOwn ? (
-        <TouchableOpacity onPress={onDelete} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+        <TouchableOpacity
+          onPress={onDelete}
+          hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+          accessibilityLabel={t('common.delete')}
+        >
           <Ionicons name="trash-outline" size={16} color={colors.muted} />
         </TouchableOpacity>
       ) : (
-        <TouchableOpacity onPress={handleMenu} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+        <TouchableOpacity
+          onPress={handleMenu}
+          hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+          accessibilityLabel={t('common.more')}
+        >
           <Ionicons name="ellipsis-horizontal" size={16} color={colors.muted} />
         </TouchableOpacity>
       )}

@@ -219,6 +219,7 @@ export default function ConcertDetailScreen({ route }: Props) {
           onPress={() => navigation.goBack()}
           style={styles.backButton}
           hitSlop={10}
+          accessibilityLabel={t('common.back')}
         >
           <Ionicons name="arrow-back" size={22} color={colors.bright} />
         </TouchableOpacity>
@@ -505,6 +506,7 @@ export default function ConcertDetailScreen({ route }: Props) {
               style={styles.iconCtaButton}
               onPress={handleAddToCalendar}
               activeOpacity={0.85}
+              accessibilityLabel={t('common.calendar')}
             >
               <Ionicons name="calendar-outline" size={20} color={colors.silver} />
             </TouchableOpacity>
@@ -512,6 +514,7 @@ export default function ConcertDetailScreen({ route }: Props) {
               style={styles.iconCtaButton}
               onPress={handleShare}
               activeOpacity={0.85}
+              accessibilityLabel={t('common.share')}
             >
               <Ionicons name="share-social-outline" size={20} color={colors.silver} />
             </TouchableOpacity>

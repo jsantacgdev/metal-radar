@@ -93,7 +93,12 @@ export default function PublicProfileScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} hitSlop={10}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+          hitSlop={10}
+          accessibilityLabel={t('common.back')}
+        >
           <Ionicons name="arrow-back" size={22} color={colors.bright} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('social.profileTitle')}</Text>
