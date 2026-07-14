@@ -351,7 +351,7 @@ export default function RadarScreen() {
             const isFollowed = followedNames.has(b.name.toLowerCase());
             return (
               <TouchableOpacity
-                key={b.spotify_id}
+                key={b.spotify_id ?? `name-${b.name}-${i}`}
                 style={[styles.row, i === searchResults.length - 1 && { borderBottomWidth: 0 }]}
                 onPress={() =>
                   openBandDetail({

@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import {
-  Alert,
   Keyboard,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
@@ -16,34 +15,54 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../../lib/supabase';
 import { AuthStackParamList } from '../../navigation/AuthNavigator';
-import { colors, fontFamily, radius, spacing } from '../../theme';
-import { Button, Text } from '../../components/ui';
-import { Linking } from 'react-native';
+import { colors, radius, spacing } from '../../theme';
+import { Button, FormField, Text } from '../../components/ui';
 import { privacyUrl, termsUrl } from '../../lib/legalUrls';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+type FormErrors = {
+  displayName?: string;
+  email?: string;
+  password?: string;
+  confirmPassword?: string;
+};
 
 export default function RegisterScreen({ navigation }: Props) {
   const { t, i18n } = useTranslation();
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const clearError = (field: keyof FormErrors) => {
+    if (errors[field]) setErrors((e) => ({ ...e, [field]: undefined }));
+  };
+
+  const validate = () => {
+    const next: FormErrors = {};
+    if (!displayName.trim()) next.displayName = t('register.errorNameRequired');
+    if (!email.trim()) next.email = t('register.errorEmailRequired');
+    else if (!EMAIL_RE.test(email.trim())) next.email = t('register.errorEmailInvalid');
+    if (!password) next.password = t('register.errorPasswordRequired');
+    else if (password.length < 6) next.password = t('register.shortPasswordBody');
+    if (confirmPassword !== password) next.confirmPassword = t('register.errorPasswordMismatch');
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
 
   const handleRegister = async () => {
-    if (!displayName.trim()) {
-      return Alert.alert(t('register.missingDataTitle'), t('register.missingNameBody'));
-    }
-    if (!email || !password) {
-      return Alert.alert(t('register.missingDataTitle'), t('register.missingEmailPasswordBody'));
-    }
-    if (password.length < 6) {
-      return Alert.alert(t('register.shortPasswordTitle'), t('register.shortPasswordBody'));
-    }
+    setFormError(null);
+    if (!validate()) return;
     try {
       setLoading(true);
       const { error } = await supabase.auth.signUp({
-        email,
+        email: email.trim(),
         password,
         options: {
           data: {
@@ -51,9 +70,10 @@ export default function RegisterScreen({ navigation }: Props) {
           },
         },
       });
-      if (error) throw error;
-    } catch (err: any) {
-      Alert.alert(t('common.error'), err.message);
+      if (error) {
+        setFormError(error.message);
+        return;
+      }
     } finally {
       setLoading(false);
     }
@@ -85,55 +105,73 @@ export default function RegisterScreen({ navigation }: Props) {
           </View>
 
           <View style={styles.form}>
-            <View style={styles.fieldGroup}>
-              <Text variant="monoSM" color="muted" style={styles.label}>
-                {t('register.nameLabel')}
-              </Text>
-              <TextInput
-                style={styles.input}
-                placeholder={t('register.namePlaceholder')}
-                placeholderTextColor={colors.faint}
-                value={displayName}
-                onChangeText={setDisplayName}
-                autoCapitalize="words"
-                returnKeyType="next"
-                maxLength={40}
-              />
-            </View>
+            {formError && (
+              <View style={styles.errorBanner}>
+                <Ionicons name="alert-circle" size={16} color={colors.bloodBright} />
+                <Text variant="bodySM" color="bloodBright" style={{ marginLeft: spacing.sm, flex: 1 }}>
+                  {formError}
+                </Text>
+              </View>
+            )}
 
-            <View style={styles.fieldGroup}>
-              <Text variant="monoSM" color="muted" style={styles.label}>
-                {t('register.emailLabel')}
-              </Text>
-              <TextInput
-                style={styles.input}
-                placeholder={t('register.emailPlaceholder')}
-                placeholderTextColor={colors.faint}
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                autoComplete="email"
-                returnKeyType="next"
-              />
-            </View>
+            <FormField
+              label={t('register.nameLabel')}
+              placeholder={t('register.namePlaceholder')}
+              value={displayName}
+              onChangeText={(text) => {
+                setDisplayName(text);
+                clearError('displayName');
+              }}
+              error={errors.displayName}
+              autoCapitalize="words"
+              returnKeyType="next"
+              maxLength={40}
+            />
 
-            <View style={styles.fieldGroup}>
-              <Text variant="monoSM" color="muted" style={styles.label}>
-                {t('register.passwordLabel')}
-              </Text>
-              <TextInput
-                style={styles.input}
-                placeholder="••••••••"
-                placeholderTextColor={colors.faint}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                autoCapitalize="none"
-                returnKeyType="done"
-                onSubmitEditing={handleRegister}
-              />
-            </View>
+            <FormField
+              label={t('register.emailLabel')}
+              placeholder={t('register.emailPlaceholder')}
+              value={email}
+              onChangeText={(text) => {
+                setEmail(text);
+                clearError('email');
+              }}
+              error={errors.email}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              autoComplete="email"
+              returnKeyType="next"
+            />
+
+            <FormField
+              label={t('register.passwordLabel')}
+              placeholder="••••••••"
+              value={password}
+              onChangeText={(text) => {
+                setPassword(text);
+                clearError('password');
+              }}
+              error={errors.password}
+              isPassword
+              autoCapitalize="none"
+              returnKeyType="next"
+            />
+
+            <FormField
+              label={t('register.confirmPasswordLabel')}
+              placeholder="••••••••"
+              value={confirmPassword}
+              onChangeText={(text) => {
+                setConfirmPassword(text);
+                clearError('confirmPassword');
+              }}
+              error={errors.confirmPassword}
+              isPassword
+              autoCapitalize="none"
+              returnKeyType="done"
+              onSubmitEditing={handleRegister}
+            />
+
             <View style={styles.legalNotice}>
               <Text variant="bodySM" color="muted" style={{ textAlign: 'center', lineHeight: 18 }}>
                 {t('register.legalPrefix')}{' '}
@@ -207,22 +245,14 @@ const styles = StyleSheet.create({
   form: {
     gap: spacing.lg,
   },
-  fieldGroup: {
-    gap: spacing.sm,
-  },
-  label: {
-    paddingLeft: spacing.xs,
-  },
-  input: {
-    backgroundColor: colors.panel,
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bloodTint,
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: colors.bloodTintBorder,
     borderRadius: radius.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md + 2,
-    fontSize: 16,
-    color: colors.bright,
-    fontFamily: fontFamily.body,
+    padding: spacing.md,
   },
   switchLink: {
     flexDirection: 'row',

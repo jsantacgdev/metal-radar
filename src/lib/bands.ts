@@ -2,7 +2,7 @@ import i18n from '../i18n';
 import { supabase } from './supabase';
 
 export type BandToFollow = {
-  spotify_id: string;
+  spotify_id: string | null;
   name: string;
   image_url: string | null;
   genres: string[];

@@ -1,12 +1,10 @@
 import { useState } from 'react';
 import {
-  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
@@ -16,27 +14,47 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../../lib/supabase';
 import { AuthStackParamList } from '../../navigation/AuthNavigator';
-import { colors, fontFamily, radius, spacing } from '../../theme';
-import { Button, Text } from '../../components/ui';
+import { colors, radius, spacing } from '../../theme';
+import { Button, FormField, Text } from '../../components/ui';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginScreen({ navigation }: Props) {
   const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const validate = () => {
+    const next: typeof errors = {};
+    if (!email.trim()) next.email = t('login.errorEmailRequired');
+    else if (!EMAIL_RE.test(email.trim())) next.email = t('login.errorEmailInvalid');
+    if (!password) next.password = t('login.errorPasswordRequired');
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      return Alert.alert(t('login.missingDataTitle'), t('login.missingDataBody'));
-    }
+    setFormError(null);
+    if (!validate()) return;
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-    } catch (err: any) {
-      Alert.alert(t('common.error'), err.message);
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (error) {
+        setFormError(
+          error.message.includes('Invalid login credentials')
+            ? t('login.errorInvalidCredentials')
+            : error.message,
+        );
+        return;
+      }
     } finally {
       setLoading(false);
     }
@@ -64,39 +82,53 @@ export default function LoginScreen({ navigation }: Props) {
           </View>
 
           <View style={styles.form}>
-            <View style={styles.fieldGroup}>
-              <Text variant="monoSM" color="muted" style={styles.label}>
-                {t('login.emailLabel')}
-              </Text>
-              <TextInput
-                style={styles.input}
-                placeholder={t('login.emailPlaceholder')}
-                placeholderTextColor={colors.faint}
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                autoComplete="email"
-                returnKeyType="next"
-              />
-            </View>
+            {formError && (
+              <View style={styles.errorBanner}>
+                <Ionicons name="alert-circle" size={16} color={colors.bloodBright} />
+                <Text variant="bodySM" color="bloodBright" style={{ marginLeft: spacing.sm, flex: 1 }}>
+                  {formError}
+                </Text>
+              </View>
+            )}
 
-            <View style={styles.fieldGroup}>
-              <Text variant="monoSM" color="muted" style={styles.label}>
-                {t('login.passwordLabel')}
+            <FormField
+              label={t('login.emailLabel')}
+              placeholder={t('login.emailPlaceholder')}
+              value={email}
+              onChangeText={(text) => {
+                setEmail(text);
+                if (errors.email) setErrors((e) => ({ ...e, email: undefined }));
+              }}
+              error={errors.email}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              autoComplete="email"
+              returnKeyType="next"
+            />
+
+            <FormField
+              label={t('login.passwordLabel')}
+              placeholder="••••••••"
+              value={password}
+              onChangeText={(text) => {
+                setPassword(text);
+                if (errors.password) setErrors((e) => ({ ...e, password: undefined }));
+              }}
+              error={errors.password}
+              isPassword
+              autoCapitalize="none"
+              returnKeyType="done"
+              onSubmitEditing={handleLogin}
+            />
+
+            <TouchableOpacity
+              style={styles.forgotLink}
+              onPress={() => navigation.navigate('ForgotPassword')}
+            >
+              <Text variant="monoSM" color="muted">
+                {t('auth.forgotPassword')}
               </Text>
-              <TextInput
-                style={styles.input}
-                placeholder="••••••••"
-                placeholderTextColor={colors.faint}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                autoCapitalize="none"
-                returnKeyType="done"
-                onSubmitEditing={handleLogin}
-              />
-            </View>
+            </TouchableOpacity>
 
             <Button label={t('login.submit')} onPress={handleLogin} loading={loading} />
 
@@ -138,22 +170,18 @@ const styles = StyleSheet.create({
   form: {
     gap: spacing.lg,
   },
-  fieldGroup: {
-    gap: spacing.sm,
-  },
-  label: {
-    paddingLeft: spacing.xs,
-  },
-  input: {
-    backgroundColor: colors.panel,
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bloodTint,
     borderWidth: 1,
-    borderColor: colors.line,
+    borderColor: colors.bloodTintBorder,
     borderRadius: radius.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md + 2,
-    fontSize: 16,
-    color: colors.bright,
-    fontFamily: fontFamily.body,
+    padding: spacing.md,
+  },
+  forgotLink: {
+    alignSelf: 'flex-end',
+    marginTop: -spacing.sm,
   },
   switchLink: {
     flexDirection: 'row',

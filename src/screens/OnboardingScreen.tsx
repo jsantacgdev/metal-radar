@@ -14,23 +14,36 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { colors, fontFamily, radius, spacing } from '../theme';
-import { Button, Text } from '../components/ui';
+import { Button, FormField, Text } from '../components/ui';
 import { registerForPushNotifications } from '../lib/notifications';
 import { followBand } from '../lib/bands';
+import { useProfile, useUsernameAvailability } from '../hooks/useProfile';
 
 type Band = {
-  spotify_id: string;
+  spotify_id: string | null;
   name: string;
   image_url: string | null;
   genres: string[];
 };
 
-type Step = 'bands' | 'notifications';
+// Algunas bandas en caché (sobre todo las que no tienen foto) no
+// tienen spotify_id — usarlo tal cual como clave hace que varias
+// bandas distintas colisionen bajo la misma clave `null`.
+function bandKey(band: Band): string {
+  return band.spotify_id ?? `name:${band.name.toLowerCase()}`;
+}
+
+type Step = 'username' | 'bands' | 'notifications';
 
 export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
-  const [step, setStep] = useState<Step>('bands');
+  const [step, setStep] = useState<Step>('username');
+
+  const { profile, loading: profileLoading, update } = useProfile();
+  const [usernameInput, setUsernameInput] = useState('');
+  const [savingUsername, setSavingUsername] = useState(false);
+  const usernameAvailability = useUsernameAvailability(usernameInput, profile?.username ?? null);
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Band[]>([]);
@@ -39,6 +52,14 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
   const [saving, setSaving] = useState(false);
 
   const [enablingPush, setEnablingPush] = useState(false);
+
+  useEffect(() => {
+    // Ya tiene username (p.ej. cuenta antigua sin bandas seguidas
+    // todavía) — no repetir este paso.
+    if (!profileLoading && profile?.username && step === 'username') {
+      setStep('bands');
+    }
+  }, [profileLoading, profile?.username, step]);
 
   useEffect(() => {
     if (query.trim().length < 2) {
@@ -75,8 +96,9 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
 
   const toggleBand = (band: Band) => {
     const next = new Map(selected);
-    if (next.has(band.spotify_id)) next.delete(band.spotify_id);
-    else next.set(band.spotify_id, band);
+    const key = bandKey(band);
+    if (next.has(key)) next.delete(key);
+    else next.set(key, band);
     setSelected(next);
   };
 
@@ -122,6 +144,88 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
     onDone();
   };
 
+  const handleUsernameContinue = async () => {
+    if (usernameAvailability !== 'available') return;
+    try {
+      setSavingUsername(true);
+      await update({ username: usernameInput.trim().toLowerCase() });
+      setStep('bands');
+    } catch (err: any) {
+      Alert.alert(t('common.error'), err.message);
+    } finally {
+      setSavingUsername(false);
+    }
+  };
+
+  if (step === 'username') {
+    return (
+      <View style={[styles.container, { justifyContent: 'space-between' }]}>
+        <View>
+          <View style={styles.header}>
+            <Text variant="monoMD" color="bloodBright">
+              {t('onboarding.usernameEyebrow')}
+            </Text>
+            <Text variant="displayLG" style={styles.title}>
+              {t('onboarding.usernameTitle')}
+            </Text>
+            <Text variant="body" color="muted" style={styles.subtitle}>
+              {t('onboarding.usernameSubtitle')}
+            </Text>
+          </View>
+
+          <View style={{ marginTop: spacing.xl }}>
+            <FormField
+              label={t('profile.usernamePlaceholder')}
+              placeholder={t('profile.usernamePlaceholder')}
+              value={usernameInput}
+              onChangeText={(text) => setUsernameInput(text.toLowerCase())}
+              autoCapitalize="none"
+              autoCorrect={false}
+              maxLength={20}
+              autoFocus
+              error={
+                usernameAvailability === 'taken'
+                  ? t('profile.usernameTaken')
+                  : usernameAvailability === 'invalid'
+                    ? t('profile.usernameInvalid')
+                    : usernameAvailability === 'error'
+                      ? t('profile.usernameCheckError')
+                      : undefined
+              }
+            />
+            {usernameAvailability === 'checking' && (
+              <Text
+                variant="bodySM"
+                color="muted"
+                style={{ marginTop: spacing.xs, paddingLeft: spacing.xs }}
+              >
+                {t('profile.usernameChecking')}
+              </Text>
+            )}
+            {usernameAvailability === 'available' && (
+              <Text
+                variant="bodySM"
+                color="bloodBright"
+                style={{ marginTop: spacing.xs, paddingLeft: spacing.xs }}
+              >
+                {t('profile.usernameAvailable')}
+              </Text>
+            )}
+          </View>
+        </View>
+
+        <View style={styles.footer}>
+          <Button
+            label={t('onboarding.continueButton')}
+            onPress={handleUsernameContinue}
+            loading={savingUsername}
+            disabled={usernameAvailability !== 'available'}
+          />
+        </View>
+      </View>
+    );
+  }
+
   if (step === 'bands') {
     return (
       <View style={styles.container}>
@@ -163,12 +267,12 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
 
         <FlatList
           data={results}
-          keyExtractor={(item) => item.spotify_id}
+          keyExtractor={(item, index) => item.spotify_id ?? `name-${item.name}-${index}`}
           style={{ flex: 1, marginTop: spacing.md }}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingBottom: spacing.xl }}
           renderItem={({ item }) => {
-            const isSelected = selected.has(item.spotify_id);
+            const isSelected = selected.has(bandKey(item));
             return (
               <TouchableOpacity
                 style={[styles.bandRow, isSelected && styles.bandRowSelected]}

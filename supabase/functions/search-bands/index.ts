@@ -66,7 +66,14 @@ type Band = {
   name: string;
   image_url: string | null;
   genres: string[];
+  lastfm_listeners?: number | null;
 };
+
+// Bandas más grandes primero. Las que no tienen oyentes conocidos
+// (recién encontradas vía Spotify, aún no cacheadas) van al final.
+function sortByListeners(bands: Band[]): Band[] {
+  return [...bands].sort((a, b) => (b.lastfm_listeners ?? -1) - (a.lastfm_listeners ?? -1));
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
@@ -85,7 +92,7 @@ Deno.serve(async (req) => {
 
     const { data: dbBands } = await admin
       .from('bands')
-      .select('spotify_id, name, image_url, genres')
+      .select('spotify_id, name, image_url, genres, lastfm_listeners')
       .ilike('name', `${query}%`)
       .limit(20);
 
@@ -97,7 +104,7 @@ Deno.serve(async (req) => {
         dedup.set(key, b);
       }
     }
-    const cachedBands = Array.from(dedup.values());
+    const cachedBands = sortByListeners(Array.from(dedup.values()));
 
     const withSpotifyId = cachedBands.filter((b) => b.spotify_id);
     if (withSpotifyId.length >= 5) {
@@ -205,9 +212,12 @@ Deno.serve(async (req) => {
       console.warn('Spotify enrichment failed:', (err as Error).message);
     }
 
-    return new Response(JSON.stringify({ bands: Array.from(dedup.values()), source: 'mixed' }), {
-      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({ bands: sortByListeners(Array.from(dedup.values())), source: 'mixed' }),
+      {
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      },
+    );
   } catch (err) {
     return new Response(JSON.stringify({ error: (err as Error).message }), {
       status: 500,
