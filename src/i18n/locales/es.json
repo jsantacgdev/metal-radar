@@ -286,7 +286,7 @@
   "profile": {
     "accountLabel": "CUENTA",
     "usernameDesc": "Tu nombre de usuario único. Se usará para que otras personas puedan encontrarte y seguirte.",
-    "usernamePlaceholder": "nombre_usuario",
+    "usernamePlaceholder": "Nombre de usuario",
     "usernameChecking": "Comprobando disponibilidad…",
     "usernameAvailable": "Disponible",
     "usernameTaken": "Ese nombre de usuario ya está en uso",
