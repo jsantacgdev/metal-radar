@@ -1,9 +1,23 @@
 # Retro-rellena lastfm_listeners para todas las bandas.
 # Llama a update-band-listeners en bucle hasta que devuelva done=true.
 # Cada invocación procesa ~100 bandas (~25 segundos por la latencia de Last.fm).
+#
+# update-band-popularity ahora exige el CRON_SECRET configurado en el
+# proyecto de Supabase (antes se llamaba con la clave anónima, pero la
+# función no comprobaba ninguna autorización — ver auditoría de seguridad).
+# Define la variable de entorno CRON_SECRET antes de ejecutar este script:
+#   $env:CRON_SECRET = "el-valor-real"
+#   .\retro-fill-popularity.ps1
+# No hardcodees el valor real aquí ni lo subas a git.
 
 $url = "https://vzghxgfrxqwuxwmnretm.supabase.co/functions/v1/update-band-popularity"
-$anonKey = "sb_publishable_PoME-xzyU_mY0ggMoYl0SQ_ItEnjBAc"
+
+if (-not $env:CRON_SECRET) {
+  Write-Host "ERROR: falta la variable de entorno CRON_SECRET." -ForegroundColor Red
+  Write-Host 'Define primero: $env:CRON_SECRET = "el-valor-real"' -ForegroundColor Yellow
+  exit 1
+}
+$cronSecret = $env:CRON_SECRET
 
 $totalProcessed = 0
 $totalUpdated = 0
@@ -18,7 +32,7 @@ do {
 
   try {
     $response = Invoke-RestMethod -Method Post -Uri $url `
-      -Headers @{ "Authorization" = "Bearer $anonKey"; "Content-Type" = "application/json" } `
+      -Headers @{ "Authorization" = "Bearer $cronSecret"; "Content-Type" = "application/json" } `
       -Body "{}" `
       -TimeoutSec 120
 
