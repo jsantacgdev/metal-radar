@@ -334,6 +334,18 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
 
   try {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) throw new Error('Falta Authorization header');
+
+    const userClient = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const {
+      data: { user },
+      error: userError,
+    } = await userClient.auth.getUser();
+    if (userError || !user) throw new Error('Usuario no autenticado');
+
     const { concertId, bandId, force } = await req.json();
     if (!concertId) {
       return new Response(JSON.stringify({ error: 'concertId is required' }), {

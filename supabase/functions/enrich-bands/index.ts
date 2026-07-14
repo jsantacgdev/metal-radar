@@ -6,6 +6,7 @@ const SPOTIFY_CLIENT_SECRET = Deno.env.get('SPOTIFY_CLIENT_SECRET')!;
 const LASTFM_API_KEY = Deno.env.get('LASTFM_API_KEY')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const CRON_SECRET = Deno.env.get('CRON_SECRET')!;
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -109,11 +110,19 @@ function buildPendingQuery(admin: any, sevenDaysAgo: string) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
 
+  const authHeader = req.headers.get('Authorization');
+  if (authHeader !== `Bearer ${CRON_SECRET}`) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const url = new URL(req.url);
-    const batchSize = parseInt(url.searchParams.get('batch') ?? `${BATCH_SIZE}`, 10);
+    const batchSize = Math.min(parseInt(url.searchParams.get('batch') ?? `${BATCH_SIZE}`, 10), 200);
 
     const today = new Date().toISOString().slice(0, 10);
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();

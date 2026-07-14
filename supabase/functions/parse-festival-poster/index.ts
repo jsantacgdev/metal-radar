@@ -55,6 +55,30 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
 
   try {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) throw new Error('Falta Authorization header');
+
+    const userClient = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const {
+      data: { user },
+      error: userError,
+    } = await userClient.auth.getUser();
+    if (userError || !user) throw new Error('Usuario no autenticado');
+
+    const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Herramienta solo para admins: importar carteles crea/edita festivales
+    // reales — no basta con ocultar el botón en el cliente.
+    const { data: profile } = await admin.from('profiles').select('role').eq('id', user.id).single();
+    if (profile?.role !== 'admin') {
+      return new Response(JSON.stringify({ error: 'forbidden' }), {
+        status: 403,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { imageBase64, mediaType = 'image/jpeg' } = await req.json();
 
     if (!imageBase64) {
@@ -119,8 +143,6 @@ Deno.serve(async (req) => {
         { status: 500, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
       );
     }
-
-    const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     let existingFestivalId: string | null = null;
     if (parsed.festival_name) {
