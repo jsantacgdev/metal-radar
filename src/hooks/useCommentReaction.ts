@@ -31,14 +31,13 @@ export function useCommentReaction(commentId: string) {
   });
 
   const toggleMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (wasReacted: boolean) => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) throw new Error(i18n.t('errors.noSession'));
 
-      const current = queryClient.getQueryData<ReactionState>(queryKey);
-      if (current?.reacted) {
+      if (wasReacted) {
         const { error } = await supabase
           .from('reactions')
           .delete()
@@ -50,13 +49,13 @@ export function useCommentReaction(commentId: string) {
         if (error) throw error;
       }
     },
-    onMutate: async () => {
+    onMutate: async (wasReacted: boolean) => {
       await queryClient.cancelQueries({ queryKey });
       const prev = queryClient.getQueryData<ReactionState>(queryKey);
       if (prev) {
         queryClient.setQueryData<ReactionState>(queryKey, {
-          count: prev.reacted ? prev.count - 1 : prev.count + 1,
-          reacted: !prev.reacted,
+          count: wasReacted ? prev.count - 1 : prev.count + 1,
+          reacted: !wasReacted,
         });
       }
       return { prev };
@@ -71,6 +70,6 @@ export function useCommentReaction(commentId: string) {
     count: query.data?.count ?? 0,
     reacted: query.data?.reacted ?? false,
     loading: query.isLoading,
-    toggle: () => toggleMutation.mutateAsync(),
+    toggle: () => toggleMutation.mutateAsync(query.data?.reacted ?? false),
   };
 }
