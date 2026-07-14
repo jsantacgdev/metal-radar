@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { supabase } from '../lib/supabase';
@@ -57,6 +58,7 @@ type CommitResult = {
 export default function PosterAdminScreen() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [stage, setStage] = useState<Stage>('select');
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
@@ -67,7 +69,7 @@ export default function PosterAdminScreen() {
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permiso denegado', 'Necesitamos acceso a la galería');
+      Alert.alert(t('profile.permissionDeniedTitle'), t('posterAdmin.galleryPermissionBody'));
       return;
     }
 
@@ -105,7 +107,7 @@ export default function PosterAdminScreen() {
       setBands(data.bands ?? []);
       setStage('review');
     } catch (err: any) {
-      Alert.alert('Error procesando cartel', err.message);
+      Alert.alert(t('posterAdmin.processErrorTitle'), err.message);
       setStage('select');
     }
   };
@@ -128,7 +130,7 @@ export default function PosterAdminScreen() {
 
   const commit = async () => {
     if (!festival?.name) {
-      Alert.alert('Falta nombre', 'El festival necesita un nombre');
+      Alert.alert(t('posterAdmin.missingNameTitle'), t('posterAdmin.missingNameBody'));
       return;
     }
     setStage('committing');
@@ -168,7 +170,7 @@ export default function PosterAdminScreen() {
       setResult(data);
       setStage('done');
     } catch (err: any) {
-      Alert.alert('Error guardando', err.message);
+      Alert.alert(t('posterAdmin.saveErrorTitle'), err.message);
       setStage('review');
     }
   };
@@ -195,7 +197,7 @@ export default function PosterAdminScreen() {
         >
           <Ionicons name="arrow-back" size={22} color={colors.bright} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>OCR Carteles</Text>
+        <Text style={styles.headerTitle}>{t('posterAdmin.title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -213,44 +215,44 @@ export default function PosterAdminScreen() {
           <Centered>
             <ActivityIndicator color={colors.bloodBright} size="large" />
             <Text variant="body" color="muted" style={styles.processingHint}>
-              Procesando con IA...{'\n'}Esto puede tardar 10-30 segundos.
+              {t('posterAdmin.processingHint')}
             </Text>
           </Centered>
         )}
 
         {stage === 'review' && festival && (
           <>
-            <SectionLabel text="FESTIVAL DETECTADO" />
+            <SectionLabel text={t('posterAdmin.festivalDetectedLabel')} />
             <View style={styles.card}>
               <Field
-                label="Nombre"
+                label={t('posterAdmin.nameLabel')}
                 value={festival.name ?? ''}
                 onChange={(v) => updateFestival('name', v)}
               />
               <Field
-                label="Inicio"
+                label={t('posterAdmin.startLabel')}
                 value={festival.start_date ?? ''}
                 onChange={(v) => updateFestival('start_date', v)}
                 placeholder="YYYY-MM-DD"
               />
               <Field
-                label="Fin"
+                label={t('posterAdmin.endLabel')}
                 value={festival.end_date ?? ''}
                 onChange={(v) => updateFestival('end_date', v)}
                 placeholder="YYYY-MM-DD"
               />
               <Field
-                label="Recinto"
+                label={t('posterAdmin.venueLabel')}
                 value={festival.venue_name ?? ''}
                 onChange={(v) => updateFestival('venue_name', v)}
               />
               <Field
-                label="Ciudad"
+                label={t('posterAdmin.cityLabel')}
                 value={festival.city ?? ''}
                 onChange={(v) => updateFestival('city', v)}
               />
               <Field
-                label="País"
+                label={t('posterAdmin.countryLabel')}
                 value={festival.country ?? ''}
                 onChange={(v) => updateFestival('country', v)}
                 placeholder="ES"
@@ -258,33 +260,33 @@ export default function PosterAdminScreen() {
 
               <View style={styles.badgeRow}>
                 {festival.existing_festival_id ? (
-                  <Badge text="EXISTENTE · SE ACTUALIZARÁ" tint="blood" />
+                  <Badge text={t('posterAdmin.badgeExisting')} tint="blood" />
                 ) : (
-                  <Badge text="NUEVO · SE CREARÁ" tint="green" />
+                  <Badge text={t('posterAdmin.badgeNew')} tint="green" />
                 )}
                 {festival.existing_venue_id ? (
-                  <Badge text="VENUE EXISTENTE" tint="muted" />
+                  <Badge text={t('posterAdmin.badgeVenueExisting')} tint="muted" />
                 ) : festival.venue_name ? (
-                  <Badge text="VENUE NUEVO · SE GEOCODIFICARÁ" tint="green" />
+                  <Badge text={t('posterAdmin.badgeVenueNew')} tint="green" />
                 ) : (
-                  <Badge text="SIN VENUE" tint="muted" />
+                  <Badge text={t('posterAdmin.badgeNoVenue')} tint="muted" />
                 )}
-                <Badge text="CARTEL SE GUARDARÁ" tint="muted" />
+                <Badge text={t('posterAdmin.badgePosterWillSave')} tint="muted" />
               </View>
             </View>
 
-            <SectionLabel text={`BANDAS · ${bands.length}`} top />
+            <SectionLabel text={t('posterAdmin.bandsCountLabel', { count: bands.length })} top />
 
             {matched.length > 0 && (
               <Text variant="monoSM" color="silver" style={styles.subsection}>
-                ENCONTRADAS · {matched.length}
+                {t('posterAdmin.matchedLabel', { count: matched.length })}
               </Text>
             )}
             {bands.map(
               (b, i) =>
                 b.matched_band_id !== null && (
                   <BandRow
-                    key={`m-${i}`}
+                    key={`m-${b.extracted_name}`}
                     band={b}
                     onRemove={() => removeBand(i)}
                     onTier={() => cycleTier(i)}
@@ -294,14 +296,14 @@ export default function PosterAdminScreen() {
 
             {toCreate.length > 0 && (
               <Text variant="monoSM" color="silver" style={styles.subsection}>
-                SE CREARÁN · {toCreate.length}
+                {t('posterAdmin.toCreateLabel', { count: toCreate.length })}
               </Text>
             )}
             {bands.map(
               (b, i) =>
                 b.matched_band_id === null && (
                   <BandRow
-                    key={`c-${i}`}
+                    key={`c-${b.extracted_name}`}
                     band={b}
                     onRemove={() => removeBand(i)}
                     onTier={() => cycleTier(i)}
@@ -312,13 +314,15 @@ export default function PosterAdminScreen() {
             <TouchableOpacity style={styles.primaryButton} onPress={commit}>
               <Ionicons name="checkmark" size={18} color="#fff" />
               <Text style={styles.primaryButtonText}>
-                {festival.existing_festival_id ? 'ACTUALIZAR FESTIVAL' : 'CREAR FESTIVAL'}
+                {festival.existing_festival_id
+                  ? t('posterAdmin.updateFestivalButton')
+                  : t('posterAdmin.createFestivalButton')}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.secondaryButton} onPress={reset}>
               <Text variant="bodySM" color="muted">
-                Cancelar y empezar de nuevo
+                {t('posterAdmin.cancelRestart')}
               </Text>
             </TouchableOpacity>
           </>
@@ -328,7 +332,7 @@ export default function PosterAdminScreen() {
           <Centered>
             <ActivityIndicator color={colors.bloodBright} size="large" />
             <Text variant="body" color="muted" style={styles.processingHint}>
-              Guardando en base de datos...{'\n'}Subiendo cartel y geocodificando.
+              {t('posterAdmin.committingHint')}
             </Text>
           </Centered>
         )}
@@ -337,47 +341,66 @@ export default function PosterAdminScreen() {
           <Centered>
             <Ionicons name="checkmark-circle" size={64} color="#21c577" />
             <Text variant="displaySM" style={{ marginTop: spacing.lg, textAlign: 'center' }}>
-              ¡Festival guardado!
+              {t('posterAdmin.savedTitle')}
             </Text>
             <View style={[styles.card, { marginTop: spacing.lg, width: '100%' }]}>
               <ResultRow
-                label="Festival"
-                value={result.created_festival ? 'Creado' : 'Actualizado'}
+                label={t('posterAdmin.resultFestival')}
+                value={result.created_festival ? t('posterAdmin.created') : t('posterAdmin.updated')}
               />
               <ResultRow
-                label="Venue"
+                label={t('posterAdmin.resultVenue')}
                 value={
                   result.created_venue
                     ? result.venue_geocoded
-                      ? `Creado (geo: ${result.venue_geocode_strategy === 'venue' ? 'recinto' : 'ciudad'})`
-                      : 'Creado (sin geo)'
-                    : 'Reutilizado'
+                      ? t('posterAdmin.venueCreatedGeo', {
+                          strategy:
+                            result.venue_geocode_strategy === 'venue'
+                              ? t('posterAdmin.geoStrategyVenue')
+                              : t('posterAdmin.geoStrategyCity'),
+                        })
+                      : t('posterAdmin.venueCreatedNoGeo')
+                    : t('posterAdmin.venueReused')
                 }
               />
               <ResultRow
-                label="Cartel"
+                label={t('posterAdmin.resultPoster')}
                 value={
                   result.image_url
-                    ? 'Subido'
+                    ? t('posterAdmin.posterUploaded')
                     : result.image_upload_error
-                      ? `Error: ${result.image_upload_error.slice(0, 30)}`
-                      : 'No subido'
+                      ? t('posterAdmin.posterError', {
+                          message: result.image_upload_error.slice(0, 30),
+                        })
+                      : t('posterAdmin.posterNotUploaded')
                 }
               />
-              <ResultRow label="Bandas añadidas" value={result.bands_added.toString()} />
+              <ResultRow
+                label={t('posterAdmin.resultBandsAdded')}
+                value={result.bands_added.toString()}
+              />
               {result.bands_created > 0 && (
-                <ResultRow label="Bandas creadas" value={result.bands_created.toString()} />
+                <ResultRow
+                  label={t('posterAdmin.resultBandsCreated')}
+                  value={result.bands_created.toString()}
+                />
               )}
               {result.bands_reused > 0 && (
-                <ResultRow label="Bandas reutilizadas" value={result.bands_reused.toString()} />
+                <ResultRow
+                  label={t('posterAdmin.resultBandsReused')}
+                  value={result.bands_reused.toString()}
+                />
               )}
               {result.bands_skipped > 0 && (
-                <ResultRow label="Saltadas (error)" value={result.bands_skipped.toString()} />
+                <ResultRow
+                  label={t('posterAdmin.resultBandsSkipped')}
+                  value={result.bands_skipped.toString()}
+                />
               )}
             </View>
             <TouchableOpacity style={styles.primaryButton} onPress={reset}>
               <Ionicons name="add" size={18} color="#fff" />
-              <Text style={styles.primaryButtonText}>PROCESAR OTRO CARTEL</Text>
+              <Text style={styles.primaryButtonText}>{t('posterAdmin.processAnotherButton')}</Text>
             </TouchableOpacity>
           </Centered>
         )}
@@ -395,6 +418,7 @@ function SelectStage({
   onPick: () => void;
   onProcess: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       {imageUri ? (
@@ -405,14 +429,14 @@ function SelectStage({
         <TouchableOpacity style={styles.imagePicker} onPress={onPick} activeOpacity={0.7}>
           <Ionicons name="image-outline" size={48} color={colors.muted} />
           <Text variant="body" color="muted" style={{ marginTop: spacing.md, textAlign: 'center' }}>
-            Toca para seleccionar imagen del cartel
+            {t('posterAdmin.selectImageHint')}
           </Text>
           <Text
             variant="bodySM"
             color="faint"
             style={{ marginTop: spacing.xs, textAlign: 'center' }}
           >
-            JPEG, PNG o WebP
+            {t('posterAdmin.imageFormats')}
           </Text>
         </TouchableOpacity>
       )}
@@ -421,12 +445,12 @@ function SelectStage({
         <>
           <TouchableOpacity style={styles.secondaryButton} onPress={onPick}>
             <Text variant="bodySM" color="silver">
-              Cambiar imagen
+              {t('posterAdmin.changeImage')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.primaryButton} onPress={onProcess}>
             <Ionicons name="sparkles" size={18} color="#fff" />
-            <Text style={styles.primaryButtonText}>PROCESAR CARTEL</Text>
+            <Text style={styles.primaryButtonText}>{t('posterAdmin.processButton')}</Text>
           </TouchableOpacity>
         </>
       )}
@@ -505,6 +529,7 @@ function BandRow({
   onRemove: () => void;
   onTier: () => void;
 }) {
+  const { t } = useTranslation();
   const isMatched = band.matched_band_id !== null;
   const tierColor =
     band.tier === 'headliner'
@@ -513,7 +538,11 @@ function BandRow({
         ? '#f0ad4e'
         : colors.muted;
   const tierLabel =
-    band.tier === 'headliner' ? 'HEAD' : band.tier === 'subheadliner' ? 'SUB' : 'LINEUP';
+    band.tier === 'headliner'
+      ? t('posterAdmin.tierHead')
+      : band.tier === 'subheadliner'
+        ? t('posterAdmin.tierSub')
+        : t('posterAdmin.tierLineup');
 
   return (
     <View style={styles.bandRow}>

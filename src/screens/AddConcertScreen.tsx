@@ -63,6 +63,7 @@ export default function AddConcertScreen() {
   const [time, setTime] = useState('');
   const [ticketUrl, setTicketUrl] = useState('');
   const [bands, setBands] = useState<SubmitConcertBand[]>([]);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const prefilled = useRef(false);
 
@@ -147,19 +148,15 @@ export default function AddConcertScreen() {
   const timeValid = time.trim().length === 0 || TIME_RE.test(time.trim());
   const canSubmit = venueName.trim().length > 0 && dateValid && timeValid && bands.length > 0;
 
+  const venueNameError =
+    submitAttempted && !venueName.trim() ? t('addConcert.missingVenueName') : null;
+  const dateError = submitAttempted && !dateValid ? t('addConcert.invalidDate') : null;
+  const timeError = submitAttempted && !timeValid ? t('addConcert.invalidTime') : null;
+  const bandsError = submitAttempted && bands.length === 0 ? t('addConcert.missingBands') : null;
+
   const handleSubmit = async () => {
-    if (!venueName.trim()) {
-      Alert.alert(t('common.error'), t('addConcert.missingVenueName'));
-      return;
-    }
-    if (!dateValid) {
-      Alert.alert(t('common.error'), t('addConcert.invalidDate'));
-      return;
-    }
-    if (bands.length === 0) {
-      Alert.alert(t('common.error'), t('addConcert.missingBands'));
-      return;
-    }
+    setSubmitAttempted(true);
+    if (!canSubmit) return;
 
     const input = {
       event_date: date.trim(),
@@ -222,6 +219,7 @@ export default function AddConcertScreen() {
             value={venueName}
             onChange={handleVenueNameChange}
             placeholder={t('addConcert.venueNamePlaceholder')}
+            error={venueNameError}
           />
           {venueSearching && (
             <ActivityIndicator
@@ -263,12 +261,14 @@ export default function AddConcertScreen() {
           value={date}
           onChange={setDate}
           placeholder="YYYY-MM-DD"
+          error={dateError}
         />
         <Field
           label={t('addConcert.timeLabel')}
           value={time}
           onChange={setTime}
           placeholder={t('addConcert.timePlaceholder')}
+          error={timeError}
         />
         <Field
           label={t('addConcert.ticketUrlLabel')}
@@ -281,11 +281,16 @@ export default function AddConcertScreen() {
           {t('addConcert.bandsLabel')}
         </Text>
         <BandLineupPicker bands={bands} onChange={setBands} showFollowToggle={!isEditMode} />
+        {bandsError && (
+          <Text variant="bodySM" color="bloodBright" style={styles.fieldError}>
+            {bandsError}
+          </Text>
+        )}
 
         <TouchableOpacity
-          style={[styles.primaryButton, !canSubmit && styles.primaryButtonDisabled]}
+          style={styles.primaryButton}
           onPress={handleSubmit}
-          disabled={!canSubmit || isSubmitting}
+          disabled={isSubmitting}
           activeOpacity={0.8}
         >
           {isSubmitting ? (
@@ -310,26 +315,35 @@ function Field({
   value,
   onChange,
   placeholder,
+  error,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
+  error?: string | null;
 }) {
   return (
-    <View style={styles.fieldRow}>
-      <Text variant="monoSM" color="muted" style={styles.fieldLabel}>
-        {label.toUpperCase()}
-      </Text>
-      <TextInput
-        value={value}
-        onChangeText={onChange}
-        placeholder={placeholder ?? '—'}
-        placeholderTextColor={colors.faint}
-        style={styles.input}
-        autoCapitalize="none"
-        autoCorrect={false}
-      />
+    <View>
+      <View style={[styles.fieldRow, error && styles.fieldRowError]}>
+        <Text variant="monoSM" color="muted" style={styles.fieldLabel}>
+          {label.toUpperCase()}
+        </Text>
+        <TextInput
+          value={value}
+          onChangeText={onChange}
+          placeholder={placeholder ?? '—'}
+          placeholderTextColor={colors.faint}
+          style={styles.input}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+      </View>
+      {error && (
+        <Text variant="bodySM" color="bloodBright" style={styles.fieldError}>
+          {error}
+        </Text>
+      )}
     </View>
   );
 }
@@ -360,6 +374,13 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: colors.lineSoft,
+  },
+  fieldRowError: {
+    borderBottomColor: colors.bloodBright,
+  },
+  fieldError: {
+    paddingTop: 4,
+    paddingBottom: 6,
   },
   fieldLabel: { width: 90 },
   input: {
@@ -407,9 +428,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     marginTop: spacing.xl,
     gap: spacing.sm,
-  },
-  primaryButtonDisabled: {
-    opacity: 0.4,
   },
   primaryButtonText: {
     color: '#fff',
