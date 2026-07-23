@@ -38,7 +38,7 @@ export const textStyles = {
   displaySM: {
     fontFamily: fontFamily.displayBold,
     fontSize: 17,
-    lineHeight: 15,
+    lineHeight: 20,
     letterSpacing: -0.2,
     color: colors.bright,
   },
