@@ -599,6 +599,7 @@
     "replyingTo": "Respondiendo a @{{username}}",
     "menuTitle": "Comentario",
     "report": "Reportar",
+    "sendMessage": "Enviar mensaje",
     "status": {
       "addStatus": "Añadir estado",
       "goingAlone": "Voy solo/a",
@@ -615,6 +616,14 @@
       "followersHint": "Solo tus seguidores aceptados",
       "followersBadge": "Seguidores"
     }
+  },
+  "messages": {
+    "title": "Mensajes",
+    "conversationsEmptyTitle": "Sin conversaciones",
+    "conversationsEmpty": "Cuando alguien te escriba (o escribas tú), aparecerá aquí.",
+    "placeholder": "Escribe un mensaje...",
+    "empty": "Aún no hay mensajes. Di algo.",
+    "notConnected": "Solo puedes escribir a gente que sigues o te sigue."
   },
   "posterAdmin": {
     "title": "OCR Carteles",

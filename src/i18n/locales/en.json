@@ -599,6 +599,7 @@
     "replyingTo": "Replying to @{{username}}",
     "menuTitle": "Comment",
     "report": "Report",
+    "sendMessage": "Send message",
     "status": {
       "addStatus": "Add status",
       "goingAlone": "Going alone",
@@ -615,6 +616,14 @@
       "followersHint": "Only your accepted followers",
       "followersBadge": "Followers"
     }
+  },
+  "messages": {
+    "title": "Messages",
+    "conversationsEmptyTitle": "No conversations",
+    "conversationsEmpty": "When someone messages you (or you message them), it'll show up here.",
+    "placeholder": "Write a message...",
+    "empty": "No messages yet. Say something.",
+    "notConnected": "You can only message people you follow or who follow you."
   },
   "posterAdmin": {
     "title": "Poster OCR",

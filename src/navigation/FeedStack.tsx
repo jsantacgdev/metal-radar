@@ -6,6 +6,7 @@ import BandDetailScreen from '../screens/BandDetailScreen';
 import PublicProfileScreen from '../screens/PublicProfileScreen';
 import WhoIsGoingScreen from '../screens/WhoIsGoingScreen';
 import UserSearchScreen from '../screens/UserSearchScreen';
+import ChatScreen from '../screens/ChatScreen';
 import { colors, fontFamily } from '../theme';
 
 export type FeedStackParamList = {
@@ -16,6 +17,7 @@ export type FeedStackParamList = {
   PublicProfile: { userId: string };
   WhoIsGoing: { targetType: 'concert' | 'festival'; targetId: string };
   UserSearch: undefined;
+  Chat: { userId: string; username: string | null };
 };
 
 const Stack = createNativeStackNavigator<FeedStackParamList>();
@@ -66,6 +68,7 @@ export default function FeedStack() {
         component={UserSearchScreen}
         options={{ headerShown: false }}
       />
+      <Stack.Screen name="Chat" component={ChatScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }

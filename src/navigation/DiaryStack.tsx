@@ -11,6 +11,7 @@ import { StatsDetailParams } from '../screens/StatsDetailScreen';
 import PosterScreen from '../screens/PosterScreen';
 import PublicProfileScreen from '../screens/PublicProfileScreen';
 import WhoIsGoingScreen from '../screens/WhoIsGoingScreen';
+import ChatScreen from '../screens/ChatScreen';
 
 export type DiaryStackParamList = {
   DiaryHome: undefined;
@@ -21,6 +22,7 @@ export type DiaryStackParamList = {
   Poster: undefined;
   PublicProfile: { userId: string };
   WhoIsGoing: { targetType: 'concert' | 'festival'; targetId: string };
+  Chat: { userId: string; username: string | null };
 };
 
 const Stack = createNativeStackNavigator<DiaryStackParamList>();
@@ -88,6 +90,7 @@ export default function DiaryStack() {
         component={WhoIsGoingScreen}
         options={{ headerShown: false }}
       />
+      <Stack.Screen name="Chat" component={ChatScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }

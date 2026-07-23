@@ -18,6 +18,7 @@ const I18N: Record<
     newFollowerTitle: (username: string) => string;
     newFollowerBody: string;
     replyTitle: (username: string) => string;
+    messageTitle: (username: string) => string;
   }
 > = {
   es: {
@@ -26,6 +27,7 @@ const I18N: Record<
     newFollowerTitle: (u) => `🤘 @${u} te sigue ahora`,
     newFollowerBody: 'Nuevo seguidor en Metal Radar',
     replyTitle: (u) => `🤘 @${u} respondió a tu comentario`,
+    messageTitle: (u) => `🤘 @${u} te ha escrito`,
   },
   en: {
     followRequestTitle: (u) => `🤘 @${u} wants to follow you`,
@@ -33,6 +35,7 @@ const I18N: Record<
     newFollowerTitle: (u) => `🤘 @${u} is now following you`,
     newFollowerBody: 'New follower on Metal Radar',
     replyTitle: (u) => `🤘 @${u} replied to your comment`,
+    messageTitle: (u) => `🤘 @${u} sent you a message`,
   },
 };
 
@@ -88,38 +91,47 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const now = new Date().toISOString();
 
-    const [{ data: pendingRequests, error: prErr }, { data: newFollows, error: nfErr }, { data: newReplies, error: nrErr }] =
-      await Promise.all([
-        admin
-          .from('user_follows')
-          .select(
-            'follower_id, followee_id, follower:profiles!user_follows_follower_id_fkey ( username )',
-          )
-          .eq('status', 'pending')
-          .is('request_notified_at', null),
-        admin
-          .from('user_follows')
-          .select(
-            'follower_id, followee_id, follower:profiles!user_follows_follower_id_fkey ( username )',
-          )
-          .eq('status', 'accepted')
-          .is('accepted_notified_at', null),
-        admin
-          .from('comments')
-          .select(
-            `
+    const [
+      { data: pendingRequests, error: prErr },
+      { data: newFollows, error: nfErr },
+      { data: newReplies, error: nrErr },
+      { data: newMessages, error: dmErr },
+    ] = await Promise.all([
+      admin
+        .from('user_follows')
+        .select(
+          'follower_id, followee_id, follower:profiles!user_follows_follower_id_fkey ( username )',
+        )
+        .eq('status', 'pending')
+        .is('request_notified_at', null),
+      admin
+        .from('user_follows')
+        .select(
+          'follower_id, followee_id, follower:profiles!user_follows_follower_id_fkey ( username )',
+        )
+        .eq('status', 'accepted')
+        .is('accepted_notified_at', null),
+      admin
+        .from('comments')
+        .select(
+          `
             id, body, concert_id, festival_id, author_id,
             author:profiles!comments_author_id_fkey ( username ),
             parent:comments!comments_parent_comment_id_fkey ( author_id )
           `,
-          )
-          .not('parent_comment_id', 'is', null)
-          .is('reply_notified_at', null),
-      ]);
+        )
+        .not('parent_comment_id', 'is', null)
+        .is('reply_notified_at', null),
+      admin
+        .from('direct_messages')
+        .select('id, sender_id, recipient_id, sender:profiles!direct_messages_sender_id_fkey ( username )')
+        .is('notified_at', null),
+    ]);
 
     if (prErr) throw prErr;
     if (nfErr) throw nfErr;
     if (nrErr) throw nrErr;
+    if (dmErr) throw dmErr;
 
     // recipientId -> evento a notificar
     type Event =
@@ -131,7 +143,8 @@ Deno.serve(async (req) => {
           username: string;
           concertId: string | null;
           festivalId: string | null;
-        };
+        }
+      | { kind: 'direct_message'; recipientId: string; username: string; senderId: string };
 
     const events: Event[] = [];
 
@@ -163,6 +176,15 @@ Deno.serve(async (req) => {
           festivalId: row.festival_id,
         });
       }
+    }
+
+    for (const row of (newMessages ?? []) as any[]) {
+      events.push({
+        kind: 'direct_message',
+        recipientId: row.recipient_id,
+        username: row.sender?.username ?? '',
+        senderId: row.sender_id,
+      });
     }
 
     if (events.length === 0) {
@@ -210,7 +232,7 @@ Deno.serve(async (req) => {
           priority: 'high',
           channelId: 'default',
         });
-      } else {
+      } else if (event.kind === 'comment_reply') {
         messages.push({
           to: info.push_token,
           title: dict.replyTitle(event.username),
@@ -220,6 +242,16 @@ Deno.serve(async (req) => {
             concertId: event.concertId ?? undefined,
             festivalId: event.festivalId ?? undefined,
           },
+          sound: 'default',
+          priority: 'high',
+          channelId: 'default',
+        });
+      } else {
+        messages.push({
+          to: info.push_token,
+          title: dict.messageTitle(event.username),
+          body: '',
+          data: { kind: 'direct_message', userId: event.senderId },
           sound: 'default',
           priority: 'high',
           channelId: 'default',
@@ -254,6 +286,15 @@ Deno.serve(async (req) => {
             .in(
               'id',
               (newReplies ?? []).map((row: any) => row.id),
+            )
+        : Promise.resolve(),
+      (newMessages ?? []).length > 0
+        ? admin
+            .from('direct_messages')
+            .update({ notified_at: now })
+            .in(
+              'id',
+              (newMessages ?? []).map((row: any) => row.id),
             )
         : Promise.resolve(),
     ]);

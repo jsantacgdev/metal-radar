@@ -15,6 +15,8 @@ import FollowRequestsScreen from '../screens/FollowRequestsScreen';
 import FollowListScreen from '../screens/FollowListScreen';
 import WhoIsGoingScreen from '../screens/WhoIsGoingScreen';
 import BlockedUsersScreen from '../screens/BlockedUsersScreen';
+import ConversationsScreen from '../screens/ConversationsScreen';
+import ChatScreen from '../screens/ChatScreen';
 
 export type ProfileStackParamList = {
   ProfileHome: undefined;
@@ -33,6 +35,8 @@ export type ProfileStackParamList = {
   FollowList: { userId: string; mode: 'followers' | 'following' };
   WhoIsGoing: { targetType: 'concert' | 'festival'; targetId: string };
   BlockedUsers: undefined;
+  Conversations: undefined;
+  Chat: { userId: string; username: string | null };
 };
 
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
@@ -128,6 +132,12 @@ export default function ProfileStack() {
         component={BlockedUsersScreen}
         options={{ headerShown: false }}
       />
+      <Stack.Screen
+        name="Conversations"
+        component={ConversationsScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen name="Chat" component={ChatScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }

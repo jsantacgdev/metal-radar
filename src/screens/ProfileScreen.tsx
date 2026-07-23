@@ -10,6 +10,7 @@ import { useProfile } from '../hooks/useProfile';
 import { useProfileStats, StatsPeriod } from '../hooks/useProfileStats';
 import { useFollowCounts } from '../hooks/usePublicProfile';
 import { useFollowRequests } from '../hooks/useUserFollows';
+import { useConversations } from '../hooks/useConversations';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Button, Text } from '../components/ui';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -23,6 +24,7 @@ export default function ProfileScreen() {
   const { profile } = useProfile();
   const { counts: followCounts } = useFollowCounts(profile?.id ?? null);
   const { requests: followRequests } = useFollowRequests();
+  const { unreadTotal } = useConversations(false);
 
   const [statsPeriod, setStatsPeriod] = useState<StatsPeriod>('year');
   const currentYear = new Date().getFullYear();
@@ -32,6 +34,7 @@ export default function ProfileScreen() {
     useCallback(() => {
       queryClient.invalidateQueries({ queryKey: ['profileStats'] });
       queryClient.invalidateQueries({ queryKey: ['spotify-user'] });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
     }, [queryClient]),
   );
 
@@ -102,6 +105,24 @@ export default function ProfileScreen() {
             </View>
             <Text variant="bodySM" color="silver" style={{ marginTop: 6 }}>
               {t('social.requestsShort')}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.socialBtn}
+            onPress={() => navigation.navigate('Conversations')}
+            activeOpacity={0.7}
+          >
+            <View>
+              <Ionicons name="chatbubbles-outline" size={20} color={colors.bright} />
+              {unreadTotal > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{unreadTotal}</Text>
+                </View>
+              )}
+            </View>
+            <Text variant="bodySM" color="silver" style={{ marginTop: 6 }}>
+              {t('messages.title')}
             </Text>
           </TouchableOpacity>
 

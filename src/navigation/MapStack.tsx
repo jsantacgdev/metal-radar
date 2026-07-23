@@ -7,6 +7,7 @@ import BandDetailScreen from '../screens/BandDetailScreen';
 import AddConcertScreen from '../screens/AddConcertScreen';
 import PublicProfileScreen from '../screens/PublicProfileScreen';
 import WhoIsGoingScreen from '../screens/WhoIsGoingScreen';
+import ChatScreen from '../screens/ChatScreen';
 import { colors, fontFamily } from '../theme';
 
 export type MapStackParamList = {
@@ -17,6 +18,7 @@ export type MapStackParamList = {
   AddConcert: { concertId?: string } | undefined;
   PublicProfile: { userId: string };
   WhoIsGoing: { targetType: 'concert' | 'festival'; targetId: string };
+  Chat: { userId: string; username: string | null };
 };
 
 const Stack = createNativeStackNavigator<MapStackParamList>();
@@ -69,6 +71,7 @@ export default function MapStack() {
         component={WhoIsGoingScreen}
         options={{ headerShown: false }}
       />
+      <Stack.Screen name="Chat" component={ChatScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }

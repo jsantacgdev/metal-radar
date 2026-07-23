@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/useAuth';
 import { Comment, CommentTargetType, CommentVisibility, StatusType, useComments } from '../hooks/useComments';
@@ -12,6 +14,12 @@ import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from './ui';
 import ReportReasonModal from './ReportReasonModal';
 import StatusComposerModal from './StatusComposerModal';
+
+// CommentsSection se renderiza dentro de varios stacks (Map, Diary,
+// Feed, Profile), cada uno con su propio ParamList — todos registran
+// una pantalla "Chat" con esta misma forma, así que basta con este
+// subconjunto mínimo para poder navegar sin acoplarse a un stack concreto.
+type ChatParamList = { Chat: { userId: string; username: string | null } };
 
 const STATUS_CHIPS: { type: StatusType; icon: keyof typeof Ionicons.glyphMap; labelKey: string }[] = [
   { type: 'going_alone', icon: 'person-outline', labelKey: 'comments.status.goingAlone' },
@@ -263,6 +271,7 @@ function CommentRow({
   onReport: () => void;
 }) {
   const { t } = useTranslation();
+  const navigation = useNavigation<NativeStackNavigationProp<ChatParamList>>();
   const { count, reacted, toggle } = useCommentReaction(comment.id);
   const { block } = useBlockUser(comment.author.id);
   const isOwn = comment.author.id === ownUserId;
@@ -280,6 +289,11 @@ function CommentRow({
 
   const handleMenu = () => {
     Alert.alert(t('comments.menuTitle'), undefined, [
+      {
+        text: t('comments.sendMessage'),
+        onPress: () =>
+          navigation.navigate('Chat', { userId: comment.author.id, username: comment.author.username }),
+      },
       { text: t('comments.report'), onPress: onReport },
       { text: t('social.block'), style: 'destructive', onPress: handleBlock },
       { text: t('common.cancel'), style: 'cancel' },
