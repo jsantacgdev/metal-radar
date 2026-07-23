@@ -4,11 +4,18 @@ import i18n from '../i18n';
 
 export type CommentTargetType = 'concert' | 'festival';
 
+export type CommentType = 'comment' | 'status';
+export type StatusType = 'going_alone' | 'has_car_space' | 'looking_for_ride';
+export type CommentVisibility = 'public' | 'followers';
+
 export type Comment = {
   id: string;
   body: string;
   created_at: string;
   parent_comment_id: string | null;
+  comment_type: CommentType;
+  status_type: StatusType | null;
+  visibility: CommentVisibility;
   author: { id: string; username: string | null; display_name: string | null };
 };
 
@@ -20,7 +27,7 @@ async function fetchComments(targetType: CommentTargetType, targetId: string): P
   const { data, error } = await supabase
     .from('comments')
     .select(
-      'id, body, created_at, parent_comment_id, author:profiles!comments_author_id_fkey ( id, username, display_name )',
+      'id, body, created_at, parent_comment_id, comment_type, status_type, visibility, author:profiles!comments_author_id_fkey ( id, username, display_name )',
     )
     .eq(targetColumn(targetType), targetId)
     .order('created_at', { ascending: true });
@@ -39,7 +46,19 @@ export function useComments(targetType: CommentTargetType, targetId: string | nu
   });
 
   const postMutation = useMutation({
-    mutationFn: async ({ body, parentCommentId }: { body: string; parentCommentId?: string | null }) => {
+    mutationFn: async ({
+      body,
+      parentCommentId,
+      commentType,
+      statusType,
+      visibility,
+    }: {
+      body: string;
+      parentCommentId?: string | null;
+      commentType?: CommentType;
+      statusType?: StatusType | null;
+      visibility?: CommentVisibility;
+    }) => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -50,6 +69,9 @@ export function useComments(targetType: CommentTargetType, targetId: string | nu
         author_id: user.id,
         body: trimmed,
         parent_comment_id: parentCommentId ?? null,
+        comment_type: commentType ?? 'comment',
+        status_type: statusType ?? null,
+        visibility: visibility ?? 'public',
         [targetColumn(targetType)]: targetId,
       });
       if (error) throw error;
@@ -69,8 +91,11 @@ export function useComments(targetType: CommentTargetType, targetId: string | nu
     comments: query.data ?? [],
     loading: query.isLoading,
     error: query.error?.message ?? null,
-    post: (body: string, parentCommentId?: string | null) =>
-      postMutation.mutateAsync({ body, parentCommentId }),
+    post: (
+      body: string,
+      parentCommentId?: string | null,
+      options?: { commentType?: CommentType; statusType?: StatusType | null; visibility?: CommentVisibility },
+    ) => postMutation.mutateAsync({ body, parentCommentId, ...options }),
     posting: postMutation.isPending,
     remove: (commentId: string) => deleteMutation.mutateAsync(commentId),
   };

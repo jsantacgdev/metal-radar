@@ -598,7 +598,23 @@
     "reply": "Reply",
     "replyingTo": "Replying to @{{username}}",
     "menuTitle": "Comment",
-    "report": "Report"
+    "report": "Report",
+    "status": {
+      "addStatus": "Add status",
+      "goingAlone": "Going alone",
+      "hasCarSpace": "Have room in my car",
+      "lookingForRide": "Looking for a ride",
+      "notePlaceholder": "Optional note...",
+      "publish": "Publish"
+    },
+    "visibility": {
+      "title": "Who can see this?",
+      "public": "Public",
+      "publicHint": "Anyone can see it",
+      "followers": "Followers",
+      "followersHint": "Only your accepted followers",
+      "followersBadge": "Followers"
+    }
   },
   "posterAdmin": {
     "title": "Poster OCR",

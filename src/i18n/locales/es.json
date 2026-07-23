@@ -598,7 +598,23 @@
     "reply": "Responder",
     "replyingTo": "Respondiendo a @{{username}}",
     "menuTitle": "Comentario",
-    "report": "Reportar"
+    "report": "Reportar",
+    "status": {
+      "addStatus": "Añadir estado",
+      "goingAlone": "Voy solo/a",
+      "hasCarSpace": "Tengo hueco en el coche",
+      "lookingForRide": "Busco quien me lleve",
+      "notePlaceholder": "Nota opcional...",
+      "publish": "Publicar"
+    },
+    "visibility": {
+      "title": "¿Quién puede verlo?",
+      "public": "Público",
+      "publicHint": "Cualquiera puede verlo",
+      "followers": "Seguidores",
+      "followersHint": "Solo tus seguidores aceptados",
+      "followersBadge": "Seguidores"
+    }
   },
   "posterAdmin": {
     "title": "OCR Carteles",

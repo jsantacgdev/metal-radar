@@ -3,13 +3,21 @@ import { ActivityIndicator, Alert, StyleSheet, TextInput, TouchableOpacity, View
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/useAuth';
-import { Comment, CommentTargetType, useComments } from '../hooks/useComments';
+import { Comment, CommentTargetType, CommentVisibility, StatusType, useComments } from '../hooks/useComments';
 import { useCommentReaction } from '../hooks/useCommentReaction';
 import { useReportComment } from '../hooks/useReportComment';
 import { useBlockUser } from '../hooks/useBlockUser';
+import { useProfile } from '../hooks/useProfile';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from './ui';
 import ReportReasonModal from './ReportReasonModal';
+import StatusComposerModal from './StatusComposerModal';
+
+const STATUS_CHIPS: { type: StatusType; icon: keyof typeof Ionicons.glyphMap; labelKey: string }[] = [
+  { type: 'going_alone', icon: 'person-outline', labelKey: 'comments.status.goingAlone' },
+  { type: 'has_car_space', icon: 'car-outline', labelKey: 'comments.status.hasCarSpace' },
+  { type: 'looking_for_ride', icon: 'hand-left-outline', labelKey: 'comments.status.lookingForRide' },
+];
 
 type Props = {
   targetType: CommentTargetType;
@@ -21,10 +29,13 @@ type ReplyTarget = { id: string; username: string | null };
 export default function CommentsSection({ targetType, targetId }: Props) {
   const { t } = useTranslation();
   const { session } = useAuth();
+  const { profile } = useProfile();
   const { comments, post, posting, remove } = useComments(targetType, targetId);
   const [text, setText] = useState('');
+  const [textVisibility, setTextVisibility] = useState<CommentVisibility>('public');
   const [replyingTo, setReplyingTo] = useState<ReplyTarget | null>(null);
   const [reportTarget, setReportTarget] = useState<string | null>(null);
+  const [statusModalType, setStatusModalType] = useState<StatusType | null>(null);
   const reportComment = useReportComment(reportTarget ?? '');
 
   const { topLevel, repliesByParent } = useMemo(() => {
@@ -47,9 +58,24 @@ export default function CommentsSection({ targetType, targetId }: Props) {
     try {
       const body = text;
       const parentId = replyingTo?.id ?? null;
+      const visibility = profile?.is_private ? textVisibility : 'public';
       setText('');
       setReplyingTo(null);
-      await post(body, parentId);
+      await post(body, parentId, { visibility });
+    } catch (err: any) {
+      Alert.alert(t('common.error'), err.message);
+    }
+  };
+
+  const handleStatusSubmit = async ({ note, visibility }: { note: string; visibility: CommentVisibility }) => {
+    const statusType = statusModalType;
+    if (!statusType) return;
+    const chip = STATUS_CHIPS.find((c) => c.type === statusType);
+    const label = chip ? t(chip.labelKey) : '';
+    const body = note ? `${label} — ${note}` : label;
+    setStatusModalType(null);
+    try {
+      await post(body, null, { commentType: 'status', statusType, visibility });
     } catch (err: any) {
       Alert.alert(t('common.error'), err.message);
     }
@@ -132,6 +158,55 @@ export default function CommentsSection({ targetType, targetId }: Props) {
         </View>
       )}
 
+      <View style={styles.statusChipsRow}>
+        {STATUS_CHIPS.map((chip) => (
+          <TouchableOpacity
+            key={chip.type}
+            style={styles.statusChip}
+            onPress={() => setStatusModalType(chip.type)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name={chip.icon} size={13} color={colors.silver} />
+            <Text variant="monoSM" color="silver" style={{ marginLeft: 6 }}>
+              {t(chip.labelKey)}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {profile?.is_private && (
+        <View style={styles.visibilityToggleRow}>
+          <TouchableOpacity
+            style={styles.visibilityToggleOption}
+            onPress={() => setTextVisibility('followers')}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name={textVisibility === 'followers' ? 'radio-button-on' : 'radio-button-off'}
+              size={14}
+              color={textVisibility === 'followers' ? colors.bloodBright : colors.muted}
+            />
+            <Text variant="monoSM" color={textVisibility === 'followers' ? 'bright' : 'muted'} style={{ marginLeft: 4 }}>
+              {t('comments.visibility.followers')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.visibilityToggleOption}
+            onPress={() => setTextVisibility('public')}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name={textVisibility === 'public' ? 'radio-button-on' : 'radio-button-off'}
+              size={14}
+              color={textVisibility === 'public' ? colors.bloodBright : colors.muted}
+            />
+            <Text variant="monoSM" color={textVisibility === 'public' ? 'bright' : 'muted'} style={{ marginLeft: 4 }}>
+              {t('comments.visibility.public')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.inputRow}>
         <TextInput
           style={styles.input}
@@ -160,6 +235,13 @@ export default function CommentsSection({ targetType, targetId }: Props) {
         visible={!!reportTarget}
         onClose={() => setReportTarget(null)}
         onSubmit={handleReportSubmit}
+      />
+
+      <StatusComposerModal
+        visible={!!statusModalType}
+        statusType={statusModalType}
+        onClose={() => setStatusModalType(null)}
+        onSubmit={handleStatusSubmit}
       />
     </View>
   );
@@ -204,15 +286,38 @@ function CommentRow({
     ]);
   };
 
+  const statusChip = comment.comment_type === 'status'
+    ? STATUS_CHIPS.find((c) => c.type === comment.status_type)
+    : undefined;
+
   return (
     <View style={[styles.commentRow, isReply && styles.replyRow]}>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text variant="bodySM" color="silver">
-          @{comment.author.username}
-        </Text>
-        <Text variant="body" style={{ marginTop: 2 }}>
-          {comment.body}
-        </Text>
+        <View style={styles.commentAuthorRow}>
+          <Text variant="bodySM" color="silver">
+            @{comment.author.username}
+          </Text>
+          {comment.visibility === 'followers' && (
+            <View style={styles.visibilityBadge}>
+              <Ionicons name="lock-closed" size={10} color={colors.muted} />
+              <Text variant="monoSM" color="muted" style={{ marginLeft: 3 }}>
+                {t('comments.visibility.followersBadge')}
+              </Text>
+            </View>
+          )}
+        </View>
+        {statusChip ? (
+          <View style={styles.statusBody}>
+            <Ionicons name={statusChip.icon} size={14} color={colors.bloodBright} />
+            <Text variant="body" style={{ marginLeft: 6, flex: 1 }}>
+              {comment.body}
+            </Text>
+          </View>
+        ) : (
+          <Text variant="body" style={{ marginTop: 2 }}>
+            {comment.body}
+          </Text>
+        )}
         <View style={styles.commentActionsRow}>
           <TouchableOpacity
             style={styles.commentAction}
@@ -280,6 +385,45 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   commentAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  commentAuthorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  visibilityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusBody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  statusChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  statusChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.panel,
+  },
+  visibilityToggleRow: {
+    flexDirection: 'row',
+    gap: spacing.lg,
+    marginTop: spacing.sm,
+  },
+  visibilityToggleOption: {
     flexDirection: 'row',
     alignItems: 'center',
   },
