@@ -21,12 +21,20 @@
     "production": {
       "autoIncrement": true,
       "environment": "production",
+      "android": {
+        "buildType": "app-bundle"
+      },
       "env": {
         "NPM_CONFIG_PRODUCTION": "true"
       }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./metal-radar-play-service-account.json",
+        "track": "internal"
+      }
+    }
   }
 }
