@@ -34,7 +34,7 @@ Two one-off admin scripts exist under `scripts/` (PowerShell, run manually again
 
 ## Environment
 
-App config is read from `EXPO_PUBLIC_*` vars (`.env`): `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_TICKETMASTER_API_KEY`, `EXPO_PUBLIC_MAPTILER_KEY`, `EXPO_PUBLIC_SENTRY_DSN`, `EXPO_PUBLIC_SPOTIFY_CLIENT_ID`, `EXPO_PUBLIC_CRON_SECRET`. Edge functions read their own secrets from `Deno.env` (service role key, Ticketmaster key, etc.) — these are configured in the Supabase project, not `.env`.
+App config is read from `EXPO_PUBLIC_*` vars (`.env`): `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_MAPTILER_KEY`, `EXPO_PUBLIC_SENTRY_DSN`, `EXPO_PUBLIC_SPOTIFY_CLIENT_ID`, `EXPO_PUBLIC_CRON_SECRET`. Edge functions read their own secrets from `Deno.env` (service role key, Ticketmaster key, etc.) — these are configured in the Supabase project, not `.env`.
 
 ## Expo version note
 

@@ -22,7 +22,8 @@
     "like": "Me gusta",
     "send": "Enviar",
     "photo": "Foto",
-    "calendar": "Añadir al calendario"
+    "calendar": "Añadir al calendario",
+    "anonymous": "Usuario"
   },
   "auth": {
     "signIn": "Iniciar sesión",

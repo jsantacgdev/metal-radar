@@ -6,8 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useFollowList } from '../hooks/useUserFollows';
 import { ProfileStackParamList } from '../navigation/ProfileStack';
-import { colors, fontFamily, radius, spacing } from '../theme';
-import { Text } from '../components/ui';
+import { colors, fontFamily, spacing } from '../theme';
+import { Avatar, Text } from '../components/ui';
 import EmptyState from '../components/EmptyState';
 
 type Route = RouteProp<ProfileStackParamList, 'FollowList'>;
@@ -59,9 +59,7 @@ export default function FollowListScreen() {
               onPress={() => navigation.push('PublicProfile', { userId: item.id })}
               activeOpacity={0.7}
             >
-              <View style={styles.avatar}>
-                <Ionicons name="person" size={20} color={colors.silver} />
-              </View>
+              <Avatar />
               <View style={styles.rowContent}>
                 <Text variant="displaySM" numberOfLines={1}>
                   @{item.username}
@@ -108,16 +106,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.lineSoft,
-  },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.full,
-    backgroundColor: colors.panel2,
-    borderWidth: 1,
-    borderColor: colors.line,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   rowContent: { flex: 1, marginLeft: spacing.md, minWidth: 0 },
 });

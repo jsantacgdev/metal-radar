@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   submitBtnText: {
-    color: '#fff',
+    color: colors.onAccent,
     fontFamily: fontFamily.displayBold,
     fontSize: 13,
     letterSpacing: 1,

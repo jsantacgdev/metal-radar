@@ -1,13 +1,13 @@
 import { StyleSheet, TouchableOpacity, View, ActivityIndicator } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import { Ionicons } from '@expo/vector-icons';
 import { useConversations } from '../hooks/useConversations';
 import { ProfileStackParamList } from '../navigation/ProfileStack';
 import { colors, fontFamily, radius, spacing } from '../theme';
-import { Text } from '../components/ui';
+import { Avatar, Text } from '../components/ui';
 import EmptyState from '../components/EmptyState';
 
 export default function ConversationsScreen() {
@@ -15,7 +15,7 @@ export default function ConversationsScreen() {
   const { t, i18n } = useTranslation();
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const isFocused = useIsFocused();
-  const { conversations, loading } = useConversations(isFocused);
+  const { conversations, loading, error } = useConversations(isFocused);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -32,6 +32,14 @@ export default function ConversationsScreen() {
         <View style={{ width: 40 }} />
       </View>
 
+      {error && (
+        <View style={styles.errorBox}>
+          <Text variant="bodySM" color="bloodBright">
+            {error}
+          </Text>
+        </View>
+      )}
+
       {loading ? (
         <View style={styles.centered}>
           <ActivityIndicator color={colors.bloodBright} size="large" />
@@ -44,46 +52,49 @@ export default function ConversationsScreen() {
         />
       ) : (
         <View style={styles.listSection}>
-          {conversations.map((item, i) => (
-            <TouchableOpacity
-              key={item.otherId}
-              style={[styles.row, i === conversations.length - 1 && { borderBottomWidth: 0 }]}
-              onPress={() =>
-                navigation.navigate('Chat', { userId: item.otherId, username: item.username })
-              }
-              activeOpacity={0.7}
-            >
-              <View style={styles.avatar}>
-                <Ionicons name="person" size={20} color={colors.silver} />
-              </View>
-              <View style={styles.rowContent}>
-                <Text variant="displaySM" numberOfLines={1}>
-                  @{item.username}
-                </Text>
-                <Text
-                  variant="bodySM"
-                  color={item.unreadCount > 0 ? 'bright' : 'muted'}
-                  numberOfLines={1}
-                  style={{ marginTop: 2 }}
-                >
-                  {item.lastBody}
-                </Text>
-              </View>
-              <View style={styles.rowMeta}>
-                <Text variant="monoSM" color="muted">
-                  {new Date(item.lastCreatedAt).toLocaleDateString(i18n.language, {
-                    day: '2-digit',
-                    month: 'short',
-                  })}
-                </Text>
-                {item.unreadCount > 0 && (
-                  <View style={styles.unreadBadge}>
-                    <Text style={styles.unreadBadgeText}>{item.unreadCount}</Text>
-                  </View>
-                )}
-              </View>
-            </TouchableOpacity>
-          ))}
+          {conversations.map((item, i) => {
+            const label = item.username
+              ? `@${item.username}`
+              : item.displayName ?? t('common.anonymous');
+            return (
+              <TouchableOpacity
+                key={item.otherId}
+                style={[styles.row, i === conversations.length - 1 && { borderBottomWidth: 0 }]}
+                onPress={() =>
+                  navigation.navigate('Chat', { userId: item.otherId, username: item.username })
+                }
+                activeOpacity={0.7}
+              >
+                <Avatar />
+                <View style={styles.rowContent}>
+                  <Text variant="displaySM" numberOfLines={1}>
+                    {label}
+                  </Text>
+                  <Text
+                    variant="bodySM"
+                    color={item.unreadCount > 0 ? 'bright' : 'muted'}
+                    numberOfLines={1}
+                    style={{ marginTop: 2 }}
+                  >
+                    {item.lastBody}
+                  </Text>
+                </View>
+                <View style={styles.rowMeta}>
+                  <Text variant="monoSM" color="muted">
+                    {new Date(item.lastCreatedAt).toLocaleDateString(i18n.language, {
+                      day: '2-digit',
+                      month: 'short',
+                    })}
+                  </Text>
+                  {item.unreadCount > 0 && (
+                    <View style={styles.unreadBadge}>
+                      <Text style={styles.unreadBadgeText}>{item.unreadCount}</Text>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       )}
     </View>
@@ -109,6 +120,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     letterSpacing: 0.5,
   },
+  errorBox: {
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.md,
+    padding: spacing.md,
+    backgroundColor: colors.bloodTint,
+    borderWidth: 1,
+    borderColor: colors.bloodTintBorder,
+    borderRadius: radius.md,
+  },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listSection: { paddingHorizontal: spacing.xl, marginTop: spacing.md },
   row: {
@@ -117,16 +137,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.lineSoft,
-  },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.full,
-    backgroundColor: colors.panel2,
-    borderWidth: 1,
-    borderColor: colors.line,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   rowContent: { flex: 1, marginLeft: spacing.md, minWidth: 0 },
   rowMeta: { alignItems: 'flex-end', marginLeft: spacing.sm },
@@ -141,7 +151,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
   },
   unreadBadgeText: {
-    color: '#fff',
+    color: colors.onAccent,
     fontFamily: fontFamily.displayBold,
     fontSize: 10,
   },

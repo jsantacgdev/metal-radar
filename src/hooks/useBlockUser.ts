@@ -9,6 +9,10 @@ function invalidateAfterBlock(queryClient: QueryClient, targetId: string) {
   queryClient.invalidateQueries({ queryKey: ['following'] });
   queryClient.invalidateQueries({ queryKey: ['followRequests'] });
   queryClient.invalidateQueries({ queryKey: ['blockedUsers'] });
+  // Bloquear a alguien desde el menú de un comentario/"quién va" no debe
+  // dejar su contenido visible en el hilo que ya está en pantalla.
+  queryClient.invalidateQueries({ queryKey: ['comments'] });
+  queryClient.invalidateQueries({ queryKey: ['whoIsGoing'] });
 }
 
 export function useBlockUser(targetId: string) {

@@ -217,7 +217,12 @@ export default FestivalPoster;
 
 const RED = colors.bloodBright;
 const RED_DEEP = colors.blood;
-const WHITE = '#edeff2';
+const WHITE = colors.bright;
+// SILVER y GREY son deliberadamente distintos de colors.silver/colors.muted:
+// esto es la paleta de un póster exportable/compartible (estilo cartel de
+// festival), no chrome de la UI — no debe seguir en automático futuros
+// ajustes del tema, o los pósters ya generados/compartidos cambiarían de
+// aspecto sin que nadie lo pidiera.
 const SILVER = '#d8dade';
 const GREY = '#a8abb4';
 
@@ -225,7 +230,7 @@ const styles = StyleSheet.create({
   poster: {
     width: POSTER_WIDTH,
     height: POSTER_HEIGHT,
-    backgroundColor: '#0a0a0c',
+    backgroundColor: colors.ink,
     position: 'relative',
   },
 

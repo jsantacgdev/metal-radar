@@ -13,6 +13,8 @@ export const colors = {
   muted: '#82858d',
   faint: '#5a5d64',
 
+  onAccent: '#fff',
+
   blood: '#cf2e24',
   bloodBright: '#e63c2e',
   bloodDeep: '#7d1a14',

@@ -32,7 +32,16 @@ async function fetchComments(targetType: CommentTargetType, targetId: string): P
     .eq(targetColumn(targetType), targetId)
     .order('created_at', { ascending: true });
   if (error) throw error;
-  return (data ?? []) as any;
+  return ((data ?? []) as any[]).map((row) => ({
+    id: row.id,
+    body: row.body,
+    created_at: row.created_at,
+    parent_comment_id: row.parent_comment_id,
+    comment_type: row.comment_type,
+    status_type: row.status_type,
+    visibility: row.visibility,
+    author: row.author,
+  }));
 }
 
 export function useComments(targetType: CommentTargetType, targetId: string | null) {

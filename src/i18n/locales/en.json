@@ -22,7 +22,8 @@
     "like": "Like",
     "send": "Send",
     "photo": "Photo",
-    "calendar": "Add to calendar"
+    "calendar": "Add to calendar",
+    "anonymous": "User"
   },
   "auth": {
     "signIn": "Sign in",

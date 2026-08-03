@@ -11,7 +11,7 @@ import { useBlockUser } from '../hooks/useBlockUser';
 import { DiaryEntry, useUserDiary } from '../hooks/useDiary';
 import { ProfileStackParamList } from '../navigation/ProfileStack';
 import { colors, fontFamily, radius, spacing } from '../theme';
-import { Button, Text } from '../components/ui';
+import { Avatar, Button, Text } from '../components/ui';
 import BandImage from '../components/BandImage';
 import EmptyState from '../components/EmptyState';
 import { localeFromI18n } from '../i18n';
@@ -118,9 +118,7 @@ export default function PublicProfileScreen() {
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: spacing.xxxl }}>
           <View style={styles.userBlock}>
-            <View style={styles.avatar}>
-              <Ionicons name="person" size={32} color={colors.silver} />
-            </View>
+            <Avatar size={72} />
             <Text variant="displayLG" style={{ marginTop: spacing.md }}>
               @{data.profile.username}
             </Text>
@@ -307,16 +305,6 @@ const styles = StyleSheet.create({
   },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   userBlock: { alignItems: 'center', padding: spacing.xl },
-  avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: radius.full,
-    backgroundColor: colors.panel2,
-    borderWidth: 1,
-    borderColor: colors.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   privateBadge: {
     flexDirection: 'row',
     alignItems: 'center',

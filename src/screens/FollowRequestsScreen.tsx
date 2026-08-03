@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useFollowRequests } from '../hooks/useUserFollows';
 import { colors, fontFamily, radius, spacing } from '../theme';
-import { Text } from '../components/ui';
+import { Avatar, Text } from '../components/ui';
 import EmptyState from '../components/EmptyState';
 
 export default function FollowRequestsScreen() {
@@ -87,9 +87,7 @@ export default function FollowRequestsScreen() {
                 key={item.follower_id}
                 style={[styles.row, i === requests.length - 1 && { borderBottomWidth: 0 }]}
               >
-                <View style={styles.avatar}>
-                  <Ionicons name="person" size={20} color={colors.silver} />
-                </View>
+                <Avatar />
                 <View style={styles.rowContent}>
                   <Text variant="displaySM" numberOfLines={1}>
                     @{item.profile.username}
@@ -118,7 +116,7 @@ export default function FollowRequestsScreen() {
                       activeOpacity={0.7}
                       accessibilityLabel={t('social.accept')}
                     >
-                      <Ionicons name="checkmark" size={18} color="#fff" />
+                      <Ionicons name="checkmark" size={18} color={colors.onAccent} />
                     </TouchableOpacity>
                   </View>
                 )}
@@ -158,16 +156,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.lineSoft,
-  },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.full,
-    backgroundColor: colors.panel2,
-    borderWidth: 1,
-    borderColor: colors.line,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   rowContent: { flex: 1, marginLeft: spacing.md, minWidth: 0 },
   actionsRow: { flexDirection: 'row', gap: spacing.sm },
