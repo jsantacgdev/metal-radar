@@ -8,12 +8,13 @@ import { useReportedConcerts, ReportedConcert } from '../hooks/useReportedConcer
 import { useModerateConcert } from '../hooks/useModerateConcert';
 import { useReportedComments, ReportedComment } from '../hooks/useReportedComments';
 import { useModerateComment } from '../hooks/useModerateComment';
+import { useReportedUsers, useDismissUserReports, ReportedUser } from '../hooks/useReportedUsers';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from '../components/ui';
 import EmptyState from '../components/EmptyState';
 import { localeFromI18n } from '../i18n';
 
-type Tab = 'concerts' | 'comments';
+type Tab = 'concerts' | 'comments' | 'users';
 
 export default function ModerationScreen() {
   const navigation = useNavigation<any>();
@@ -31,6 +32,10 @@ export default function ModerationScreen() {
     useReportedComments();
   const moderateComment = useModerateComment();
   const [busyCommentId, setBusyCommentId] = useState<string | null>(null);
+
+  const { users, loading: usersLoading, error: usersError, reload: reloadUsers } = useReportedUsers();
+  const dismissUserReports = useDismissUserReports();
+  const [busyUserId, setBusyUserId] = useState<string | null>(null);
 
   const handleDismissConcert = (concert: ReportedConcert) => {
     setBusyConcertId(concert.id);
@@ -75,6 +80,15 @@ export default function ModerationScreen() {
         onSettled: () => setBusyCommentId(null),
       },
     );
+  };
+
+  const handleDismissUser = (user: ReportedUser) => {
+    setBusyUserId(user.reportedId);
+    dismissUserReports.mutate(user.reportedId, {
+      onSuccess: () => Alert.alert(t('moderation.dismissUserSuccess')),
+      onError: (err: any) => Alert.alert(t('common.error'), err.message),
+      onSettled: () => setBusyUserId(null),
+    });
   };
 
   const handleDeleteComment = (comment: ReportedComment) => {
@@ -123,6 +137,11 @@ export default function ModerationScreen() {
           label={t('moderation.commentsTab')}
           active={tab === 'comments'}
           onPress={() => setTab('comments')}
+        />
+        <TabPill
+          label={t('moderation.usersTab')}
+          active={tab === 'users'}
+          onPress={() => setTab('users')}
         />
       </View>
 
@@ -234,45 +253,138 @@ export default function ModerationScreen() {
             }}
           />
         )
-      ) : commentsLoading ? (
+      ) : tab === 'comments' ? (
+        commentsLoading ? (
+          <View style={styles.centered}>
+            <ActivityIndicator color={colors.bloodBright} size="large" />
+          </View>
+        ) : commentsError ? (
+          <View style={styles.centered}>
+            <Text
+              variant="bodySM"
+              color="bloodBright"
+              style={{ textAlign: 'center', paddingHorizontal: spacing.xl }}
+            >
+              {commentsError}
+            </Text>
+          </View>
+        ) : comments.length === 0 ? (
+          <EmptyState
+            icon="checkmark-circle-outline"
+            title={t('moderation.emptyTitle')}
+            description={t('moderation.emptyDesc')}
+          />
+        ) : (
+          <FlatList
+            data={comments}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxxl }}
+            refreshing={commentsLoading}
+            onRefresh={reloadComments}
+            renderItem={({ item }) => {
+              const isBusy = busyCommentId === item.id && moderateComment.isPending;
+
+              return (
+                <View style={styles.card}>
+                  <View style={styles.cardHeader}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text variant="displaySM" numberOfLines={1}>
+                        @{item.author.username}
+                      </Text>
+                      <Text variant="monoSM" color="muted" numberOfLines={1} style={{ marginTop: 2 }}>
+                        {item.target.label}
+                      </Text>
+                    </View>
+                    <View style={styles.reportBadge}>
+                      <Ionicons name="flag" size={12} color={colors.bloodBright} />
+                      <Text variant="monoSM" color="bloodBright" style={{ marginLeft: 4 }}>
+                        {t('moderation.reportsLabel', { count: item.report_count })}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text variant="body" style={{ marginTop: spacing.sm }}>
+                    {item.body}
+                  </Text>
+
+                  {item.reports.length > 0 && (
+                    <View style={styles.reasonsBox}>
+                      {item.reports.map((r, i) => (
+                        <Text key={i} variant="bodySM" color="muted" style={{ marginTop: i > 0 ? 4 : 0 }}>
+                          {r.reason ? `"${r.reason}"` : t('moderation.noReason')}
+                        </Text>
+                      ))}
+                    </View>
+                  )}
+
+                  <View style={styles.actionsRow}>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, styles.dismissBtn]}
+                      onPress={() => handleDismissComment(item)}
+                      disabled={isBusy}
+                      activeOpacity={0.8}
+                    >
+                      {isBusy ? (
+                        <ActivityIndicator color={colors.silver} size="small" />
+                      ) : (
+                        <Text variant="monoSM" color="silver">
+                          {t('moderation.dismissButton')}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, styles.deleteBtn]}
+                      onPress={() => handleDeleteComment(item)}
+                      disabled={isBusy}
+                      activeOpacity={0.8}
+                    >
+                      <Text variant="monoSM" color="bloodBright">
+                        {t('moderation.deleteButton')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            }}
+          />
+        )
+      ) : usersLoading ? (
         <View style={styles.centered}>
           <ActivityIndicator color={colors.bloodBright} size="large" />
         </View>
-      ) : commentsError ? (
+      ) : usersError ? (
         <View style={styles.centered}>
           <Text
             variant="bodySM"
             color="bloodBright"
             style={{ textAlign: 'center', paddingHorizontal: spacing.xl }}
           >
-            {commentsError}
+            {usersError}
           </Text>
         </View>
-      ) : comments.length === 0 ? (
+      ) : users.length === 0 ? (
         <EmptyState
-          icon="checkmark-circle-outline"
-          title={t('moderation.emptyTitle')}
-          description={t('moderation.emptyDesc')}
+          icon="person-remove-outline"
+          title={t('moderation.emptyUsersTitle')}
+          description={t('moderation.emptyUsersDesc')}
         />
       ) : (
         <FlatList
-          data={comments}
-          keyExtractor={(item) => item.id}
+          data={users}
+          keyExtractor={(item) => item.reportedId}
           contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxxl }}
-          refreshing={commentsLoading}
-          onRefresh={reloadComments}
+          refreshing={usersLoading}
+          onRefresh={reloadUsers}
           renderItem={({ item }) => {
-            const isBusy = busyCommentId === item.id && moderateComment.isPending;
+            const isBusy = busyUserId === item.reportedId && dismissUserReports.isPending;
+            const label = item.username ? `@${item.username}` : item.display_name ?? t('common.anonymous');
 
             return (
               <View style={styles.card}>
                 <View style={styles.cardHeader}>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text variant="displaySM" numberOfLines={1}>
-                      @{item.author.username}
-                    </Text>
-                    <Text variant="monoSM" color="muted" numberOfLines={1} style={{ marginTop: 2 }}>
-                      {item.target.label}
+                      {label}
                     </Text>
                   </View>
                   <View style={styles.reportBadge}>
@@ -282,10 +394,6 @@ export default function ModerationScreen() {
                     </Text>
                   </View>
                 </View>
-
-                <Text variant="body" style={{ marginTop: spacing.sm }}>
-                  {item.body}
-                </Text>
 
                 {item.reports.length > 0 && (
                   <View style={styles.reasonsBox}>
@@ -300,7 +408,7 @@ export default function ModerationScreen() {
                 <View style={styles.actionsRow}>
                   <TouchableOpacity
                     style={[styles.actionBtn, styles.dismissBtn]}
-                    onPress={() => handleDismissComment(item)}
+                    onPress={() => handleDismissUser(item)}
                     disabled={isBusy}
                     activeOpacity={0.8}
                   >
@@ -311,16 +419,6 @@ export default function ModerationScreen() {
                         {t('moderation.dismissButton')}
                       </Text>
                     )}
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.deleteBtn]}
-                    onPress={() => handleDeleteComment(item)}
-                    disabled={isBusy}
-                    activeOpacity={0.8}
-                  >
-                    <Text variant="monoSM" color="bloodBright">
-                      {t('moderation.deleteButton')}
-                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>

@@ -447,6 +447,7 @@
     "title": "Reported concerts",
     "concertsTab": "Concerts",
     "commentsTab": "Comments",
+    "usersTab": "Users",
     "emptyTitle": "No pending reports",
     "emptyDesc": "When someone reports a community-added concert, it'll show up here.",
     "reportsLabel_one": "{{count}} REPORT",
@@ -462,7 +463,10 @@
     "deleteCommentConfirmTitle": "Delete comment",
     "deleteCommentConfirmMessage": "The comment will be permanently deleted. This can't be undone.",
     "deleteCommentSuccess": "Comment deleted",
-    "dismissCommentSuccess": "Reports dismissed, the comment is still visible"
+    "dismissCommentSuccess": "Reports dismissed, the comment is still visible",
+    "dismissUserSuccess": "Reports dismissed",
+    "emptyUsersTitle": "No reported users",
+    "emptyUsersDesc": "When someone reports a user, it'll show up here."
   },
   "reportReason": {
     "title": "What's the issue?",
@@ -624,7 +628,9 @@
     "conversationsEmpty": "When someone messages you (or you message them), it'll show up here.",
     "placeholder": "Write a message...",
     "empty": "No messages yet. Say something.",
-    "notConnected": "You can only message people you follow or who follow you."
+    "notConnected": "You can only message people you follow or who follow you.",
+    "menuTitle": "Options",
+    "reportThanks": "Thanks, we'll review the report"
   },
   "posterAdmin": {
     "title": "Poster OCR",

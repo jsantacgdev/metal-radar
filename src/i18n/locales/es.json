@@ -447,6 +447,7 @@
     "title": "Conciertos reportados",
     "concertsTab": "Conciertos",
     "commentsTab": "Comentarios",
+    "usersTab": "Usuarios",
     "emptyTitle": "Sin reportes pendientes",
     "emptyDesc": "Cuando alguien reporte un concierto añadido por la comunidad, aparecerá aquí.",
     "reportsLabel_one": "{{count}} REPORTE",
@@ -462,7 +463,10 @@
     "deleteCommentConfirmTitle": "Eliminar comentario",
     "deleteCommentConfirmMessage": "Se borrará el comentario de forma permanente. Esta acción no se puede deshacer.",
     "deleteCommentSuccess": "Comentario eliminado",
-    "dismissCommentSuccess": "Reportes descartados, el comentario sigue visible"
+    "dismissCommentSuccess": "Reportes descartados, el comentario sigue visible",
+    "dismissUserSuccess": "Reportes descartados",
+    "emptyUsersTitle": "Sin usuarios reportados",
+    "emptyUsersDesc": "Cuando alguien reporte a un usuario, aparecerá aquí."
   },
   "reportReason": {
     "title": "¿Cuál es el problema?",
@@ -624,7 +628,9 @@
     "conversationsEmpty": "Cuando alguien te escriba (o escribas tú), aparecerá aquí.",
     "placeholder": "Escribe un mensaje...",
     "empty": "Aún no hay mensajes. Di algo.",
-    "notConnected": "Solo puedes escribir a gente que sigues o te sigue."
+    "notConnected": "Solo puedes escribir a gente que sigues o te sigue.",
+    "menuTitle": "Opciones",
+    "reportThanks": "Gracias, revisaremos el aviso"
   },
   "posterAdmin": {
     "title": "OCR Carteles",

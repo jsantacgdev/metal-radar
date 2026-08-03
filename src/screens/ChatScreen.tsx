@@ -17,9 +17,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../hooks/useAuth';
 import { DirectMessage, useDirectMessages } from '../hooks/useDirectMessages';
+import { useBlockUser } from '../hooks/useBlockUser';
+import { useReportUser } from '../hooks/useReportUser';
 import { ProfileStackParamList } from '../navigation/ProfileStack';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from '../components/ui';
+import ReportReasonModal from '../components/ReportReasonModal';
 
 type Route = RouteProp<ProfileStackParamList, 'Chat'>;
 
@@ -31,8 +34,11 @@ export default function ChatScreen() {
   const { userId, username } = params;
   const { session } = useAuth();
   const isFocused = useIsFocused();
-  const { messages, loading, send, sending, markRead } = useDirectMessages(userId, isFocused);
+  const { messages, loading, error, send, sending, markRead } = useDirectMessages(userId, isFocused);
+  const { block } = useBlockUser(userId);
+  const reportUser = useReportUser(userId, 'chat');
   const [text, setText] = useState('');
+  const [reportVisible, setReportVisible] = useState(false);
   const listRef = useRef<FlatList<DirectMessage>>(null);
 
   useEffect(() => {
@@ -41,14 +47,46 @@ export default function ChatScreen() {
 
   const handleSend = async () => {
     if (!text.trim()) return;
+    const body = text;
     try {
-      const body = text;
       setText('');
       await send(body);
       listRef.current?.scrollToEnd({ animated: true });
     } catch (err: any) {
+      setText(body);
       Alert.alert(t('common.error'), err.message);
     }
+  };
+
+  const handleBlock = () => {
+    Alert.alert(t('social.blockTitle'), t('social.blockBody', { username }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('social.block'),
+        style: 'destructive',
+        onPress: () =>
+          block()
+            .then(() => navigation.goBack())
+            .catch((err: any) => Alert.alert(t('common.error'), err.message)),
+      },
+    ]);
+  };
+
+  const handleReportSubmit = async (reason: string | null) => {
+    try {
+      await reportUser.mutateAsync(reason ?? undefined);
+      Alert.alert(t('messages.reportThanks'));
+    } catch (err: any) {
+      Alert.alert(t('common.error'), err.message);
+    }
+  };
+
+  const handleMenu = () => {
+    Alert.alert(t('messages.menuTitle'), undefined, [
+      { text: t('comments.report'), onPress: () => setReportVisible(true) },
+      { text: t('social.block'), style: 'destructive', onPress: handleBlock },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
   };
 
   return (
@@ -66,8 +104,23 @@ export default function ChatScreen() {
           <Ionicons name="arrow-back" size={22} color={colors.bright} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>@{username}</Text>
-        <View style={{ width: 40 }} />
+        <TouchableOpacity
+          onPress={handleMenu}
+          style={styles.backButton}
+          hitSlop={10}
+          accessibilityLabel={t('common.more')}
+        >
+          <Ionicons name="ellipsis-horizontal" size={20} color={colors.bright} />
+        </TouchableOpacity>
       </View>
+
+      {error && (
+        <View style={styles.errorBox}>
+          <Text variant="bodySM" color="bloodBright">
+            {error}
+          </Text>
+        </View>
+      )}
 
       {loading ? (
         <View style={styles.centered}>
@@ -124,12 +177,18 @@ export default function ChatScreen() {
           accessibilityLabel={t('common.send')}
         >
           {sending ? (
-            <ActivityIndicator color="#fff" size="small" />
+            <ActivityIndicator color={colors.onAccent} size="small" />
           ) : (
-            <Ionicons name="send" size={16} color="#fff" />
+            <Ionicons name="send" size={16} color={colors.onAccent} />
           )}
         </TouchableOpacity>
       </View>
+
+      <ReportReasonModal
+        visible={reportVisible}
+        onClose={() => setReportVisible(false)}
+        onSubmit={handleReportSubmit}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -144,7 +203,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.line,
   },
-  backButton: { width: 40, height: 40, justifyContent: 'center' },
+  backButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   headerTitle: {
     flex: 1,
     textAlign: 'center',
@@ -152,6 +211,15 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.displayBold,
     fontSize: 16,
     letterSpacing: 0.5,
+  },
+  errorBox: {
+    marginHorizontal: spacing.xl,
+    marginTop: spacing.md,
+    padding: spacing.md,
+    backgroundColor: colors.bloodTint,
+    borderWidth: 1,
+    borderColor: colors.bloodTintBorder,
+    borderRadius: radius.md,
   },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { paddingHorizontal: spacing.xl, paddingVertical: spacing.md },
