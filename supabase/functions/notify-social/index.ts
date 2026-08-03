@@ -6,6 +6,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const CRON_SECRET = Deno.env.get('CRON_SECRET')!;
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
+const LOCK_NAME = 'notify-social';
 
 type Lang = 'es' | 'en';
 const DEFAULT_LANG: Lang = 'es';
@@ -49,14 +50,21 @@ type PushPayload = {
   channelId?: string;
 };
 
-async function sendExpoPush(messages: PushPayload[]) {
-  const chunks: PushPayload[][] = [];
-  for (let i = 0; i < messages.length; i += 100) {
-    chunks.push(messages.slice(i, i + 100));
-  }
+// Índices alineados 1:1 con el array de entrada: un fallo de chunk no debe
+// desplazar los resultados de los chunks siguientes (bug previo: `results`
+// se construía con push() y perdía la alineación con `messages[idx]` en
+// cuanto un chunk fallaba). `failedIndices` marca qué mensajes pertenecían
+// a un chunk que ni siquiera llegó a procesarse (fallo de transporte, no
+// fallo por-token) — esos no cuentan como notificados y se reintentan en la
+// siguiente ejecución.
+async function sendExpoPush(
+  messages: PushPayload[],
+): Promise<{ results: (any | undefined)[]; failedIndices: Set<number> }> {
+  const results: (any | undefined)[] = new Array(messages.length).fill(undefined);
+  const failedIndices = new Set<number>();
 
-  const results: any[] = [];
-  for (const chunk of chunks) {
+  for (let start = 0; start < messages.length; start += 100) {
+    const chunk = messages.slice(start, start + 100);
     const res = await fetch(EXPO_PUSH_URL, {
       method: 'POST',
       headers: {
@@ -69,13 +77,18 @@ async function sendExpoPush(messages: PushPayload[]) {
 
     if (!res.ok) {
       console.warn(`Expo Push error: ${res.status}`);
+      for (let i = 0; i < chunk.length; i++) failedIndices.add(start + i);
       continue;
     }
 
     const data = await res.json();
-    results.push(...(data.data ?? []));
+    const chunkResults = data.data ?? [];
+    chunkResults.forEach((r: any, i: number) => {
+      results[start + i] = r;
+    });
   }
-  return results;
+
+  return { results, failedIndices };
 }
 
 Deno.serve(async (req) => {
@@ -87,8 +100,20 @@ Deno.serve(async (req) => {
     });
   }
 
+  const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+  // Evita procesar el mismo lote de eventos dos veces si una ejecución se
+  // solapa con la siguiente (p. ej. Expo Push va lento). No usa
+  // pg_advisory_lock: con PgBouncer en modo transacción no hay garantía de
+  // que "adquirir" y "liberar" compartan sesión entre dos llamadas RPC.
+  const { data: gotLock } = await admin.rpc('try_acquire_cron_lock', { p_name: LOCK_NAME });
+  if (!gotLock) {
+    return new Response(JSON.stringify({ skipped: true, reason: 'already running' }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
-    const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const now = new Date().toISOString();
 
     const [
@@ -133,18 +158,20 @@ Deno.serve(async (req) => {
     if (nrErr) throw nrErr;
     if (dmErr) throw dmErr;
 
-    // recipientId -> evento a notificar
-    type Event =
-      | { kind: 'follow_request'; recipientId: string; username: string }
-      | { kind: 'new_follower'; recipientId: string; username: string; followerId: string }
-      | {
-          kind: 'comment_reply';
-          recipientId: string;
-          username: string;
-          concertId: string | null;
-          festivalId: string | null;
-        }
-      | { kind: 'direct_message'; recipientId: string; username: string; senderId: string };
+    // Cada evento lleva su propia forma de marcarse como procesado — así el
+    // marcado final puede hacerse por evento individual (necesario para no
+    // marcar como notificados los que cayeron en un chunk de push fallido)
+    // en vez de en bloque por tabla de origen.
+    type Event = {
+      recipientId: string;
+      username: string;
+      markNotified: () => PromiseLike<unknown>;
+    } & (
+      | { kind: 'follow_request' }
+      | { kind: 'new_follower'; followerId: string }
+      | { kind: 'comment_reply'; concertId: string | null; festivalId: string | null }
+      | { kind: 'direct_message'; senderId: string }
+    );
 
     const events: Event[] = [];
 
@@ -153,6 +180,12 @@ Deno.serve(async (req) => {
         kind: 'follow_request',
         recipientId: row.followee_id,
         username: row.follower?.username ?? '',
+        markNotified: () =>
+          admin
+            .from('user_follows')
+            .update({ request_notified_at: now })
+            .eq('follower_id', row.follower_id)
+            .eq('followee_id', row.followee_id),
       });
     }
 
@@ -162,6 +195,12 @@ Deno.serve(async (req) => {
         recipientId: row.followee_id,
         username: row.follower?.username ?? '',
         followerId: row.follower_id,
+        markNotified: () =>
+          admin
+            .from('user_follows')
+            .update({ accepted_notified_at: now })
+            .eq('follower_id', row.follower_id)
+            .eq('followee_id', row.followee_id),
       });
     }
 
@@ -174,6 +213,7 @@ Deno.serve(async (req) => {
           username: row.author?.username ?? '',
           concertId: row.concert_id,
           festivalId: row.festival_id,
+          markNotified: () => admin.from('comments').update({ reply_notified_at: now }).eq('id', row.id),
         });
       }
     }
@@ -184,6 +224,7 @@ Deno.serve(async (req) => {
         recipientId: row.recipient_id,
         username: row.sender?.username ?? '',
         senderId: row.sender_id,
+        markNotified: () => admin.from('direct_messages').update({ notified_at: now }).eq('id', row.id),
       });
     }
 
@@ -207,9 +248,17 @@ Deno.serve(async (req) => {
     }
 
     const messages: PushPayload[] = [];
+    const messageEvents: Event[] = [];
+    const immediateMarks: PromiseLike<unknown>[] = [];
+
     for (const event of events) {
       const info = recipientInfo.get(event.recipientId);
-      if (!info) continue;
+      if (!info) {
+        // Sin push_token: no hay nada que reintentar, marcar ya (igual que
+        // antes) para no repetir trabajo en cada ejecución.
+        immediateMarks.push(event.markNotified());
+        continue;
+      }
       const dict = I18N[info.language] ?? I18N[DEFAULT_LANG];
 
       if (event.kind === 'follow_request') {
@@ -257,51 +306,21 @@ Deno.serve(async (req) => {
           channelId: 'default',
         });
       }
+      messageEvents.push(event);
     }
 
-    const results = messages.length > 0 ? await sendExpoPush(messages) : [];
+    const { results, failedIndices } =
+      messages.length > 0 ? await sendExpoPush(messages) : { results: [], failedIndices: new Set<number>() };
 
-    // Marcar como procesado independientemente de si había push_token o
-    // no — si el usuario no tiene notificaciones activas, reintentar en
-    // cada ejecución no serviría de nada y solo repetiría trabajo.
-    await Promise.all([
-      ...(pendingRequests ?? []).map((row: any) =>
-        admin
-          .from('user_follows')
-          .update({ request_notified_at: now })
-          .eq('follower_id', row.follower_id)
-          .eq('followee_id', row.followee_id),
-      ),
-      ...(newFollows ?? []).map((row: any) =>
-        admin
-          .from('user_follows')
-          .update({ accepted_notified_at: now })
-          .eq('follower_id', row.follower_id)
-          .eq('followee_id', row.followee_id),
-      ),
-      (newReplies ?? []).length > 0
-        ? admin
-            .from('comments')
-            .update({ reply_notified_at: now })
-            .in(
-              'id',
-              (newReplies ?? []).map((row: any) => row.id),
-            )
-        : Promise.resolve(),
-      (newMessages ?? []).length > 0
-        ? admin
-            .from('direct_messages')
-            .update({ notified_at: now })
-            .in(
-              'id',
-              (newMessages ?? []).map((row: any) => row.id),
-            )
-        : Promise.resolve(),
-    ]);
+    const sentMarks = messageEvents
+      .filter((_event, idx) => !failedIndices.has(idx))
+      .map((event) => event.markNotified());
+
+    await Promise.all([...immediateMarks, ...sentMarks]);
 
     const invalidTokens: string[] = [];
     results.forEach((r: any, idx: number) => {
-      if (r.status === 'error' && r.details?.error === 'DeviceNotRegistered') {
+      if (r?.status === 'error' && r.details?.error === 'DeviceNotRegistered') {
         invalidTokens.push(messages[idx].to);
       }
     });
@@ -311,7 +330,12 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ sent: messages.length, events: events.length, invalid_tokens: invalidTokens.length }),
+      JSON.stringify({
+        sent: messages.length - failedIndices.size,
+        retrying: failedIndices.size,
+        events: events.length,
+        invalid_tokens: invalidTokens.length,
+      }),
       { headers: { 'Content-Type': 'application/json' } },
     );
   } catch (err) {
@@ -320,5 +344,7 @@ Deno.serve(async (req) => {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });
+  } finally {
+    await admin.rpc('release_cron_lock', { p_name: LOCK_NAME });
   }
 });

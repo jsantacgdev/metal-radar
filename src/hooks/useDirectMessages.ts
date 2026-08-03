@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import i18n from '../i18n';
@@ -80,12 +81,17 @@ export function useDirectMessages(otherUserId: string | null, polling: boolean =
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['conversations'] }),
   });
 
+  // Identidad estable entre renders: si no, el useEffect de ChatScreen que
+  // depende de markRead se re-ejecutaría en cada render (p. ej. cada
+  // pulsación de tecla en el composer), no solo al enfocar/recibir mensajes.
+  const markRead = useCallback(() => markReadMutation.mutateAsync(), [markReadMutation.mutateAsync]);
+
   return {
     messages: query.data ?? [],
     loading: query.isLoading,
     error: query.error?.message ?? null,
     send: (body: string) => sendMutation.mutateAsync(body),
     sending: sendMutation.isPending,
-    markRead: () => markReadMutation.mutateAsync(),
+    markRead,
   };
 }

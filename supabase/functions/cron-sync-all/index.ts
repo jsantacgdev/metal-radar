@@ -7,7 +7,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const CRON_SECRET = Deno.env.get('CRON_SECRET')!;
 
 const NOMINATIM_HEADERS = {
-  'User-Agent': 'MetalRadar/1.0 (contacto: tu@email.com)',
+  'User-Agent': 'MetalRadar/1.0 (contacto: jsantacgdev@gmail.com)',
 };
 
 const TRIBUTE_KEYWORDS =

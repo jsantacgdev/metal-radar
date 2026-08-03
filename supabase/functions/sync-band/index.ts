@@ -11,7 +11,7 @@ const CORS_HEADERS = {
 };
 
 const NOMINATIM_HEADERS = {
-  'User-Agent': 'MetalRadar/1.0 (contacto: tu@email.com)',
+  'User-Agent': 'MetalRadar/1.0 (contacto: jsantacgdev@gmail.com)',
 };
 
 const TRIBUTE_KEYWORDS =

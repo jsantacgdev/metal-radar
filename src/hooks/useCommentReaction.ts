@@ -70,6 +70,7 @@ export function useCommentReaction(commentId: string) {
     count: query.data?.count ?? 0,
     reacted: query.data?.reacted ?? false,
     loading: query.isLoading,
+    toggling: toggleMutation.isPending,
     toggle: () => toggleMutation.mutateAsync(query.data?.reacted ?? false),
   };
 }
