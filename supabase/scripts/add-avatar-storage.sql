@@ -45,6 +45,12 @@ create policy avatars_own_delete on storage.objects
 -- la columna a `profiles`, un `returns table(...)` fijo no la coge
 -- sola. Redefinir con el mismo cuerpo de siempre + avatar_url.
 -- ------------------------------------------------------------
+-- create or replace no vale aquí: cambia el shape de las columnas de
+-- salida (se añade avatar_url), y Postgres exige DROP explícito cuando
+-- el RETURNS TABLE cambia, no solo el cuerpo.
+drop function if exists get_blocked_profiles();
+drop function if exists list_conversations();
+
 create or replace function get_blocked_profiles()
 returns table(id uuid, username text, display_name text, avatar_url text)
 language sql stable
