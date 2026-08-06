@@ -140,9 +140,8 @@ Deno.serve(async (req) => {
         .from('comments')
         .select(
           `
-            id, body, concert_id, festival_id, author_id,
-            author:profiles!comments_author_id_fkey ( username ),
-            parent:comments!comments_parent_comment_id_fkey ( author_id )
+            id, body, concert_id, festival_id, author_id, parent_comment_id,
+            author:profiles!comments_author_id_fkey ( username )
           `,
         )
         .not('parent_comment_id', 'is', null)
@@ -157,6 +156,25 @@ Deno.serve(async (req) => {
     if (nfErr) throw nfErr;
     if (nrErr) throw nrErr;
     if (dmErr) throw dmErr;
+
+    // Autor del comentario padre de cada respuesta, buscado aparte en vez
+    // de con un embed anidado (`comments!comments_parent_comment_id_fkey`):
+    // PostgREST no resolvía esa relación en un self-join pese a que la FK
+    // existe y el nombre es correcto (probado, sigue fallando incluso tras
+    // recargar su caché de esquema) — dos consultas simples es el mismo
+    // patrón que ya usan otros hooks del proyecto en vez de pelearse con
+    // embeds complejos.
+    const parentIds = Array.from(
+      new Set(((newReplies ?? []) as any[]).map((r) => r.parent_comment_id).filter(Boolean)),
+    );
+    const { data: parents, error: parentsErr } =
+      parentIds.length > 0
+        ? await admin.from('comments').select('id, author_id').in('id', parentIds)
+        : { data: [] as any[], error: null };
+    if (parentsErr) throw parentsErr;
+    const parentAuthorById = new Map<string, string>(
+      ((parents ?? []) as any[]).map((p) => [p.id, p.author_id] as [string, string]),
+    );
 
     // Cada evento lleva su propia forma de marcarse como procesado — así el
     // marcado final puede hacerse por evento individual (necesario para no
@@ -205,11 +223,12 @@ Deno.serve(async (req) => {
     }
 
     for (const row of (newReplies ?? []) as any[]) {
+      const parentAuthorId = parentAuthorById.get(row.parent_comment_id);
       // No notificar autorrespuestas (responder a tu propio comentario).
-      if (row.parent?.author_id && row.parent.author_id !== row.author_id) {
+      if (parentAuthorId && parentAuthorId !== row.author_id) {
         events.push({
           kind: 'comment_reply',
-          recipientId: row.parent.author_id,
+          recipientId: parentAuthorId,
           username: row.author?.username ?? '',
           concertId: row.concert_id,
           festivalId: row.festival_id,
