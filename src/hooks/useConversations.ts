@@ -5,6 +5,7 @@ export type Conversation = {
   otherId: string;
   username: string | null;
   displayName: string | null;
+  avatarUrl: string | null;
   lastBody: string;
   lastCreatedAt: string;
   unreadCount: number;
@@ -17,6 +18,7 @@ async function fetchConversations(): Promise<Conversation[]> {
     otherId: row.other_id,
     username: row.other_username,
     displayName: row.other_display_name,
+    avatarUrl: row.other_avatar_url,
     lastBody: row.last_body,
     lastCreatedAt: row.last_created_at,
     unreadCount: row.unread_count,

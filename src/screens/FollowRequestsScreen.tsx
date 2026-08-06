@@ -87,7 +87,7 @@ export default function FollowRequestsScreen() {
                 key={item.follower_id}
                 style={[styles.row, i === requests.length - 1 && { borderBottomWidth: 0 }]}
               >
-                <Avatar />
+                <Avatar uri={item.profile.avatar_url} />
                 <View style={styles.rowContent}>
                   <Text variant="displaySM" numberOfLines={1}>
                     @{item.profile.username}

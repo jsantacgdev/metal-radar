@@ -16,7 +16,7 @@ export type Comment = {
   comment_type: CommentType;
   status_type: StatusType | null;
   visibility: CommentVisibility;
-  author: { id: string; username: string | null; display_name: string | null };
+  author: { id: string; username: string | null; display_name: string | null; avatar_url: string | null };
 };
 
 function targetColumn(targetType: CommentTargetType) {
@@ -27,7 +27,7 @@ async function fetchComments(targetType: CommentTargetType, targetId: string): P
   const { data, error } = await supabase
     .from('comments')
     .select(
-      'id, body, created_at, parent_comment_id, comment_type, status_type, visibility, author:profiles!comments_author_id_fkey ( id, username, display_name )',
+      'id, body, created_at, parent_comment_id, comment_type, status_type, visibility, author:profiles!comments_author_id_fkey ( id, username, display_name, avatar_url )',
     )
     .eq(targetColumn(targetType), targetId)
     .order('created_at', { ascending: true });

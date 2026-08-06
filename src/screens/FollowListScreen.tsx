@@ -59,7 +59,7 @@ export default function FollowListScreen() {
               onPress={() => navigation.push('PublicProfile', { userId: item.id })}
               activeOpacity={0.7}
             >
-              <Avatar />
+              <Avatar uri={item.avatar_url} />
               <View style={styles.rowContent}>
                 <Text variant="displaySM" numberOfLines={1}>
                   @{item.username}

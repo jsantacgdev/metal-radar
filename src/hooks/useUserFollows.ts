@@ -63,7 +63,7 @@ export function useFollowUser(targetId: string) {
 export type FollowRequest = {
   follower_id: string;
   created_at: string;
-  profile: { id: string; username: string | null; display_name: string | null };
+  profile: { id: string; username: string | null; display_name: string | null; avatar_url: string | null };
 };
 
 async function fetchFollowRequests(): Promise<FollowRequest[]> {
@@ -75,7 +75,7 @@ async function fetchFollowRequests(): Promise<FollowRequest[]> {
   const { data, error } = await supabase
     .from('user_follows')
     .select(
-      'follower_id, created_at, profile:profiles!user_follows_follower_id_fkey(id, username, display_name)',
+      'follower_id, created_at, profile:profiles!user_follows_follower_id_fkey(id, username, display_name, avatar_url)',
     )
     .eq('followee_id', user.id)
     .eq('status', 'pending')
@@ -143,12 +143,17 @@ export function useFollowRequests() {
   };
 }
 
-export type FollowListItem = { id: string; username: string | null; display_name: string | null };
+export type FollowListItem = {
+  id: string;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+};
 
 async function fetchFollowers(userId: string): Promise<FollowListItem[]> {
   const { data, error } = await supabase
     .from('user_follows')
-    .select('profile:profiles!user_follows_follower_id_fkey(id, username, display_name)')
+    .select('profile:profiles!user_follows_follower_id_fkey(id, username, display_name, avatar_url)')
     .eq('followee_id', userId)
     .eq('status', 'accepted')
     .order('created_at', { ascending: false });
@@ -159,7 +164,7 @@ async function fetchFollowers(userId: string): Promise<FollowListItem[]> {
 async function fetchFollowing(userId: string): Promise<FollowListItem[]> {
   const { data, error } = await supabase
     .from('user_follows')
-    .select('profile:profiles!user_follows_followee_id_fkey(id, username, display_name)')
+    .select('profile:profiles!user_follows_followee_id_fkey(id, username, display_name, avatar_url)')
     .eq('follower_id', userId)
     .eq('status', 'accepted')
     .order('created_at', { ascending: false });

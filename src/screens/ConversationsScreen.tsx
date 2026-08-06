@@ -74,7 +74,7 @@ export default function ConversationsScreen() {
                 }
                 activeOpacity={0.7}
               >
-                <Avatar />
+                <Avatar uri={item.avatarUrl} />
                 <View style={styles.rowContent}>
                   <Text variant="displaySM" numberOfLines={1}>
                     {label}

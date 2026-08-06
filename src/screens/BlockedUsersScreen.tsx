@@ -13,7 +13,7 @@ function UnblockRow({
   user,
   onUnblocked,
 }: {
-  user: { id: string; username: string | null; display_name: string | null };
+  user: { id: string; username: string | null; display_name: string | null; avatar_url: string | null };
   onUnblocked: () => void;
 }) {
   const { t } = useTranslation();
@@ -39,7 +39,7 @@ function UnblockRow({
 
   return (
     <View style={styles.row}>
-      <Avatar />
+      <Avatar uri={user.avatar_url} />
       <View style={styles.rowContent}>
         <Text variant="displaySM" numberOfLines={1}>
           @{user.username}

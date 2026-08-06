@@ -62,7 +62,7 @@ export default function NewMessageScreen() {
                 }
                 activeOpacity={0.7}
               >
-                <Avatar />
+                <Avatar uri={item.avatar_url} />
                 <View style={styles.rowContent}>
                   <Text variant="displaySM" numberOfLines={1}>
                     {label}

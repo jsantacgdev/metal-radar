@@ -2,7 +2,12 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import i18n from '../i18n';
 
-export type Connection = { id: string; username: string | null; display_name: string | null };
+export type Connection = {
+  id: string;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+};
 
 // "Conectado" = misma regla que are_connected() en SQL (RLS de
 // direct_messages): sigues a la otra persona, o ella te sigue a ti,
@@ -16,12 +21,12 @@ async function fetchConnections(): Promise<Connection[]> {
   const [{ data: following, error: followingErr }, { data: followers, error: followersErr }] = await Promise.all([
     supabase
       .from('user_follows')
-      .select('profile:profiles!user_follows_followee_id_fkey(id, username, display_name)')
+      .select('profile:profiles!user_follows_followee_id_fkey(id, username, display_name, avatar_url)')
       .eq('follower_id', user.id)
       .eq('status', 'accepted'),
     supabase
       .from('user_follows')
-      .select('profile:profiles!user_follows_follower_id_fkey(id, username, display_name)')
+      .select('profile:profiles!user_follows_follower_id_fkey(id, username, display_name, avatar_url)')
       .eq('followee_id', user.id)
       .eq('status', 'accepted'),
   ]);

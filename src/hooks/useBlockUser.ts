@@ -62,7 +62,12 @@ export function useBlockUser(targetId: string) {
   };
 }
 
-export type BlockedUser = { id: string; username: string | null; display_name: string | null };
+export type BlockedUser = {
+  id: string;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+};
 
 async function fetchBlockedUsers(): Promise<BlockedUser[]> {
   // RPC en vez de un select/embed normal de `profiles`: la política de

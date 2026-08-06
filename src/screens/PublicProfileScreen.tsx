@@ -118,7 +118,7 @@ export default function PublicProfileScreen() {
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: spacing.xxxl }}>
           <View style={styles.userBlock}>
-            <Avatar size={72} />
+            <Avatar size={72} uri={data.profile.avatar_url} />
             <Text variant="displayLG" style={{ marginTop: spacing.md }}>
               @{data.profile.username}
             </Text>
