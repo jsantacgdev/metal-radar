@@ -632,7 +632,11 @@
     "empty": "Aún no hay mensajes. Di algo.",
     "notConnected": "Solo puedes escribir a gente que sigues o te sigue.",
     "menuTitle": "Opciones",
-    "reportThanks": "Gracias, revisaremos el aviso"
+    "reportThanks": "Gracias, revisaremos el aviso",
+    "newMessage": "Nuevo mensaje",
+    "newMessageTitle": "Escribir a",
+    "noConnectionsTitle": "Sin contactos todavía",
+    "noConnectionsDesc": "Solo puedes escribir a gente que sigues o te sigue. Sigue a alguien primero."
   },
   "posterAdmin": {
     "title": "OCR Carteles",

@@ -68,7 +68,7 @@ export default function ProfileScreen() {
             numberOfLines={1}
             style={{ marginTop: 4, lineHeight: 28, paddingBottom: 2 }}
           >
-            {session?.user.email ?? '—'}
+            {profile?.username ? `@${profile.username}` : session?.user.email ?? '—'}
           </Text>
         </View>
       </View>

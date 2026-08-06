@@ -632,7 +632,11 @@
     "empty": "No messages yet. Say something.",
     "notConnected": "You can only message people you follow or who follow you.",
     "menuTitle": "Options",
-    "reportThanks": "Thanks, we'll review the report"
+    "reportThanks": "Thanks, we'll review the report",
+    "newMessage": "New message",
+    "newMessageTitle": "Message",
+    "noConnectionsTitle": "No contacts yet",
+    "noConnectionsDesc": "You can only message people you follow or who follow you. Follow someone first."
   },
   "posterAdmin": {
     "title": "Poster OCR",

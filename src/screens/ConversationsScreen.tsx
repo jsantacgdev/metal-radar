@@ -29,7 +29,14 @@ export default function ConversationsScreen() {
           <Ionicons name="arrow-back" size={22} color={colors.bright} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('messages.title')}</Text>
-        <View style={{ width: 40 }} />
+        <TouchableOpacity
+          onPress={() => navigation.navigate('NewMessage')}
+          style={styles.backButton}
+          hitSlop={10}
+          accessibilityLabel={t('messages.newMessage')}
+        >
+          <Ionicons name="create-outline" size={22} color={colors.bright} />
+        </TouchableOpacity>
       </View>
 
       {error && (
@@ -49,6 +56,8 @@ export default function ConversationsScreen() {
           icon="chatbubbles-outline"
           title={t('messages.conversationsEmptyTitle')}
           description={t('messages.conversationsEmpty')}
+          actionLabel={t('messages.newMessage')}
+          onAction={() => navigation.navigate('NewMessage')}
         />
       ) : (
         <View style={styles.listSection}>

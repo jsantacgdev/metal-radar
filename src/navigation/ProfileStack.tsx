@@ -16,6 +16,7 @@ import FollowListScreen from '../screens/FollowListScreen';
 import WhoIsGoingScreen from '../screens/WhoIsGoingScreen';
 import BlockedUsersScreen from '../screens/BlockedUsersScreen';
 import ConversationsScreen from '../screens/ConversationsScreen';
+import NewMessageScreen from '../screens/NewMessageScreen';
 import ChatScreen from '../screens/ChatScreen';
 
 export type ProfileStackParamList = {
@@ -36,6 +37,7 @@ export type ProfileStackParamList = {
   WhoIsGoing: { targetType: 'concert' | 'festival'; targetId: string };
   BlockedUsers: undefined;
   Conversations: undefined;
+  NewMessage: undefined;
   Chat: { userId: string; username: string | null };
 };
 
@@ -135,6 +137,11 @@ export default function ProfileStack() {
       <Stack.Screen
         name="Conversations"
         component={ConversationsScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="NewMessage"
+        component={NewMessageScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen name="Chat" component={ChatScreen} options={{ headerShown: false }} />
