@@ -17,6 +17,7 @@ import { initI18n } from './src/i18n';
 import { useEffect, useState } from 'react';
 import * as Sentry from '@sentry/react-native';
 import { supabase } from './src/lib/supabase';
+import { checkNotificationPermissions, registerForPushNotifications } from './src/lib/notifications';
 import { BebasNeue_400Regular } from '@expo-google-fonts/bebas-neue';
 import { Anton_400Regular } from '@expo-google-fonts/anton';
 import { Oswald_400Regular, Oswald_500Medium } from '@expo-google-fonts/oswald';
@@ -102,6 +103,32 @@ export default Sentry.wrap(function App() {
 
     return () => {
       subscription.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    // El permiso del sistema puede seguir "concedido" mientras el token
+    // guardado en `profiles.push_token` ya no es válido para FCM (p. ej.
+    // tras reinstalar la app) — la UI de Ajustes solo deja re-registrar
+    // a mano cuando detecta que NO hay token guardado, así que sin esto
+    // un token obsoleto se queda así para siempre. Refrescarlo en cada
+    // arranque/login (sin pedir permiso si no lo tenía ya concedido) lo
+    // mantiene al día solo.
+    const refreshPushTokenIfGranted = async () => {
+      const status = await checkNotificationPermissions();
+      if (status === 'granted') {
+        registerForPushNotifications();
+      }
+    };
+
+    refreshPushTokenIfGranted();
+
+    const { data: pushSubscription } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') refreshPushTokenIfGranted();
+    });
+
+    return () => {
+      pushSubscription.subscription.unsubscribe();
     };
   }, []);
 
