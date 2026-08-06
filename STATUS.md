@@ -1,10 +1,10 @@
 # Metal Radar — Estado del proyecto
 
-_Última actualización: 2026-07-23_
+_Última actualización: 2026-08-04_
 
 ## Estado actual
 
-Metal Radar es una app móvil (Expo/React Native) en desarrollo activo, sin publicar aún en las stores. El repositorio tiene ~122 commits. Desde la última revisión de este documento se completó por entero la interacción social (seguir usuarios, perfiles públicos/privados, feed de actividad, comentarios con respuestas y reacciones, valoraciones públicas, bloqueo de usuarios y notificaciones push de eventos sociales), y el trabajo más reciente se ha centrado en pulir el flujo de autenticación (nickname, "olvidé mi contraseña"), un endurecimiento de seguridad en varias Edge Functions (incluyendo una corrección de escalada de rol en perfiles) y una pasada de accesibilidad e i18n por buena parte de la app. La app tiene un flujo de producto completo y navegable (onboarding → radar → mapa → diario → feed → perfil), con backend en Supabase en producción (proyecto ya linkado vía `supabase/.temp`). No hay suite de tests automatizados configurada; la validación se apoya en `tsc --noEmit`, ESLint y pruebas manuales.
+Metal Radar es una app móvil (Expo/React Native) en desarrollo activo, con Google Play como objetivo de publicación más cercano (Apple queda fuera por ahora). El repositorio tiene ~131 commits. Desde la última revisión de este documento: la interacción social se amplió con posts de "estado" por concierto/festival (voy solo/a, hueco en el coche, busco quien me lleve), visibilidad pública/solo-seguidores por comentario, y mensajería privada 1:1 entre usuarios conectados; y se hizo una auditoría completa (bugs de correctness, calidad de código, preparación para Google Play) con todos los hallazgos corregidos — incluyendo un hueco real de RLS en mensajes privados, reporte/bloqueo de usuarios extendido al chat (antes solo cubría comentarios/conciertos), y un bug preexistente por el que nunca se podían leer los motivos de reporte de comentarios en moderación. Ver la sección "Preparación para publicación" más abajo para lo que sigue pendiente antes de subir a Play Console. La app tiene un flujo de producto completo y navegable (onboarding → radar → mapa → diario → feed → perfil), con backend en Supabase en producción (proyecto ya linkado vía `supabase/.temp`). No hay suite de tests automatizados configurada; la validación se apoya en `tsc --noEmit`, ESLint y pruebas manuales.
 
 La rama de trabajo es `main` (sin otras ramas locales), sin cambios pendientes de commitear y al día con `origin/main`.
 
@@ -51,11 +51,15 @@ La rama de trabajo es `main` (sin otras ramas locales), sin cambios pendientes d
 - "Quién va" a un concierto/festival, acotado a los usuarios que sigues.
 - Feed de actividad (pestaña "Feed" en la navegación principal).
 - Comentarios con un nivel de respuestas anidadas y likes por comentario, más valoración media pública de cada concierto/festival.
-- Bloqueo de usuarios, aplicado en seguimiento, búsqueda y visibilidad de perfil.
-- Notificaciones push de eventos sociales (solicitud de seguimiento, nuevo seguidor, respuesta a comentario), vía la función `notify-social` programada con pg_cron nativo de Supabase.
+- Visibilidad por comentario (público o solo seguidores) — el autor elige al publicar; por defecto público, salvo los posts de estado (ver siguiente punto), que nacen en solo-seguidores.
+- Posts de "estado" de logística dentro de los comentarios de un concierto/festival: "voy solo/a", "tengo hueco en el coche", "busco quien me lleve" — mismo hilo/likes/reporte que un comentario normal.
+- Mensajes privados 1:1, solo entre usuarios ya conectados (que se siguen en algún sentido) — sondeo periódico, sin Supabase Realtime, con aviso push de mensaje nuevo vía `notify-social`.
+- Bloqueo de usuarios, aplicado en seguimiento, búsqueda, visibilidad de perfil, comentarios y mensajes privados.
+- Reporte de usuarios (no solo de contenido puntual), accesible desde el menú de un comentario y desde el chat privado.
+- Notificaciones push de eventos sociales (solicitud de seguimiento, nuevo seguidor, respuesta a comentario, mensaje nuevo), vía la función `notify-social` programada con pg_cron nativo de Supabase; protegida contra ejecuciones solapadas y con reintento real de los envíos de push que fallan a mitad.
 
 ### Moderación
-- Reporte de conciertos y de comentarios por parte de usuarios (motivo + detalle), con pantalla de moderación para revisar/gestionar ambos tipos de reporte.
+- Reporte de conciertos, comentarios y usuarios, con pantalla de moderación de tres pestañas (Conciertos / Comentarios / Usuarios) para revisar/gestionar los tres tipos de reporte.
 
 ### Notificaciones
 - Aviso push el día antes de un concierto marcado como "voy".
@@ -71,6 +75,16 @@ La rama de trabajo es `main` (sin otras ramas locales), sin cambios pendientes d
 - Sincronización manual de conciertos bajo demanda.
 - Borrado de cuenta con purga completa de datos (perfil, bandas seguidas, conciertos, diario, fotos).
 
+## Preparación para publicación (Google Play)
+
+Auditoría hecha el 2026-08-04 (bugs, calidad de código, checklist de Play). Ya resuelto en código: RLS de mensajes privados, reporte/bloqueo extendido al chat, `eas.json` configurado para generar App Bundle y con el scaffold de `submit.production.android`. Pendiente, todo fuera del código (ver detalle en la sección de abajo):
+
+- Ejecutar en Supabase Studio (en este orden): `fix-direct-messages-update-grant.sql`, `add-cron-lock.sql`, `add-user-reports.sql`.
+- Redesplegar `notify-social` (`supabase functions deploy notify-social`).
+- Generar la clave de servicio de Play Console y colocarla en `./metal-radar-play-service-account.json` (raíz del repo; ya cubierta por el patrón `metal-radar-*.json` de `.gitignore`).
+- Confirmar que la política de privacidad (enlazada desde Ajustes) esté realmente publicada, y darla de alta en Play Console (ficha + formulario Data Safety).
+- Decisiones pendientes sobre proveedores externos antes de tener tráfico real (ver tabla de APIs de terceros): Nominatim no tiene tier de aprobación para uso público (plan de migración a autoalojado/pago); Setlist.fm exige no retener setlists más que "periodos cortos" y un enlace de atribución que falta; Last.fm exige un crédito "powered by AudioScrobbler" que falta; MapTiler exige plan de pago para uso comercial; Spotify limita a una lista de usuarios autorizados salvo que se apruebe "Extended Quota Mode".
+
 ## Stack tecnológico
 
 - **App**: Expo SDK 54, React Native 0.81, React 19, TypeScript en modo estricto.
@@ -82,9 +96,11 @@ La rama de trabajo es `main` (sin otras ramas locales), sin cambios pendientes d
 - **Monitorización de errores**: Sentry (`@sentry/react-native`), deshabilitado en desarrollo, con scrubbing de PII (IP, email, username, cuerpos de request/response).
 - **Tema**: tema oscuro único, centralizado en `src/theme/` (colores, tipografía, spacing), sin colores/fuentes hardcodeados en componentes.
 - **Calidad**: ESLint (`eslint-config-expo` flat config) + Prettier; sin test runner configurado.
-- **Build/distribución**: EAS (`eas.json`), bundle ids `com.metalradar.app` (iOS y Android), Google Services file y credencial Firebase Admin SDK presentes en el repo raíz (para push).
+- **Build/distribución**: EAS (`eas.json`), bundle ids `com.metalradar.app` (iOS y Android), Google Services file y credencial Firebase Admin SDK presentes en el repo raíz (para push). Perfil `production` genera App Bundle para Android; `submit.production.android` ya apunta a la clave de servicio de Play (pendiente generarla, ver "Preparación para publicación").
 
 ## APIs de terceros de las que dependemos
+
+Estado de cara a un lanzamiento público con tráfico real revisado el 2026-08-04 — ver el detalle de qué falta en cada una en "Preparación para publicación" más arriba.
 
 | API | Uso |
 |---|---|
@@ -119,8 +135,10 @@ Cada función es independiente (`deno.json` propio, sin compartir `node_modules`
 - `fix-concert-headliners.ps1` — corrección puntual de headliners.
 
 ### SQL auxiliar (manual, contra la base remota) — `supabase/scripts/`
-- Interacción social: `add-username.sql`, `add-user-follows.sql`, `add-diary-visibility.sql`, `add-activity-feed.sql`, `add-comments-reactions.sql` (+ `undo-comments-reactions.sql`), `add-user-blocking.sql`, `add-social-push-notifications.sql`, `schedule-notify-social.sql`.
-- Seguridad: `fix-profile-role-escalation.sql` — corrige una escalada de rol en perfiles.
+- Interacción social: `add-username.sql`, `add-user-follows.sql`, `add-diary-visibility.sql`, `add-activity-feed.sql`, `add-comments-reactions.sql` (+ `undo-comments-reactions.sql`), `add-user-blocking.sql`, `add-social-push-notifications.sql`, `schedule-notify-social.sql`, `add-comment-visibility-and-status.sql`, `add-direct-messages.sql`.
+- Seguridad: `fix-profile-role-escalation.sql` (escalada de rol en perfiles), `fix-direct-messages-update-grant.sql` (columnas editables en mensajes privados).
+- Moderación: `add-user-reports.sql` (reporte de usuarios + arregla la política de lectura que le faltaba a `comment_reports`).
+- Infraestructura: `add-cron-lock.sql` (evita que `notify-social` se solape consigo mismo).
 - Datos: `festivals-2026.sql`.
 
 ### Otros
