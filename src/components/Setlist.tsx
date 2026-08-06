@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Setlist, useRefreshSetlist } from '../hooks/useSetlist';
 import { colors, fontFamily, radius, spacing } from '../theme';
-import { Text } from './ui';
+import { InfoTooltip, Text } from './ui';
 import { localeFromI18n } from '../i18n';
 import { Alert, Linking } from 'react-native';
 import { isSpotifyLoggedIn, loginToSpotify } from '../lib/spotify-auth';
@@ -175,11 +175,14 @@ export default function SetlistView({ concertId, setlist, bandId, bandName }: Pr
                 </Text>
               </View>
             ) : (
-              <View style={styles.badge}>
-                <Text variant="monoSM" color="bloodBright">
-                  {t('setlist.realSetlist')}
-                </Text>
-              </View>
+              <>
+                <View style={styles.badge}>
+                  <Text variant="monoSM" color="bloodBright">
+                    {t('setlist.realSetlist')}
+                  </Text>
+                </View>
+                <InfoTooltip text={t('setlist.sourceCredit')} url="https://www.setlist.fm" />
+              </>
             )}
             <Text variant="monoSM" color="silver">
               {t('setlist.songsCount', { count: setlist.song_count })}

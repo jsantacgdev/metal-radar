@@ -17,7 +17,7 @@ import { useBandInfo, BandMember } from '../hooks/useBandInfo';
 import { useFollowedBands } from '../hooks/useFollowedBands';
 import { followBand, syncBandConcerts } from '../lib/bands';
 import { colors, fontFamily, radius, spacing } from '../theme';
-import { Text, Tag } from '../components/ui';
+import { InfoTooltip, Text, Tag } from '../components/ui';
 import BandImage from '../components/BandImage';
 import BandDetailSkeleton from '../components/skeletons/BandDetailSkeleton';
 import { RadarStackParamList } from '../navigation/RadarStack';
@@ -328,7 +328,12 @@ export default function BandDetailScreen({ route }: Props) {
             </View>
 
             {info.bio && (
-              <Section title={t('bandDetail.bioTitle')}>
+              <Section
+                title={t('bandDetail.bioTitle')}
+                titleExtra={
+                  <InfoTooltip text={t('bandDetail.bioSourceCredit')} url="https://www.last.fm" />
+                }
+              >
                 <Text variant="body" color="silver" style={{ lineHeight: 22 }}>
                   {info.bio.length > 1000 ? info.bio.slice(0, 1000) + '…' : info.bio}
                 </Text>
@@ -423,12 +428,23 @@ function MetaItem({
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  titleExtra,
+  children,
+}: {
+  title: string;
+  titleExtra?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <View style={styles.section}>
-      <Text variant="monoMD" color="muted" style={styles.sectionTitle}>
-        {title}
-      </Text>
+      <View style={styles.sectionTitleRow}>
+        <Text variant="monoMD" color="muted">
+          {title}
+        </Text>
+        {titleExtra}
+      </View>
       {children}
     </View>
   );
@@ -513,7 +529,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.line,
   },
-  sectionTitle: {
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
     marginBottom: spacing.md,
   },
   tagsRow: {
