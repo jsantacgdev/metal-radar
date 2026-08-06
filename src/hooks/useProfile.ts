@@ -8,6 +8,7 @@ export type Profile = {
   id: string;
   display_name: string | null;
   username: string | null;
+  avatar_url: string | null;
   home_lat: number | null;
   home_lng: number | null;
   search_radius_km: number;

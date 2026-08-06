@@ -287,6 +287,7 @@
   },
   "profile": {
     "accountLabel": "CUENTA",
+    "changeAvatar": "Cambiar foto de perfil",
     "usernameDesc": "Tu nombre de usuario único. Se usará para que otras personas puedan encontrarte y seguirte.",
     "usernamePlaceholder": "Nombre de usuario",
     "usernameChecking": "Comprobando disponibilidad…",

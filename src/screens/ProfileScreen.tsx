@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
@@ -11,8 +11,9 @@ import { useProfileStats, StatsPeriod } from '../hooks/useProfileStats';
 import { useFollowCounts } from '../hooks/usePublicProfile';
 import { useFollowRequests } from '../hooks/useUserFollows';
 import { useConversations } from '../hooks/useConversations';
+import { useUploadAvatar } from '../hooks/useUploadAvatar';
 import { colors, fontFamily, radius, spacing } from '../theme';
-import { Button, Text } from '../components/ui';
+import { Avatar, Button, Text } from '../components/ui';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ProfileStackParamList } from '../navigation/ProfileStack';
 
@@ -25,6 +26,7 @@ export default function ProfileScreen() {
   const { counts: followCounts } = useFollowCounts(profile?.id ?? null);
   const { requests: followRequests } = useFollowRequests();
   const { unreadTotal } = useConversations(false);
+  const uploadAvatar = useUploadAvatar();
 
   const [statsPeriod, setStatsPeriod] = useState<StatsPeriod>('year');
   const currentYear = new Date().getFullYear();
@@ -37,6 +39,12 @@ export default function ProfileScreen() {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
     }, [queryClient]),
   );
+
+  const handleChangeAvatar = () => {
+    uploadAvatar.mutate(undefined, {
+      onError: (err: any) => Alert.alert(t('common.error'), err.message),
+    });
+  };
 
   const handleLogout = () => {
     Alert.alert(t('auth.signOut'), t('profile.signOutConfirm'), [
@@ -56,9 +64,21 @@ export default function ProfileScreen() {
     >
       {/* Avatar + email */}
       <View style={styles.userBlock}>
-        <View style={styles.avatar}>
-          <Ionicons name="person" size={28} color={colors.silver} />
-        </View>
+        <TouchableOpacity
+          onPress={handleChangeAvatar}
+          disabled={uploadAvatar.isPending}
+          activeOpacity={0.7}
+          accessibilityLabel={t('profile.changeAvatar')}
+        >
+          <Avatar size={56} uri={profile?.avatar_url} />
+          <View style={styles.avatarEditBadge}>
+            {uploadAvatar.isPending ? (
+              <ActivityIndicator size="small" color={colors.onAccent} />
+            ) : (
+              <Ionicons name="camera" size={12} color={colors.onAccent} />
+            )}
+          </View>
+        </TouchableOpacity>
         <View style={{ flex: 1, marginLeft: spacing.md, minWidth: 0 }}>
           <Text variant="monoMD" color="bloodBright">
             {t('profile.accountLabel')}
@@ -449,13 +469,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.line,
   },
-  avatar: {
-    width: 56,
-    height: 56,
+  avatarEditBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 22,
+    height: 22,
     borderRadius: radius.full,
-    backgroundColor: colors.panel2,
-    borderWidth: 1,
-    borderColor: colors.line,
+    backgroundColor: colors.blood,
+    borderWidth: 2,
+    borderColor: colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
   },
