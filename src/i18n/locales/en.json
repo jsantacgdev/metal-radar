@@ -469,7 +469,27 @@
     "dismissCommentSuccess": "Reports dismissed, the comment is still visible",
     "dismissUserSuccess": "Reports dismissed",
     "emptyUsersTitle": "No reported users",
-    "emptyUsersDesc": "When someone reports a user, it'll show up here."
+    "emptyUsersDesc": "When someone reports a user, it'll show up here.",
+    "bannedTab": "Banned",
+    "banButton": "Ban",
+    "banTitle": "Ban user",
+    "banBody": "How long do you want to ban @{{username}}? They won't be able to sign in or use their current session while the ban lasts.",
+    "ban24h": "24 hours",
+    "ban7d": "7 days",
+    "banPermanent": "Permanent",
+    "banSuccess": "User banned",
+    "cannotBanSelf": "You can't ban yourself",
+    "cannotBanAdmin": "You can't ban another admin",
+    "unbanButton": "Reactivate",
+    "unbanSuccess": "User reactivated",
+    "bannedUntil": "Banned until {{date}}",
+    "emptyBannedTitle": "No banned users",
+    "emptyBannedDesc": "Accounts you ban will show up here."
+  },
+  "banned": {
+    "title": "Account suspended",
+    "messagePermanent": "Your account has been permanently suspended for violating community guidelines.",
+    "messageTemporary": "Your account is suspended until {{date}} for violating community guidelines."
   },
   "reportReason": {
     "title": "What's the issue?",

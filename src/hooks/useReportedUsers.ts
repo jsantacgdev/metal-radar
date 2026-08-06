@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import i18n from '../i18n';
 
 export type ReportedUser = {
   reportedId: string;
@@ -56,5 +57,54 @@ export function useDismissUserReports() {
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reportedUsers'] }),
+  });
+}
+
+export type BanDuration = '24h' | '7d' | 'permanent';
+
+export function useModerateUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      userId,
+      action,
+      duration,
+    }: {
+      userId: string;
+      action: 'ban' | 'unban';
+      duration?: BanDuration;
+    }) => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) throw new Error(i18n.t('errors.noSession'));
+
+      const res = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/moderate-user`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ user_id: userId, action, duration }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        const key =
+          json.error === 'forbidden'
+            ? 'errors.forbidden'
+            : json.error === 'cannot_ban_self'
+              ? 'moderation.cannotBanSelf'
+              : json.error === 'cannot_ban_admin'
+                ? 'moderation.cannotBanAdmin'
+                : null;
+        throw new Error(key ? i18n.t(key) : (json.error ?? i18n.t('common.error')));
+      }
+      return json;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reportedUsers'] });
+      queryClient.invalidateQueries({ queryKey: ['bannedUsers'] });
+    },
   });
 }

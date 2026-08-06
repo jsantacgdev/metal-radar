@@ -8,13 +8,20 @@ import { useReportedConcerts, ReportedConcert } from '../hooks/useReportedConcer
 import { useModerateConcert } from '../hooks/useModerateConcert';
 import { useReportedComments, ReportedComment } from '../hooks/useReportedComments';
 import { useModerateComment } from '../hooks/useModerateComment';
-import { useReportedUsers, useDismissUserReports, ReportedUser } from '../hooks/useReportedUsers';
+import {
+  useReportedUsers,
+  useDismissUserReports,
+  useModerateUser,
+  ReportedUser,
+  BanDuration,
+} from '../hooks/useReportedUsers';
+import { useBannedUsers, BannedUser } from '../hooks/useBannedUsers';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from '../components/ui';
 import EmptyState from '../components/EmptyState';
 import { localeFromI18n } from '../i18n';
 
-type Tab = 'concerts' | 'comments' | 'users';
+type Tab = 'concerts' | 'comments' | 'users' | 'banned';
 
 export default function ModerationScreen() {
   const navigation = useNavigation<any>();
@@ -35,7 +42,16 @@ export default function ModerationScreen() {
 
   const { users, loading: usersLoading, error: usersError, reload: reloadUsers } = useReportedUsers();
   const dismissUserReports = useDismissUserReports();
+  const moderateUser = useModerateUser();
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
+
+  const {
+    users: bannedUsers,
+    loading: bannedLoading,
+    error: bannedError,
+    reload: reloadBanned,
+  } = useBannedUsers();
+  const [busyBannedId, setBusyBannedId] = useState<string | null>(null);
 
   const handleDismissConcert = (concert: ReportedConcert) => {
     setBusyConcertId(concert.id);
@@ -91,6 +107,39 @@ export default function ModerationScreen() {
     });
   };
 
+  const runBan = (userId: string, duration: BanDuration) => {
+    setBusyUserId(userId);
+    moderateUser.mutate(
+      { userId, action: 'ban', duration },
+      {
+        onSuccess: () => Alert.alert(t('moderation.banSuccess')),
+        onError: (err: any) => Alert.alert(t('common.error'), err.message),
+        onSettled: () => setBusyUserId(null),
+      },
+    );
+  };
+
+  const handleBanUser = (user: ReportedUser) => {
+    Alert.alert(t('moderation.banTitle'), t('moderation.banBody', { username: user.username }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('moderation.ban24h'), onPress: () => runBan(user.reportedId, '24h') },
+      { text: t('moderation.ban7d'), onPress: () => runBan(user.reportedId, '7d') },
+      { text: t('moderation.banPermanent'), style: 'destructive', onPress: () => runBan(user.reportedId, 'permanent') },
+    ]);
+  };
+
+  const handleUnbanUser = (user: BannedUser) => {
+    setBusyBannedId(user.id);
+    moderateUser.mutate(
+      { userId: user.id, action: 'unban' },
+      {
+        onSuccess: () => Alert.alert(t('moderation.unbanSuccess')),
+        onError: (err: any) => Alert.alert(t('common.error'), err.message),
+        onSettled: () => setBusyBannedId(null),
+      },
+    );
+  };
+
   const handleDeleteComment = (comment: ReportedComment) => {
     Alert.alert(t('moderation.deleteCommentConfirmTitle'), t('moderation.deleteCommentConfirmMessage'), [
       { text: t('common.cancel'), style: 'cancel' },
@@ -142,6 +191,11 @@ export default function ModerationScreen() {
           label={t('moderation.usersTab')}
           active={tab === 'users'}
           onPress={() => setTab('users')}
+        />
+        <TabPill
+          label={t('moderation.bannedTab')}
+          active={tab === 'banned'}
+          onPress={() => setTab('banned')}
         />
       </View>
 
@@ -348,7 +402,8 @@ export default function ModerationScreen() {
             }}
           />
         )
-      ) : usersLoading ? (
+      ) : tab === 'users' ? (
+        usersLoading ? (
         <View style={styles.centered}>
           <ActivityIndicator color={colors.bloodBright} size="large" />
         </View>
@@ -417,6 +472,86 @@ export default function ModerationScreen() {
                     ) : (
                       <Text variant="monoSM" color="silver">
                         {t('moderation.dismissButton')}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, styles.deleteBtn]}
+                    onPress={() => handleBanUser(item)}
+                    disabled={isBusy}
+                    activeOpacity={0.8}
+                  >
+                    <Text variant="monoSM" color="bloodBright">
+                      {t('moderation.banButton')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          }}
+        />
+        )
+      ) : bannedLoading ? (
+        <View style={styles.centered}>
+          <ActivityIndicator color={colors.bloodBright} size="large" />
+        </View>
+      ) : bannedError ? (
+        <View style={styles.centered}>
+          <Text
+            variant="bodySM"
+            color="bloodBright"
+            style={{ textAlign: 'center', paddingHorizontal: spacing.xl }}
+          >
+            {bannedError}
+          </Text>
+        </View>
+      ) : bannedUsers.length === 0 ? (
+        <EmptyState
+          icon="shield-checkmark-outline"
+          title={t('moderation.emptyBannedTitle')}
+          description={t('moderation.emptyBannedDesc')}
+        />
+      ) : (
+        <FlatList
+          data={bannedUsers}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxxl }}
+          refreshing={bannedLoading}
+          onRefresh={reloadBanned}
+          renderItem={({ item }) => {
+            const isBusy = busyBannedId === item.id && moderateUser.isPending;
+            const label = item.username ? `@${item.username}` : item.display_name ?? t('common.anonymous');
+            const untilStr = new Date(item.banned_until).toLocaleDateString(locale, {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+            });
+
+            return (
+              <View style={styles.card}>
+                <View style={styles.cardHeader}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text variant="displaySM" numberOfLines={1}>
+                      {label}
+                    </Text>
+                    <Text variant="monoSM" color="muted" numberOfLines={1} style={{ marginTop: 2 }}>
+                      {t('moderation.bannedUntil', { date: untilStr })}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.actionsRow}>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, styles.dismissBtn]}
+                    onPress={() => handleUnbanUser(item)}
+                    disabled={isBusy}
+                    activeOpacity={0.8}
+                  >
+                    {isBusy ? (
+                      <ActivityIndicator color={colors.silver} size="small" />
+                    ) : (
+                      <Text variant="monoSM" color="silver">
+                        {t('moderation.unbanButton')}
                       </Text>
                     )}
                   </TouchableOpacity>

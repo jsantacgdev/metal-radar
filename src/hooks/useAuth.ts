@@ -6,6 +6,7 @@ export function useAuth() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasOnboarded, setHasOnboarded] = useState<boolean | null>(null);
+  const [bannedUntil, setBannedUntil] = useState<string | null>(null);
 
   const checkOnboarding = async (userId: string) => {
     try {
@@ -21,6 +22,21 @@ export function useAuth() {
     }
   };
 
+  const checkBanStatus = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('banned_until')
+        .eq('id', userId)
+        .single();
+      if (error) throw error;
+      setBannedUntil(data?.banned_until ?? null);
+    } catch (err) {
+      console.warn('Error checking ban status:', err);
+      setBannedUntil(null);
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
 
@@ -30,6 +46,7 @@ export function useAuth() {
       setLoading(false);
       if (data.session) {
         checkOnboarding(data.session.user.id);
+        checkBanStatus(data.session.user.id);
       }
     });
 
@@ -38,8 +55,10 @@ export function useAuth() {
       setSession(s);
       if (s) {
         checkOnboarding(s.user.id);
+        checkBanStatus(s.user.id);
       } else {
         setHasOnboarded(null);
+        setBannedUntil(null);
       }
     });
 
@@ -53,5 +72,9 @@ export function useAuth() {
     if (session) await checkOnboarding(session.user.id);
   };
 
-  return { session, loading, hasOnboarded, refreshOnboarding };
+  // banned_until = null → nunca baneado. Una fecha pasada significa que un
+  // baneo temporal ya expiró (moderate-user no la limpia sola al expirar).
+  const isBanned = !!bannedUntil && new Date(bannedUntil).getTime() > Date.now();
+
+  return { session, loading, hasOnboarded, isBanned, bannedUntil, refreshOnboarding };
 }

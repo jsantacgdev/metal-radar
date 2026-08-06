@@ -4,10 +4,11 @@ import { useAuth } from '../hooks/useAuth';
 import AuthNavigator from './AuthNavigator';
 import MainTabs from './MainTabs';
 import OnboardingScreen from '../screens/OnboardingScreen';
+import BannedScreen from '../screens/BannedScreen';
 import { colors } from '../theme';
 
 export default function RootNavigator() {
-  const { session, loading, hasOnboarded, refreshOnboarding } = useAuth();
+  const { session, loading, hasOnboarded, isBanned, bannedUntil, refreshOnboarding } = useAuth();
 
   if (loading || (session && hasOnboarded === null)) {
     return (
@@ -28,6 +29,8 @@ export default function RootNavigator() {
     <NavigationContainer theme={DarkTheme}>
       {!session ? (
         <AuthNavigator />
+      ) : isBanned ? (
+        <BannedScreen bannedUntil={bannedUntil} />
       ) : hasOnboarded === false ? (
         <OnboardingScreen onDone={refreshOnboarding} />
       ) : (

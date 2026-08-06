@@ -469,7 +469,27 @@
     "dismissCommentSuccess": "Reportes descartados, el comentario sigue visible",
     "dismissUserSuccess": "Reportes descartados",
     "emptyUsersTitle": "Sin usuarios reportados",
-    "emptyUsersDesc": "Cuando alguien reporte a un usuario, aparecerá aquí."
+    "emptyUsersDesc": "Cuando alguien reporte a un usuario, aparecerá aquí.",
+    "bannedTab": "Baneados",
+    "banButton": "Banear",
+    "banTitle": "Banear usuario",
+    "banBody": "¿Durante cuánto tiempo quieres banear a @{{username}}? No podrá iniciar sesión ni usar su sesión actual mientras dure el baneo.",
+    "ban24h": "24 horas",
+    "ban7d": "7 días",
+    "banPermanent": "Permanente",
+    "banSuccess": "Usuario baneado",
+    "cannotBanSelf": "No puedes banearte a ti mismo",
+    "cannotBanAdmin": "No puedes banear a otro administrador",
+    "unbanButton": "Reactivar",
+    "unbanSuccess": "Usuario reactivado",
+    "bannedUntil": "Baneado hasta {{date}}",
+    "emptyBannedTitle": "Sin usuarios baneados",
+    "emptyBannedDesc": "Las cuentas que banees aparecerán aquí."
+  },
+  "banned": {
+    "title": "Cuenta suspendida",
+    "messagePermanent": "Tu cuenta ha sido suspendida de forma permanente por incumplir las normas de la comunidad.",
+    "messageTemporary": "Tu cuenta está suspendida hasta el {{date}} por incumplir las normas de la comunidad."
   },
   "reportReason": {
     "title": "¿Cuál es el problema?",
