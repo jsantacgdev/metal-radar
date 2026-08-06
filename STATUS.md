@@ -83,7 +83,7 @@ Auditoría hecha el 2026-08-04 (bugs, calidad de código, checklist de Play). Ya
 - Redesplegar `notify-social` (`supabase functions deploy notify-social`).
 - Generar la clave de servicio de Play Console y colocarla en `./metal-radar-play-service-account.json` (raíz del repo; ya cubierta por el patrón `metal-radar-*.json` de `.gitignore`).
 - Confirmar que la política de privacidad (enlazada desde Ajustes) esté realmente publicada, y darla de alta en Play Console (ficha + formulario Data Safety).
-- Decisiones pendientes sobre proveedores externos antes de tener tráfico real (ver tabla de APIs de terceros): Nominatim no tiene tier de aprobación para uso público (plan de migración a autoalojado/pago); Setlist.fm exige no retener setlists más que "periodos cortos" y un enlace de atribución que falta; Last.fm exige un crédito "powered by AudioScrobbler" que falta; MapTiler exige plan de pago para uso comercial; Spotify limita a una lista de usuarios autorizados salvo que se apruebe "Extended Quota Mode".
+- Requisitos de proveedores externos (Nominatim, Setlist.fm, Last.fm, MapTiler, Spotify, Ticketmaster, MusicBrainz...) — seguimiento vivo en **[API_Terceros.md](API_Terceros.md)**, no duplicado aquí. Estado a 2026-08-04: atribución con enlace ya añadida para Last.fm y Setlist.fm; siguen pendientes la retención de datos de Setlist.fm, el plan de pago de MapTiler, la aprobación de Spotify y la migración de Nominatim.
 
 ## Stack tecnológico
 
