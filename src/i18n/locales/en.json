@@ -444,7 +444,8 @@
     "alreadyReported": "You've already reported this concert",
     "alreadyReportedComment": "You've already reported this comment",
     "venueGeocodeFailed": "We couldn't locate that venue. Check the name, city, and country.",
-    "forbidden": "You don't have permission to do this"
+    "forbidden": "You don't have permission to do this",
+    "bandOpenFailed": "We couldn't open this band. Please try again."
   },
   "moderation": {
     "title": "Reported concerts",

@@ -114,7 +114,8 @@ export default function RadarScreen() {
       }
       navigation.navigate('BandDetail', { bandId });
     } catch (err: any) {
-      Alert.alert(t('common.error'), err.message);
+      console.warn('openBandDetail error:', err);
+      Alert.alert(t('common.error'), t('errors.bandOpenFailed'));
     }
   };
 
@@ -288,7 +289,7 @@ export default function RadarScreen() {
     .toUpperCase();
 
   const newForYou = visibleRecs.slice(0, 5);
-  const emerging = visibleRecs.slice(5);
+  const emerging = visibleRecs.slice(5).sort((a, b) => b.affinity - a.affinity);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.md }]}>

@@ -444,7 +444,8 @@
     "alreadyReported": "Ya has reportado este concierto",
     "alreadyReportedComment": "Ya has reportado este comentario",
     "venueGeocodeFailed": "No hemos podido localizar esa sala. Revisa el nombre, la ciudad y el país.",
-    "forbidden": "No tienes permiso para hacer esto"
+    "forbidden": "No tienes permiso para hacer esto",
+    "bandOpenFailed": "No hemos podido abrir esta banda. Inténtalo de nuevo."
   },
   "moderation": {
     "title": "Conciertos reportados",

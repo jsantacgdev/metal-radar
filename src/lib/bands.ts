@@ -101,21 +101,49 @@ export async function getOrCreateBandId(spotify: {
   image_url: string | null;
   genres: string[];
 }): Promise<string> {
-  const { data, error } = await supabase
+  const { data: bySpotifyId } = await supabase
     .from('bands')
-    .upsert(
-      {
+    .select('id')
+    .eq('spotify_id', spotify.spotify_id)
+    .maybeSingle();
+
+  if (bySpotifyId) return bySpotifyId.id;
+
+  // Some bands are created without a spotify_id (OCR/user-submitted). Claim that
+  // row instead of inserting a new one, or idx_bands_unique_name_lower rejects us.
+  const { data: byName } = await supabase
+    .from('bands')
+    .select('id, image_url, genres')
+    .ilike('name', spotify.name)
+    .maybeSingle();
+
+  if (byName) {
+    const mergedGenres = Array.from(new Set([...(byName.genres ?? []), ...(spotify.genres ?? [])]));
+    const { error: updateError } = await supabase
+      .from('bands')
+      .update({
         spotify_id: spotify.spotify_id,
-        name: spotify.name,
-        image_url: spotify.image_url,
-        genres: spotify.genres,
-      },
-      { onConflict: 'spotify_id' },
-    )
+        image_url: byName.image_url ?? spotify.image_url,
+        genres: mergedGenres,
+      })
+      .eq('id', byName.id);
+    if (updateError) throw updateError;
+    return byName.id;
+  }
+
+  const { data: newBand, error: insertError } = await supabase
+    .from('bands')
+    .insert({
+      spotify_id: spotify.spotify_id,
+      name: spotify.name,
+      image_url: spotify.image_url,
+      genres: spotify.genres,
+    })
     .select('id')
     .single();
-  if (error || !data) throw error ?? new Error(i18n.t('errors.bandFetchFailed'));
-  return data.id;
+
+  if (insertError || !newBand) throw insertError ?? new Error(i18n.t('errors.bandFetchFailed'));
+  return newBand.id;
 }
 
 async function prewarmBandMembers(bandIds: string[]): Promise<void> {
