@@ -64,6 +64,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ],
       // expo-dev-client SOLO en builds de desarrollo
       // ...(isDevBuild ? ['expo-dev-client'] : []),
+      './plugins/withApkName',
     ],
     ios: {
       supportsTablet: true,
