@@ -8,7 +8,7 @@ Seguimiento vivo de los requisitos de uso (términos de servicio, límites, atri
 
 | Proveedor | ¿Bloquea publicación? | Estado |
 |---|---|---|
-| Nominatim (OSM) | Sí | ⚠️ User-Agent corregido; candidato de sustitución encontrado (LocationIQ), sin migrar |
+| Nominatim (OSM) | Probablemente no, con la caché arreglada | ⚠️ User-Agent y caché de venues corregidos (2026-11-13); LocationIQ queda como seguro si crece el volumen |
 | Setlist.fm | Sí | ⚠️ Atribución añadida; retención de datos sigue incumpliendo |
 | Last.fm | Probable | ✅ Atribución añadida; uso comercial sin confirmar por escrito |
 | MapTiler | Sí | ❌ Sigue en plan gratuito ($25/mes el plan Flex que sí permite uso comercial) |
@@ -23,17 +23,17 @@ Seguimiento vivo de los requisitos de uso (términos de servicio, límites, atri
 ## Detalle por proveedor
 
 ### Nominatim (OpenStreetMap)
-**Uso:** geocodificación de venues — `sync-concerts`, `cron-sync-all`, `sync-band`, `band-info`, `moderate-concert`, `submit-concert`, `commit-festival-from-poster`, `prewarm-band-members`, `refresh-all-bands`.
+**Uso:** geocodificación de venues — `sync-concerts`, `cron-sync-all`, `sync-band` (sincronización con Ticketmaster), `moderate-concert`, `submit-concert`, `commit-festival-from-poster` (venues manuales/de festival). Verificado el 2026-11-13: `band-info`, `prewarm-band-members` y `refresh-all-bands` ya no llaman a Nominatim.
 **Nivel actual:** instancia pública gratuita, sin key.
 
 - [x] User-Agent identificable con email de contacto real en todas las llamadas — corregido en código el 2026-08-04 (`sync-band` y `cron-sync-all` tenían un placeholder `tu@email.com`; el resto ya estaba bien), pero **no se desplegó hasta el 2026-11-13**: hasta entonces producción siguió enviando el placeholder.
-- [x] Caché de coordenadas para no repetir geocodificaciones — ya existente (lat/lng se guardan en `venues`).
-- [ ] Límite de 1 req/seg, y máx. 4 req/min en tareas programadas — no verificado que `cron-sync-all` respete el límite de ráfaga con throttling explícito.
+- [x] Caché de coordenadas para no repetir geocodificaciones — **corregido el 2026-11-13**. Hasta entonces este punto estaba marcado como hecho, pero no era cierto en las tres funciones de sincronización: hacían un reverse geocode por cada concierto con coordenadas (para validar el país de Ticketmaster) antes de mirar si el venue ya existía, y como cada banda se resincroniza cada 12 h, los mismos venues se consultaban una y otra vez. Ahora cargan de `venues` los ya conocidos por `ticketmaster_id` y solo geocodifican los nuevos. Sus respuestas incluyen `venues_cached`/`venues_geocoded` para vigilar el volumen real. `moderate-concert`, `submit-concert` y `commit-festival-from-poster` ya consultaban `venues` antes de geocodificar.
+- [ ] Límite de 1 req/seg — cada llamada va seguida de `sleep(1100)` y las llamadas de una misma ejecución son secuenciales, así que cada invocación respeta el límite (verificado 2026-11-13). No está garantizado en conjunto: si coinciden varias invocaciones (cron + usuarios siguiendo bandas), la suma puede superar 1 req/s. Con la caché el riesgo es bajo, porque solo los venues nuevos llegan a Nominatim.
 - [ ] **Sin nivel de aprobación para uso comercial/público a volumen real** — la política de Nominatim pide autoalojarlo o usar un proveedor de pago por encima de uso ligero. No existe un "modo aprobado" al que solicitar acceso.
 
 **Candidato de sustitución encontrado (2026-08-04, precios verificados):** **LocationIQ** — su plan gratuito (5.000 peticiones/día, 2 req/seg) **permite uso comercial explícitamente**, con la única condición de enlazar su atribución en la app (mismo patrón ya construido con `InfoTooltip` para Last.fm/Setlist.fm). Dado que Metal Radar solo geocodifica venues nuevos (los ya conocidos están cacheados en `venues`), es probable que el volumen real quede muy por debajo de 5.000/día. Si se superara, el primer escalón de pago es $49/mes (10.000 peticiones/día, 15 req/seg).
 
-**Próxima acción:** migrar `NOMINATIM_HEADERS`/las llamadas a `nominatim.openstreetmap.org` en los Edge Functions afectados a la API de LocationIQ, y añadir su atribución con `InfoTooltip` donde corresponda (mapa / ficha de venue). Coste esperado: $0/mes salvo que el volumen crezca por encima del plan gratuito.
+**Próxima acción:** con la caché corregida, la migración a LocationIQ deja de ser previa a publicar y pasa a ser un seguro: clave propia, condiciones comerciales explícitas y sin riesgo de bloqueo sin aviso. Vigilar `venues_geocoded` en las respuestas de `cron-sync-all`/`sync-concerts` y migrar si el volumen deja de ser "uso ligero" o si Nominatim empieza a fallar. Migrar consiste en cambiar `NOMINATIM_HEADERS` y las URLs de `nominatim.openstreetmap.org` en las 6 funciones afectadas, y añadir su atribución con `InfoTooltip`. Coste esperado: $0/mes salvo que el volumen supere el plan gratuito.
 
 ### Setlist.fm
 **Uso:** `fetch-setlist` — setlists reales y predicción de setlist por gira.
@@ -140,6 +140,7 @@ Lo que no cuesta dinero pero sí tiempo: cambiar el modelo de retención de setl
 
 ## Historial
 
+- **2026-11-13** — Nominatim: corregida la caché de venues en `sync-band`, `sync-concerts` y `cron-sync-all` (el punto "caché ya existente" era incorrecto). LocationIQ pasa de requisito previo a publicar a seguro opcional.
 - **2026-11-13** — Desplegados `cron-sync-all` y `sync-band` con el User-Agent real de Nominatim (el arreglo del 2026-08-04 solo estaba en el repo). El resto de requisitos sigue sin cambios desde 2026-08-04; los precios no se han vuelto a verificar.
 - **2026-08-04** — Verificados precios reales (Google Play $25 único, MapTiler Flex $25/mes, MusicBrainz Bronze $100–499/mes, Supabase Pro ~$25/mes base). Encontrado candidato de sustitución para Nominatim: LocationIQ, plan gratuito que permite uso comercial con atribución. Añadida sección de coste estimado.
 - **2026-08-04** — Añadida atribución con enlace para Last.fm (`BandDetailScreen.tsx`) y Setlist.fm (`Setlist.tsx`) vía el nuevo componente `InfoTooltip`. Creado este documento.

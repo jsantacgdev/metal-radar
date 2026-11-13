@@ -91,7 +91,7 @@ Pendiente, todo fuera del código (ver detalle en la sección de abajo):
 
 - Generar la clave de servicio de Play Console y colocarla en `./metal-radar-play-service-account.json` (raíz del repo; ya cubierta por el patrón `metal-radar-*.json` de `.gitignore`).
 - Confirmar que la política de privacidad (enlazada desde Ajustes) esté realmente publicada, y darla de alta en Play Console (ficha + formulario Data Safety).
-- Requisitos de proveedores externos (Nominatim, Setlist.fm, Last.fm, MapTiler, Spotify, Ticketmaster, MusicBrainz...) — seguimiento vivo en **[API_Terceros.md](API_Terceros.md)**, no duplicado aquí. Estado a 2026-08-04: atribución con enlace ya añadida para Last.fm y Setlist.fm; siguen pendientes la retención de datos de Setlist.fm, el plan de pago de MapTiler, la aprobación de Spotify y la migración de Nominatim.
+- Requisitos de proveedores externos (Nominatim, Setlist.fm, Last.fm, MapTiler, Spotify, Ticketmaster, MusicBrainz...) — seguimiento vivo en **[API_Terceros.md](API_Terceros.md)**, no duplicado aquí. Estado a 2026-11-13: atribución con enlace ya añadida para Last.fm y Setlist.fm; corregida la caché de venues, de modo que Nominatim solo recibe venues nuevos y migrar a LocationIQ pasa a ser opcional; siguen pendientes la retención de datos de Setlist.fm, el plan de pago de MapTiler y la aprobación de Spotify.
 
 ## Stack tecnológico
 

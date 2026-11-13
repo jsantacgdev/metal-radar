@@ -107,6 +107,36 @@ async function forwardGeocode(query: string): Promise<{ lat: number; lng: number
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// Caché de recintos para no repetir Nominatim: ticketmaster_id → venues.id
+// (null = su geocodificación ya falló en esta ejecución). Las coordenadas
+// guardadas ya pasaron la validación de país al crearse, así que un recinto
+// conocido no se vuelve a geocodificar en cada sincronización.
+type VenueCache = Map<string, string | null>;
+
+async function loadKnownVenues(admin: any, events: TmEvent[], cache: VenueCache) {
+  const ids = [
+    ...new Set(
+      events
+        .map((ev) => ev._embedded?.venues?.[0]?.id)
+        .filter((id): id is string => !!id && !cache.has(id)),
+    ),
+  ];
+  if (ids.length === 0) return;
+
+  const { data, error } = await admin
+    .from('venues')
+    .select('id, ticketmaster_id')
+    .in('ticketmaster_id', ids)
+    .not('lat', 'is', null)
+    .not('lng', 'is', null);
+  if (error) {
+    // Sin caché se geocodifica como antes: más lento, pero la sincronización sigue.
+    console.warn('No se pudo cargar la caché de venues:', error.message);
+    return;
+  }
+  for (const v of data ?? []) cache.set(v.ticketmaster_id, v.id);
+}
+
 type TmEvent = {
   id: string;
   name: string;
@@ -171,6 +201,11 @@ Deno.serve(async (req) => {
     let discardedConcerts = 0;
     let bandsSkipped = 0;
     let bandsProcessed = 0;
+    let venuesCached = 0;
+    let venuesGeocoded = 0;
+
+    // Compartida entre bandas: varias bandas suelen tocar en los mismos recintos.
+    const knownVenues: VenueCache = new Map();
 
     for (const ub of userBands) {
       const band = (ub as any).bands;
@@ -239,6 +274,7 @@ Deno.serve(async (req) => {
 
         const tmData = await tmRes.json();
         const events: TmEvent[] = tmData._embedded?.events ?? [];
+        await loadKnownVenues(admin, events, knownVenues);
 
         for (const ev of events) {
           if (TRIBUTE_KEYWORDS.test(ev.name) || VIP_KEYWORDS.test(ev.name)) {
@@ -252,59 +288,76 @@ Deno.serve(async (req) => {
           const eventDate = ev.dates.start.dateTime ?? ev.dates.start.localDate;
           if (!eventDate) continue;
 
-          const declaredCountry = normalizeCountry(venue.country?.name);
-          let lat: number | null = venue.location ? parseFloat(venue.location.latitude) : null;
-          let lng: number | null = venue.location ? parseFloat(venue.location.longitude) : null;
-
-          let needsForwardGeocode = false;
-          if (lat != null && lng != null && declaredCountry) {
-            const realCountry = await reverseGeocode(lat, lng);
-            await sleep(1100);
-            if (realCountry && realCountry !== declaredCountry) {
-              needsForwardGeocode = true;
-            }
-          } else if (lat == null || lng == null) {
-            needsForwardGeocode = true;
-          }
-
-          if (needsForwardGeocode) {
-            const query = [venue.name, venue.city?.name, venue.country?.name]
-              .filter(Boolean)
-              .join(', ');
-            const geo = await forwardGeocode(query);
-            await sleep(1100);
-            if (!geo) {
-              discardedConcerts++;
-              continue;
-            }
-            lat = geo.lat;
-            lng = geo.lng;
-          }
-
-          if (lat == null || lng == null) {
+          const cachedVenueId = knownVenues.get(venue.id);
+          if (cachedVenueId === null) {
             discardedConcerts++;
             continue;
           }
 
-          const { data: venueRow, error: venueError } = await admin
-            .from('venues')
-            .upsert(
-              {
-                ticketmaster_id: venue.id,
-                name: venue.name,
-                city: venue.city?.name,
-                country: venue.country?.name,
-                lat,
-                lng,
-              },
-              { onConflict: 'ticketmaster_id' },
-            )
-            .select('id')
-            .single();
+          let venueId: string;
+          if (cachedVenueId) {
+            venueId = cachedVenueId;
+            venuesCached++;
+          } else {
+            venuesGeocoded++;
+            const declaredCountry = normalizeCountry(venue.country?.name);
+            let lat: number | null = venue.location ? parseFloat(venue.location.latitude) : null;
+            let lng: number | null = venue.location ? parseFloat(venue.location.longitude) : null;
 
-          if (venueError || !venueRow) {
-            console.warn('Venue upsert error:', venueError?.message);
-            continue;
+            let needsForwardGeocode = false;
+            if (lat != null && lng != null && declaredCountry) {
+              const realCountry = await reverseGeocode(lat, lng);
+              await sleep(1100);
+              if (realCountry && realCountry !== declaredCountry) {
+                needsForwardGeocode = true;
+              }
+            } else if (lat == null || lng == null) {
+              needsForwardGeocode = true;
+            }
+
+            if (needsForwardGeocode) {
+              const query = [venue.name, venue.city?.name, venue.country?.name]
+                .filter(Boolean)
+                .join(', ');
+              const geo = await forwardGeocode(query);
+              await sleep(1100);
+              if (!geo) {
+                knownVenues.set(venue.id, null);
+                discardedConcerts++;
+                continue;
+              }
+              lat = geo.lat;
+              lng = geo.lng;
+            }
+
+            if (lat == null || lng == null) {
+              knownVenues.set(venue.id, null);
+              discardedConcerts++;
+              continue;
+            }
+
+            const { data: venueRow, error: venueError } = await admin
+              .from('venues')
+              .upsert(
+                {
+                  ticketmaster_id: venue.id,
+                  name: venue.name,
+                  city: venue.city?.name,
+                  country: venue.country?.name,
+                  lat,
+                  lng,
+                },
+                { onConflict: 'ticketmaster_id' },
+              )
+              .select('id')
+              .single();
+
+            if (venueError || !venueRow) {
+              console.warn('Venue upsert error:', venueError?.message);
+              continue;
+            }
+            venueId = venueRow.id;
+            knownVenues.set(venue.id, venueId);
           }
 
           const attractions = ev._embedded?.attractions ?? [];
@@ -321,7 +374,7 @@ Deno.serve(async (req) => {
             .upsert(
               {
                 ticketmaster_id: ev.id,
-                venue_id: venueRow.id,
+                venue_id: venueId,
                 event_date: eventDate,
                 ticket_url: ev.url,
                 price_min: priceRange?.min ?? null,
@@ -417,6 +470,8 @@ Deno.serve(async (req) => {
         bands: userBands.length,
         bands_processed: bandsProcessed,
         bands_skipped: bandsSkipped,
+        venues_cached: venuesCached,
+        venues_geocoded: venuesGeocoded,
       }),
       { headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
     );
