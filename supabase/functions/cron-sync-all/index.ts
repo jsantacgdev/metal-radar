@@ -20,6 +20,16 @@ const NON_BAND_NAME =
 
 const STALE_THRESHOLD_HOURS = 12;
 
+// Una Edge Function tiene 2 s de CPU y 150 s por petición. Procesar todas las
+// bandas pendientes en una sola llamada acababa en 546 WORKER_RESOURCE_LIMIT:
+// la función moría a medias y el push de conciertos nuevos (que se envía al
+// final) se perdía. Cada ejecución procesa un lote acotado; las bandas que
+// no entren quedan para la siguiente (ver bands_pending en la respuesta).
+const MAX_BANDS_PER_RUN = 10;
+// No se empieza una banda nueva pasado este tiempo, para dejar margen a la
+// banda en curso y al envío de push antes de los 150 s.
+const TIME_BUDGET_MS = 90_000;
+
 function normalizeName(s: string): string {
   return s
     .toLowerCase()
@@ -177,10 +187,19 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Las que llevan más tiempo sin sincronizar van primero (las que nunca se
+    // han sincronizado, antes que nadie). Con el orden fijo de antes, si una
+    // ejecución moría a medias, las bandas del final no llegaban a sincronizarse.
+    const staleBands = [...uniqueBands.values()]
+      .filter((b) => !b.last_concerts_sync_at || b.last_concerts_sync_at <= staleSince)
+      .sort((a, b) => (a.last_concerts_sync_at ?? '').localeCompare(b.last_concerts_sync_at ?? ''));
+    const bandsSkipped = uniqueBands.size - staleBands.length;
+    const startedAt = Date.now();
+
     let totalSynced = 0;
     let totalDiscarded = 0;
-    let bandsSkipped = 0;
     let bandsProcessed = 0;
+    let bandsPending = 0;
     let attractionsSkipped = 0;
     let venuesCached = 0;
     let venuesGeocoded = 0;
@@ -188,10 +207,10 @@ Deno.serve(async (req) => {
     // Compartida entre bandas: varias bandas suelen tocar en los mismos recintos.
     const knownVenues: VenueCache = new Map();
 
-    for (const band of uniqueBands.values()) {
-      if (band.last_concerts_sync_at && band.last_concerts_sync_at > staleSince) {
-        bandsSkipped++;
-        continue;
+    for (const band of staleBands) {
+      if (bandsProcessed >= MAX_BANDS_PER_RUN || Date.now() - startedAt > TIME_BUDGET_MS) {
+        bandsPending = staleBands.length - bandsProcessed;
+        break;
       }
 
       bandsProcessed++;
@@ -456,6 +475,7 @@ Deno.serve(async (req) => {
         bands_total: uniqueBands.size,
         bands_processed: bandsProcessed,
         bands_skipped: bandsSkipped,
+        bands_pending: bandsPending,
         new_concerts: newConcertIds.length,
         push: pushResults,
         timestamp: new Date().toISOString(),
