@@ -3,6 +3,11 @@
 -- con detección de duplicados entre fuentes. Ejecutar una vez en el SQL
 -- editor. Idempotente.
 --
+-- Nota (2026-11-13): Bandsintown se descartó tras la primera pasada (403
+-- desde Supabase) y sync-bandsintown se quitó del repo. Las columnas
+-- bandsintown_* quedan sin uso; find_matching_concert sigue siendo la
+-- comprobación de duplicados de Ticketmaster.
+--
 --   * sync-bandsintown: conciertos de las bandas seguidas leídos de su página
 --     pública de Bandsintown (Europa, sin festivales).
 --   * sync-ticketmaster-europe: conciertos de metal de 18 países europeos,

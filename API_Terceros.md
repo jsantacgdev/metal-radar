@@ -16,7 +16,7 @@ Seguimiento vivo de los requisitos de uso (términos de servicio, límites, atri
 | MapTiler | ✅ Plan gratuito (no comercial) | ❌ Plan Flex ($25/mes) |
 | Spotify | ✅ Modo desarrollo: añadir a mano a cada amigo en el dashboard | ❌ Extended Quota Mode |
 | Ticketmaster | ✅ Discovery API gratuita (bandas seguidas + metal en 18 países europeos) | ⚠️ Requisito de marca sin verificar |
-| Bandsintown | ⚠️ Lectura de su página pública (JSON-LD), sin API ni permiso: va contra sus condiciones. Uso personal a bajo volumen, se para si bloquean | ❌ Habría que pedir acceso a su API |
+| Bandsintown | ❌ Descartado: bloquea (403) las peticiones desde Supabase | ❌ Habría que pedir acceso a su API |
 | MusicBrainz | ✅ API pública, no comercial | ⚠️ Posible tier Bronze |
 | Anthropic (Claude) | ✅ Pago por uso | ✅ Sin cambios |
 | Expo Push / Firebase | ⚠️ Verificar credencial FCM V1 en EAS (requisito técnico) | ⚠️ Igual |
@@ -85,8 +85,8 @@ Seguimiento vivo de los requisitos de uso (términos de servicio, límites, atri
 Desde el 2026-11-13 también `sync-ticketmaster-europe`: clasificación `metal` en 18 países europeos, una página de 50 eventos cada 30 minutos (~50-150 llamadas al día, muy por debajo del límite). Cobertura medida ese día: Reino Unido ~528, Polonia ~140, Dinamarca ~53, Alemania ~47, España 4, Italia 2, Francia y Portugal 0. En el sur de Europa casi todo se vende por otras ticketeras sin API pública.
 
 ### Bandsintown
-**Uso:** `sync-bandsintown` lee los conciertos en Europa de las bandas seguidas desde la página pública del artista (`bandsintown.com/a/<id>`, datos estructurados schema.org `MusicEvent`). El id de artista se obtiene de MusicBrainz, sin usar su buscador.
-**Nivel actual:** sin API ni permiso, por decisión del usuario (uso personal y no comercial).
+**Uso:** ninguno. Descartado el 2026-11-13: `sync-bandsintown` leía los conciertos en Europa de las bandas seguidas desde la página pública del artista (`bandsintown.com/a/<id>`, datos estructurados schema.org `MusicEvent`, id de artista vía MusicBrainz). En la primera pasada en producción Bandsintown respondió 403 a las peticiones desde Supabase. Según lo acordado, no se esquiva el bloqueo: la función se quitó (queda en la historia de git).
+**Nivel actual:** sin uso. Notas del intento, por si se retoma:
 
 - Su `robots.txt` (gestionado por Cloudflare) permite el rastreo general (`User-agent: * Allow: /`), con `Content-Signal: search=yes, ai-train=no` y una reserva expresa de derechos bajo el art. 4 de la Directiva (UE) 2019/790 (minería de textos y datos).
 - Sus condiciones exigen aprobar cualquier uso de su API y restringen el uso de sus datos. No se pudieron leer completas (Cloudflare bloqueó la página de términos), pero leer su web de forma automatizada va casi seguro contra ellas.
@@ -158,6 +158,7 @@ Lo que no cuesta dinero pero sí tiempo: cambiar el modelo de retención de setl
 
 ## Historial
 
+- **2026-11-13** — Bandsintown descartado: responde 403 desde los servidores de Supabase. Se quita `sync-bandsintown` sin intentar esquivar el bloqueo; Ticketmaster Europa queda como única fuente nueva.
 - **2026-11-13** — Nuevas fuentes de conciertos: Ticketmaster en 18 países europeos (`sync-ticketmaster-europe`) y Bandsintown (`sync-bandsintown`, lectura de su página pública sin permiso, uso personal, se para si bloquean). MusicBrainz pasa a usarse también para obtener el id de artista de Bandsintown.
 - **2026-11-13** — Cambio de alcance: la app pasa a ser de uso privado y no comercial (autor + 3-4 amigos), sin publicar en Google Play. El resumen distingue entre el uso actual, cubierto por los planes gratuitos, y lo que haría falta si se publicara.
 - **2026-11-13** — Nominatim: corregida la caché de venues en `sync-band`, `sync-concerts` y `cron-sync-all` (el punto "caché ya existente" era incorrecto). LocationIQ pasa de requisito previo a publicar a seguro opcional.

@@ -467,15 +467,7 @@ export default function ConcertDetailScreen({ route }: Props) {
           </View>
         )}
 
-        {concert.source === 'bandsintown' && (
-          <Text variant="monoSM" color="muted" style={{ marginTop: spacing.lg }}>
-            {t('concertDetail.sourceBandsintown')}
-          </Text>
-        )}
-
-        {/* Ticketmaster es la fuente oficial; los añadidos a mano y los leídos de
-            Bandsintown pueden traer errores, así que se pueden reportar. */}
-        {concert.source !== 'ticketmaster' && (
+        {concert.source === 'user_submitted' && (
           <TouchableOpacity
             onPress={handleReport}
             disabled={reportConcert.isPending}
