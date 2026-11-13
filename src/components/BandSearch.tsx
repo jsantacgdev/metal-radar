@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { supabase } from '../lib/supabase';
+import { searchBands } from '../lib/bands';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from './ui';
 
@@ -50,20 +50,7 @@ export default function BandSearch({ onFollow, followedSpotifyIds, placeholder }
   const doSearch = async (q: string) => {
     try {
       setSearching(true);
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const res = await fetch(
-        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/search-bands?q=${encodeURIComponent(q)}`,
-        {
-          headers: {
-            Authorization: `Bearer ${session?.access_token ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
-          },
-        },
-      );
-      const json = await res.json();
-      if (json.error) throw new Error(json.error);
-      setResults(json.bands ?? []);
+      setResults(await searchBands<SearchedBand>(q));
     } catch (err: any) {
       Alert.alert(t('bandSearch.searchErrorTitle'), err.message);
     } finally {

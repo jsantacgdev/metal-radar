@@ -33,8 +33,12 @@ async function fetchBandInfo(bandId: string, lang: string): Promise<BandInfo> {
     },
     body: JSON.stringify({ band_id: bandId, lang }),
   });
-  const json = await res.json();
-  if (json.error) throw new Error(json.error);
+  const json = await res.json().catch(() => ({}));
+  // Un 546 del runtime de Supabase trae { code, message } en vez de { error }:
+  // sin comprobar res.ok se devolvería como si fueran los datos de la banda.
+  if (!res.ok || json.error) {
+    throw new Error(json.error ?? json.message ?? `HTTP ${res.status}`);
+  }
   return json;
 }
 

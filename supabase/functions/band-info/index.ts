@@ -18,6 +18,13 @@ const unauthorized = () =>
     headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
   });
 
+// Errores del cliente (4xx): no deben salir como 500.
+const jsonError = (status: number, error: string) =>
+  new Response(JSON.stringify({ error }), {
+    status,
+    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+  });
+
 const HEAVY_GENRE_REGEX =
   /metal|rock|ska|hardcore|punk|metalcore|deathcore|grunge|emo|screamo|thrash|doom|sludge|stoner|industrial|gothic|prog|alternative|nu.?metal|post.?punk|psychedelic|garage|indie/i;
 
@@ -271,7 +278,7 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const band_id = body.band_id;
     const requestedLang: Lang = body.lang === 'en' ? 'en' : 'es';
-    if (!band_id) throw new Error('Falta band_id');
+    if (!band_id) return jsonError(400, 'Falta band_id');
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -283,7 +290,9 @@ Deno.serve(async (req) => {
       .eq('id', band_id)
       .single();
 
-    if (error || !band) throw new Error('Banda no encontrada');
+    // PGRST116 = .single() sin filas: la banda no existe. Otro error es un fallo real (500).
+    if (error && error.code !== 'PGRST116') throw error;
+    if (!band) return jsonError(404, 'Banda no encontrada');
 
     const staleSince = new Date(Date.now() - STALE_DAYS * 24 * 60 * 60 * 1000).toISOString();
     const hasRichData =

@@ -17,10 +17,10 @@ async function fetchRecommendations(): Promise<RecommendedBand[]> {
     method: 'POST',
     headers: { Authorization: `Bearer ${session?.access_token}` },
   });
-  const json = await res.json();
-  // console.log('[recommendations] HTTP status:', res.status);
-  // console.log('[recommendations] response:', JSON.stringify(json, null, 2));
-  if (json.error) throw new Error(json.error);
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || json.error) {
+    throw new Error(json.error ?? json.message ?? `HTTP ${res.status}`);
+  }
   return json.recommendations ?? [];
 }
 

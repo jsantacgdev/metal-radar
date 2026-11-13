@@ -19,11 +19,10 @@ import PulsingBadge from '../components/PulsingBadge';
 import BandImage from '../components/BandImage';
 import { useFollowedBands, FollowedBand } from '../hooks/useFollowedBands';
 import { useRecommendations, RecommendedBand } from '../hooks/useRecommendations';
-import { followBand, getOrCreateBandId, syncBandConcerts } from '../lib/bands';
+import { followBand, getOrCreateBandId, searchBands, syncBandConcerts } from '../lib/bands';
 import { usePreference } from '../hooks/usePreference';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from '../components/ui';
-import { supabase } from '../lib/supabase';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RadarStackParamList } from '../navigation/RadarStack';
 import { localeFromI18n } from '../i18n';
@@ -193,19 +192,7 @@ export default function RadarScreen() {
     const timer = setTimeout(async () => {
       try {
         setSearching(true);
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        const res = await fetch(
-          `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/search-bands?q=${encodeURIComponent(searchQuery.trim())}`,
-          {
-            headers: {
-              Authorization: `Bearer ${session?.access_token ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
-            },
-          },
-        );
-        const json = await res.json();
-        setSearchResults(json.bands ?? []);
+        setSearchResults(await searchBands(searchQuery.trim()));
       } catch (err: any) {
         Alert.alert(t('common.error'), err.message);
       } finally {

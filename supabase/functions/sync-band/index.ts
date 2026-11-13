@@ -16,6 +16,13 @@ const unauthorized = () =>
     headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
   });
 
+// Errores del cliente (4xx): no deben salir como 500.
+const jsonError = (status: number, error: string) =>
+  new Response(JSON.stringify({ error }), {
+    status,
+    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+  });
+
 const NOMINATIM_HEADERS = {
   'User-Agent': 'MetalRadar/1.0 (contacto: jsantacgdev@gmail.com)',
 };
@@ -221,19 +228,20 @@ Deno.serve(async (req) => {
     if (userError || !user) return unauthorized();
 
     const { band_id, force } = await req.json();
-    if (!band_id) throw new Error('Falta band_id');
+    if (!band_id) return jsonError(400, 'Falta band_id');
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { data: ub } = await admin
+    const { data: ub, error: ubError } = await admin
       .from('user_bands')
       .select('band:bands(id, name, ticketmaster_id, last_concerts_sync_at)')
       .eq('user_id', user.id)
       .eq('band_id', band_id)
       .maybeSingle();
+    if (ubError) throw ubError;
 
     const band: any = (ub as any)?.band;
-    if (!band) throw new Error('Banda no encontrada o no seguida por el usuario');
+    if (!band) return jsonError(404, 'Banda no encontrada o no seguida por el usuario');
 
     const STALE_HOURS = 12;
     const staleSince = new Date(Date.now() - STALE_HOURS * 60 * 60 * 1000).toISOString();

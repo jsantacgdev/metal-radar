@@ -12,11 +12,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { supabase } from '../lib/supabase';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Button, FormField, Text } from '../components/ui';
 import { registerForPushNotifications } from '../lib/notifications';
-import { followBand } from '../lib/bands';
+import { followBand, searchBands } from '../lib/bands';
 import { useProfile, useUsernameAvailability } from '../hooks/useProfile';
 
 type Band = {
@@ -74,20 +73,7 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
   const doSearch = async (q: string) => {
     try {
       setSearching(true);
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const res = await fetch(
-        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/search-bands?q=${encodeURIComponent(q)}`,
-        {
-          headers: {
-            Authorization: `Bearer ${session?.access_token ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
-          },
-        },
-      );
-      const json = await res.json();
-      if (json.error) throw new Error(json.error);
-      setResults(json.bands ?? []);
+      setResults(await searchBands<Band>(q));
     } catch (err: any) {
       Alert.alert(t('onboarding.searchErrorTitle'), err.message);
     } finally {

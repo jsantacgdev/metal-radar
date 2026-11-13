@@ -80,9 +80,9 @@ export async function syncBandConcerts(
       },
       body: JSON.stringify({ band_id: bandId }),
     });
-    const json = await res.json();
-    if (json.error) {
-      console.warn('sync-band error:', json.error);
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json.error) {
+      console.warn('sync-band error:', json.error ?? json.message ?? `HTTP ${res.status}`);
       return null;
     }
     return {
@@ -93,6 +93,25 @@ export async function syncBandConcerts(
     console.warn('sync-band fetch error:', err);
     return null;
   }
+}
+
+// Búsqueda de bandas (Edge Function search-bands), compartida por el radar,
+// el onboarding y BandSearch. Cada pantalla tipa el resultado a su forma.
+export async function searchBands<T>(query: string): Promise<T[]> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) throw new Error(i18n.t('errors.noSession'));
+
+  const res = await fetch(
+    `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/search-bands?q=${encodeURIComponent(query)}`,
+    { headers: { Authorization: `Bearer ${session.access_token}` } },
+  );
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || json.error) {
+    throw new Error(json.error ?? json.message ?? `HTTP ${res.status}`);
+  }
+  return json.bands ?? [];
 }
 
 export async function getOrCreateBandId(spotify: {
