@@ -331,6 +331,8 @@
     "adminModerationButton": "Conciertos reportados",
     "syncDoneTitle": "Sincronización completada",
     "syncDoneBody": "Conciertos: {{synced}}\nDescartados: {{discarded}}\nBandas saltadas: {{skipped}}",
+    "syncPendingNote_one": "Queda {{count}} banda por sincronizar; se completará automáticamente en las próximas horas.",
+    "syncPendingNote_other": "Quedan {{count}} bandas por sincronizar; se completarán automáticamente en las próximas horas.",
     "permissionDeniedTitle": "Permiso denegado",
     "locationPermissionBody": "Necesitamos acceso a la ubicación",
     "locationSaved": "Ubicación de referencia guardada",

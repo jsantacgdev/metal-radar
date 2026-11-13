@@ -40,7 +40,7 @@ La app tiene un flujo de producto completo y navegable (onboarding → radar →
 ### Estadísticas y "Wrapped" anual
 - Estadísticas del año en curso o históricas: nº de conciertos, festivales, bandas y ciudades distintas, km recorridos, banda/género top, mejor año.
 - Detalle drill-down por estadística.
-- Póster "Wrapped": imagen estilo cartel de festival con las bandas del año repartidas en niveles (headliner, invitado especial, etc.), lista para compartir. Pensado para nov–ene, pero **hoy el banner del diario se muestra todo el año** (`isPosterAvailable()` existe en `src/lib/wrappedAvailability.ts` pero no se aplica). Además, en enero el banner usaría el año nuevo mientras `PosterScreen` genera el del año anterior (`getPosterYear`). Pendiente de decidir y corregir.
+- Póster "Wrapped": imagen estilo cartel de festival con las bandas del año repartidas en niveles (headliner, invitado especial, etc.), lista para compartir. Pensado para nov–ene, pero **hoy el banner del diario se muestra todo el año** (`isPosterAvailable()` existe en `src/lib/wrappedAvailability.ts` pero no se aplica). Además, en enero el banner usaría el año nuevo mientras `PosterScreen` genera el del año anterior (`getPosterYear`). Decisión (2026-11-13): se deja así durante el desarrollo y se corrige al pasar a producción, activando el filtro nov–ene y usando `getPosterYear()` también en el banner.
 
 ### Importación de cartel de festival (herramienta interna/admin)
 - Punto de entrada oculto (5 taps en el pie del perfil).
@@ -93,6 +93,11 @@ Pendiente, todo fuera del código (ver detalle en la sección de abajo):
 - Confirmar que la política de privacidad (enlazada desde Ajustes) esté realmente publicada, y darla de alta en Play Console (ficha + formulario Data Safety).
 - Requisitos de proveedores externos (Nominatim, Setlist.fm, Last.fm, MapTiler, Spotify, Ticketmaster, MusicBrainz...) — seguimiento vivo en **[API_Terceros.md](API_Terceros.md)**, no duplicado aquí. Estado a 2026-11-13: atribución con enlace ya añadida para Last.fm y Setlist.fm; corregida la caché de venues, de modo que Nominatim solo recibe venues nuevos y migrar a LocationIQ pasa a ser opcional; siguen pendientes la retención de datos de Setlist.fm, el plan de pago de MapTiler y la aprobación de Spotify.
 
+Pendiente en código antes de publicar:
+
+- Wrapped: activar el filtro nov–ene y usar el año de `getPosterYear()` en el banner del diario (ver "Estadísticas y Wrapped anual"). Se dejó sin activar a propósito durante el desarrollo.
+- Retención de setlists de Setlist.fm (ver [API_Terceros.md](API_Terceros.md)).
+
 ## Stack tecnológico
 
 - **App**: Expo SDK 54, React Native 0.81, React 19, TypeScript en modo estricto. A 2026-11-13 la última SDK de Expo es la 58. El target de Android (API 36) cumple el requisito actual de Google Play, pero Expo Go de la tienda ya no abre proyectos SDK 54: se desarrolla con build nativa local (`npm run android`).
@@ -126,7 +131,7 @@ Estado de cara a un lanzamiento público con tráfico real revisado el 2026-08-0
 ## Herramientas implementadas y utilizadas en el proyecto
 
 ### Edge Functions (Supabase, Deno) — `supabase/functions/*`
-- **Pipeline de sincronización**: `sync-concerts`, `sync-band`, `cron-sync-all` (programado), `fix-concert-headliners`. `cron-sync-all` procesa en cada ejecución un lote acotado (máx. 10 bandas y sin empezar bandas nuevas pasados 90 s), empezando por las sincronizadas hace más tiempo. Antes del 2026-11-13 intentaba hacerlas todas en una sola llamada y moría con 546 `WORKER_RESOURCE_LIMIT` (límite de 2 s de CPU), perdiendo el push de conciertos nuevos. La respuesta incluye `bands_pending`: si deja de bajar a 0 entre ejecuciones, hay que subir la frecuencia o el tope. `sync-concerts` (sincronización manual desde Ajustes) sigue procesando todas las bandas pendientes del usuario en una sola llamada, con el mismo riesgo si sigue muchas bandas: pendiente.
+- **Pipeline de sincronización**: `sync-concerts`, `sync-band`, `cron-sync-all` (programado), `fix-concert-headliners`. `cron-sync-all` procesa en cada ejecución un lote acotado (máx. 10 bandas y sin empezar bandas nuevas pasados 90 s), empezando por las sincronizadas hace más tiempo. Antes del 2026-11-13 intentaba hacerlas todas en una sola llamada y moría con 546 `WORKER_RESOURCE_LIMIT` (límite de 2 s de CPU), perdiendo el push de conciertos nuevos. La respuesta incluye `bands_pending`: si deja de bajar a 0 entre ejecuciones, hay que subir la frecuencia o el tope. `sync-concerts` (sincronización manual desde Ajustes y desde el mapa) aplica lo mismo con un lote más corto (máx. 10 bandas, 60 s), porque hay un usuario esperando. Lo que no entra lo completa `cron-sync-all`, y Ajustes avisa de cuántas bandas quedan pendientes. Las dos pantallas usan `syncAllConcerts` (`src/lib/sync.ts`), que comprueba `res.ok`: antes, un 546 se mostraba como "Sincronización completada" con "Conciertos: undefined".
 - **Enriquecimiento de bandas**: `enrich-bands`, `cron-enrich-bands`, `prewarm-band-members`, `update-band-popularity`, `refresh-all-bands`, `seed-bands-by-genre`, `band-info`, `search-bands`, `recommend-bands`.
 - **Ingesta de carteles de festival**: `parse-festival-poster` (IA) → `commit-festival-from-poster`.
 - **Conciertos manuales / moderación**: `submit-concert`, `report-concert`, `moderate-concert`.

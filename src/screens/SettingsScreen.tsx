@@ -15,7 +15,8 @@ import * as Location from 'expo-location';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { supabase } from '../lib/supabase';
+import { syncAllConcerts } from '../lib/sync';
+import { invalidateConcertQueries } from '../lib/queryInvalidation';
 import { useAuth } from '../hooks/useAuth';
 import { useProfile, useUsernameAvailability } from '../hooks/useProfile';
 import { usePreference } from '../hooks/usePreference';
@@ -99,25 +100,18 @@ export default function SettingsScreen() {
   const handleSyncConcerts = async () => {
     try {
       setSyncing(true);
-      const {
-        data: { session: s },
-      } = await supabase.auth.getSession();
-      const res = await fetch(
-        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/sync-concerts`,
-        {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${s?.access_token}` },
-        },
-      );
-      const json = await res.json();
-      if (json.error) throw new Error(json.error);
+      const result = await syncAllConcerts();
+      invalidateConcertQueries(queryClient);
+      const body = t('profile.syncDoneBody', {
+        synced: result.synced,
+        discarded: result.discarded,
+        skipped: result.bands_skipped,
+      });
       Alert.alert(
         t('profile.syncDoneTitle'),
-        t('profile.syncDoneBody', {
-          synced: json.synced,
-          discarded: json.discarded ?? 0,
-          skipped: json.bands_skipped ?? 0,
-        }),
+        result.bands_pending > 0
+          ? `${body}\n\n${t('profile.syncPendingNote', { count: result.bands_pending })}`
+          : body,
       );
     } catch (err: any) {
       Alert.alert(t('common.error'), err.message);

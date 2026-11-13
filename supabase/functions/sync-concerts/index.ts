@@ -27,6 +27,13 @@ const VIP_KEYWORDS = /\b(vip packages?|paquetes? vip|hospitality|meet [&y] greet
 
 const STALE_THRESHOLD_HOURS = 12;
 
+// Mismo límite que cron-sync-all (2 s de CPU por petición): con muchas bandas
+// pendientes, sincronizarlas todas en una llamada acababa en 546. Aquí además
+// hay un usuario esperando, así que el lote es corto; el resto lo completa
+// cron-sync-all cada hora (ver bands_pending en la respuesta).
+const MAX_BANDS_PER_CALL = 10;
+const TIME_BUDGET_MS = 60_000;
+
 function normalizeName(s: string): string {
   return s
     .toLowerCase()
@@ -197,23 +204,33 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Las que llevan más tiempo sin sincronizar van primero.
+    const userBandList: {
+      id: string;
+      name: string;
+      ticketmaster_id: string | null;
+      last_concerts_sync_at: string | null;
+    }[] = (userBands as any[]).map((ub) => ub.bands).filter((b) => b?.name);
+    const staleBands = userBandList
+      .filter((b) => !b.last_concerts_sync_at || b.last_concerts_sync_at <= staleSince)
+      .sort((a, b) => (a.last_concerts_sync_at ?? '').localeCompare(b.last_concerts_sync_at ?? ''));
+    const bandsSkipped = userBandList.length - staleBands.length;
+    const startedAt = Date.now();
+
     let totalConcerts = 0;
     let discardedConcerts = 0;
-    let bandsSkipped = 0;
     let bandsProcessed = 0;
+    let bandsPending = 0;
     let venuesCached = 0;
     let venuesGeocoded = 0;
 
     // Compartida entre bandas: varias bandas suelen tocar en los mismos recintos.
     const knownVenues: VenueCache = new Map();
 
-    for (const ub of userBands) {
-      const band = (ub as any).bands;
-      if (!band?.name) continue;
-
-      if (band.last_concerts_sync_at && band.last_concerts_sync_at > staleSince) {
-        bandsSkipped++;
-        continue;
+    for (const band of staleBands) {
+      if (bandsProcessed >= MAX_BANDS_PER_CALL || Date.now() - startedAt > TIME_BUDGET_MS) {
+        bandsPending = staleBands.length - bandsProcessed;
+        break;
       }
 
       bandsProcessed++;
@@ -470,6 +487,7 @@ Deno.serve(async (req) => {
         bands: userBands.length,
         bands_processed: bandsProcessed,
         bands_skipped: bandsSkipped,
+        bands_pending: bandsPending,
         venues_cached: venuesCached,
         venues_geocoded: venuesGeocoded,
       }),

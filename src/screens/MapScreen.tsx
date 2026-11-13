@@ -25,7 +25,8 @@ import BandImage from '../components/BandImage';
 import LeafletMap, { LeafletMarker } from '../components/LeafletMap';
 import { localeFromI18n } from '../i18n';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../lib/supabase';
+import { syncAllConcerts } from '../lib/sync';
+import { invalidateConcertQueries } from '../lib/queryInvalidation';
 
 type ConcertTypeFilter = 'all' | 'concerts' | 'festivals';
 type StatusFilter = 'all' | 'going' | 'interested';
@@ -247,31 +248,15 @@ export default function MapScreen() {
 
   const triggerBackgroundSync = useCallback(async () => {
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.access_token) return;
-
-      const res = await fetch(
-        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/sync-concerts`,
-        {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        },
-      );
-
-      if (res.ok) {
-        queryClient.invalidateQueries({ queryKey: ['nearbyConcerts'] });
-        queryClient.invalidateQueries({ queryKey: ['concerts'] });
-      }
+      await syncAllConcerts();
+      invalidateConcertQueries(queryClient);
     } catch (err) {
       console.warn('Background sync failed:', err);
     }
   }, [queryClient]);
 
   const handleManualRefresh = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['nearbyConcerts'] });
-    queryClient.invalidateQueries({ queryKey: ['concerts'] });
+    invalidateConcertQueries(queryClient);
 
     loadLocation(true).catch(() => {});
 

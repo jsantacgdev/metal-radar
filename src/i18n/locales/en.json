@@ -331,6 +331,8 @@
     "adminModerationButton": "Reported concerts",
     "syncDoneTitle": "Sync completed",
     "syncDoneBody": "Concerts: {{synced}}\nDiscarded: {{discarded}}\nBands skipped: {{skipped}}",
+    "syncPendingNote_one": "{{count}} band is still pending; it will sync automatically over the next few hours.",
+    "syncPendingNote_other": "{{count}} bands are still pending; they will sync automatically over the next few hours.",
     "permissionDeniedTitle": "Permission denied",
     "locationPermissionBody": "We need access to your location",
     "locationSaved": "Home location saved",
