@@ -16,6 +16,23 @@ const unauthorized = () =>
     headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
   });
 
+function yearOf(date: string | null | undefined): number | null {
+  const m = /^(\d{4})-/.exec(date ?? '');
+  return m ? Number(m[1]) : null;
+}
+
+// Misma clave que parse-festival-poster: nombre normalizado sin el año.
+function festivalKey(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^\w\s]/g, '')
+    .replace(/\b(19|20)\d{2}\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 const NOMINATIM_UA = 'MetalRadar/1.0 (https://metalradar.app)';
 const POSTERS_BUCKET = 'festival-posters';
 
@@ -162,7 +179,11 @@ Deno.serve(async (req) => {
 
     // Herramienta solo para admins: esto crea/edita festivales reales — no
     // basta con ocultar el botón en el cliente.
-    const { data: profile } = await admin.from('profiles').select('role').eq('id', user.id).single();
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
     if (profile?.role !== 'admin') {
       return new Response(JSON.stringify({ error: 'forbidden' }), {
         status: 403,
@@ -180,12 +201,34 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Protección: un cartel nunca actualiza una edición de otro año (antes un
+    // cartel de 2027 podía sobrescribir el festival de 2026). Se comprueba antes
+    // de tocar nada para no dejar un venue huérfano.
+    if (festival.id) {
+      const { data: current } = await admin
+        .from('festivals')
+        .select('start_date')
+        .eq('id', festival.id)
+        .maybeSingle();
+      const currentYear = yearOf(current?.start_date);
+      const newYear = yearOf(festival.start_date);
+      if (currentYear != null && newYear != null && currentYear !== newYear) {
+        return new Response(
+          JSON.stringify({
+            error: `El festival existente es la edición de ${currentYear} y el cartel es de ${newYear}: no se sobrescribe otra edición. Vuelve a analizar el cartel para crear la edición nueva.`,
+          }),
+          { status: 409, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
+        );
+      }
+    }
+
     const results = {
       festival_id: null as string | null,
       venue_id: null as string | null,
       created_festival: false,
       created_venue: false,
       venue_geocoded: false,
+      venue_has_coords: false,
       venue_geocode_strategy: null as 'venue' | 'city' | null,
       bands_added: 0,
       bands_created: 0,
@@ -197,8 +240,10 @@ Deno.serve(async (req) => {
     };
 
     let venueId: string;
+    let venueReused = false;
     if (festival.venue.id) {
       venueId = festival.venue.id;
+      venueReused = true;
     } else {
       const venueName = festival.venue.name || 'TBD';
 
@@ -216,6 +261,7 @@ Deno.serve(async (req) => {
 
       if (existingVenue) {
         venueId = existingVenue.id;
+        venueReused = true;
       } else {
         let lat: number | null = festival.venue.lat ?? null;
         let lng: number | null = festival.venue.lng ?? null;
@@ -249,9 +295,36 @@ Deno.serve(async (req) => {
         if (venueErr) throw new Error(`Error creando venue: ${venueErr.message}`);
         venueId = newVenue.id;
         results.created_venue = true;
+        results.venue_has_coords = lat != null && lng != null;
       }
     }
     results.venue_id = venueId;
+
+    // Un venue sin coordenadas deja el festival fuera del mapa. Si el reutilizado
+    // no las tiene (p. ej. uno creado antes cuando falló la geocodificación), se
+    // intenta geocodificar ahora en vez de arrastrarlo para siempre.
+    if (venueReused) {
+      const { data: venueRow } = await admin
+        .from('venues')
+        .select('name, city, country, lat, lng')
+        .eq('id', venueId)
+        .maybeSingle();
+      results.venue_has_coords = venueRow?.lat != null && venueRow?.lng != null;
+      if (venueRow && !results.venue_has_coords) {
+        const geo = await geocodeVenue(venueRow.name, venueRow.city, venueRow.country);
+        if (geo) {
+          const { error: geoErr } = await admin
+            .from('venues')
+            .update({ lat: geo.lat, lng: geo.lng })
+            .eq('id', venueId);
+          if (!geoErr) {
+            results.venue_has_coords = true;
+            results.venue_geocoded = true;
+            results.venue_geocode_strategy = geo.strategy;
+          }
+        }
+      }
+    }
 
     let festivalId: string;
     if (festival.id) {
@@ -262,6 +335,19 @@ Deno.serve(async (req) => {
       const { error: updErr } = await admin.from('festivals').update(updates).eq('id', festivalId);
       if (updErr) throw new Error(`Error actualizando festival: ${updErr.message}`);
     } else {
+      // Edición nueva de un festival ya conocido: hereda de la edición anterior
+      // lo que el cartel no trae (descripción, entradas, web oficial).
+      const key = festivalKey(festival.name);
+      const { data: allFestivals } = await admin
+        .from('festivals')
+        .select('name, start_date, description, ticket_url, official_url');
+      const previous = (allFestivals ?? [])
+        .filter((f: any) => {
+          const k = festivalKey(f.name);
+          return !!key && !!k && (k === key || k.includes(key) || key.includes(k));
+        })
+        .sort((a: any, b: any) => (b.start_date ?? '').localeCompare(a.start_date ?? ''))[0];
+
       const { data: newFest, error: festErr } = await admin
         .from('festivals')
         .insert({
@@ -269,6 +355,9 @@ Deno.serve(async (req) => {
           start_date: festival.start_date,
           end_date: festival.end_date,
           venue_id: venueId,
+          description: previous?.description ?? null,
+          ticket_url: previous?.ticket_url ?? null,
+          official_url: previous?.official_url ?? null,
         })
         .select('id')
         .single();

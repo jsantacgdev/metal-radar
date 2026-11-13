@@ -45,6 +45,9 @@ La app tiene un flujo de producto completo y navegable (onboarding → radar →
 ### Importación de cartel de festival (herramienta interna/admin)
 - Punto de entrada oculto (5 taps en el pie del perfil).
 - Sube una foto de un cartel → IA extrae el line-up completo (nombre, fechas, venue, bandas) → pantalla de revisión editable (bandas existentes vs. nuevas, con su nivel de cartel) → confirmación que crea/actualiza el festival, geocodifica el venue y guarda la imagen del póster.
+- Ediciones por año (desde el 2026-11-13). El festival se empareja por nombre sin el año ("Resurrection Fest" = "Resurrection Fest 2026") y solo se actualiza si coincide el año; un cartel de otro año crea una edición nueva. Esa edición nueva hereda el venue, la descripción y las URLs de la anterior, y `commit-festival-from-poster` rechaza (409) actualizar una edición de otro año. Si el venue usado no tiene coordenadas, se geocodifica al guardar y, si no lo consigue, la revisión avisa de que el festival no saldrá en el mapa.
+- Antes se emparejaba solo por nombre: el cartel de 2027 sobrescribió el Resurrection Fest 2026 (fechas, venue sin coordenadas, póster y bandas mezcladas). Se reparó con `supabase/scripts/fix-resurrection-2027-overwrite.sql` y se volvió a importar el cartel de 2027 como edición nueva.
+- El OCR del cartel se equivoca con algunos nombres (p. ej. "Bilesa"/"Eblesa" por Kylesa): hay que revisar las bandas "a crear" antes de confirmar.
 
 ### Interacción social
 - Usuario único (`username`) y seguimiento entre usuarios (solicitud pendiente/aceptada), con cuentas públicas o privadas y búsqueda de usuarios.

@@ -27,6 +27,20 @@ function normalizeName(s: string): string {
     .trim();
 }
 
+// Clave de festival sin el año: "Resurrection Fest 2026" y "Resurrection Fest"
+// son el mismo festival (en distintas ediciones).
+function festivalKey(name: string): string {
+  return normalizeName(name)
+    .replace(/\b(19|20)\d{2}\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function yearOf(date: string | null | undefined): number | null {
+  const m = /^(\d{4})-/.exec(date ?? '');
+  return m ? Number(m[1]) : null;
+}
+
 const PROMPT = `Analiza este cartel de festival de música. Devuelve EXCLUSIVAMENTE un JSON válido, sin texto antes ni después, sin markdown, sin comentarios.
 
 Estructura exacta del JSON:
@@ -77,7 +91,11 @@ Deno.serve(async (req) => {
 
     // Herramienta solo para admins: importar carteles crea/edita festivales
     // reales — no basta con ocultar el botón en el cliente.
-    const { data: profile } = await admin.from('profiles').select('role').eq('id', user.id).single();
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
     if (profile?.role !== 'admin') {
       return new Response(JSON.stringify({ error: 'forbidden' }), {
         status: 403,
@@ -150,19 +168,68 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Un festival se repite cada año con el mismo nombre. Solo es la misma
+    // edición (se actualizará) si coincide el año; si no, se creará un festival
+    // nuevo y se propone el recinto de la edición anterior. Antes se emparejaba
+    // solo por nombre y un cartel de 2027 sobrescribía el festival de 2026.
+    const parsedYear: number | null =
+      yearOf(parsed.start_date) ?? (Number.isInteger(parsed.year) ? parsed.year : null);
     let existingFestivalId: string | null = null;
+    let previousEdition: {
+      id: string;
+      name: string;
+      start_date: string | null;
+      venue_id: string | null;
+    } | null = null;
     if (parsed.festival_name) {
-      const { data: festivals } = await admin.from('festivals').select('id, name');
-      const normTarget = normalizeName(parsed.festival_name);
-      const match = (festivals ?? []).find((f: any) => {
-        const normF = normalizeName(f.name);
-        return normF === normTarget || normF.includes(normTarget) || normTarget.includes(normF);
+      const target = festivalKey(parsed.festival_name);
+      const { data: festivals } = await admin
+        .from('festivals')
+        .select('id, name, start_date, end_date, venue_id');
+      const sameFestival = (festivals ?? []).filter((f: any) => {
+        const key = festivalKey(f.name);
+        return (
+          !!target && !!key && (key === target || key.includes(target) || target.includes(key))
+        );
       });
-      existingFestivalId = match?.id ?? null;
+      const today = new Date().toISOString().split('T')[0];
+      const sameEdition = sameFestival.find((f: any) =>
+        parsedYear != null
+          ? yearOf(f.start_date) === parsedYear
+          : // Sin año en el cartel: es la misma edición la que aún no se ha celebrado.
+            !f.end_date || f.end_date >= today,
+      );
+      if (sameEdition) {
+        existingFestivalId = sameEdition.id;
+      } else if (sameFestival.length > 0) {
+        previousEdition = [...sameFestival].sort((a: any, b: any) =>
+          (b.start_date ?? '').localeCompare(a.start_date ?? ''),
+        )[0];
+      }
     }
 
     let existingVenueId: string | null = null;
-    if (parsed.venue_name) {
+    let venueName: string | null = parsed.venue_name ?? null;
+    let venueCity: string | null = parsed.city ?? null;
+    let venueCountry: string | null = parsed.country ?? null;
+
+    // Nueva edición: por defecto, el recinto de la edición anterior (se puede
+    // cambiar en la revisión; al editarlo se descarta este emparejamiento).
+    if (previousEdition?.venue_id) {
+      const { data: prevVenue } = await admin
+        .from('venues')
+        .select('id, name, city, country')
+        .eq('id', previousEdition.venue_id)
+        .maybeSingle();
+      if (prevVenue) {
+        existingVenueId = prevVenue.id;
+        venueName = prevVenue.name;
+        venueCity = prevVenue.city;
+        venueCountry = prevVenue.country;
+      }
+    }
+
+    if (!existingVenueId && parsed.venue_name) {
       const { data: venues } = await admin.from('venues').select('id, name, city');
       const normVenue = normalizeName(parsed.venue_name);
       const normCity = parsed.city ? normalizeName(parsed.city) : null;
@@ -198,11 +265,18 @@ Deno.serve(async (req) => {
           year: parsed.year ?? null,
           start_date: parsed.start_date ?? null,
           end_date: parsed.end_date ?? null,
-          venue_name: parsed.venue_name ?? null,
-          city: parsed.city ?? null,
-          country: parsed.country ?? null,
+          venue_name: venueName,
+          city: venueCity,
+          country: venueCountry,
           existing_festival_id: existingFestivalId,
           existing_venue_id: existingVenueId,
+          previous_edition: previousEdition
+            ? {
+                id: previousEdition.id,
+                name: previousEdition.name,
+                year: yearOf(previousEdition.start_date),
+              }
+            : null,
         },
         bands: matchedBands,
         stats: {

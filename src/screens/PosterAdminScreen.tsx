@@ -21,6 +21,19 @@ import { Text } from '../components/ui';
 
 type Stage = 'select' | 'processing' | 'review' | 'committing' | 'done';
 
+// supabase.functions.invoke no expone el cuerpo de una respuesta no-2xx (solo
+// "Edge Function returned a non-2xx status code"): se lee de error.context
+// para mostrar el mensaje real de la función.
+async function invokeErrorMessage(error: any): Promise<string> {
+  try {
+    const body = await error?.context?.json();
+    if (body?.error) return body.error;
+  } catch {
+    // cuerpo no JSON: se usa el mensaje genérico
+  }
+  return error?.message ?? 'Error';
+}
+
 type ParsedBand = {
   extracted_name: string;
   matched_band_id: string | null;
@@ -38,6 +51,8 @@ type ParsedFestival = {
   country: string | null;
   existing_festival_id: string | null;
   existing_venue_id: string | null;
+  // Mismo festival en otro año: se creará una edición nueva con su recinto.
+  previous_edition: { id: string; name: string; year: number | null } | null;
 };
 
 type CommitResult = {
@@ -46,6 +61,7 @@ type CommitResult = {
   created_festival: boolean;
   created_venue: boolean;
   venue_geocoded: boolean;
+  venue_has_coords: boolean;
   venue_geocode_strategy: 'venue' | 'city' | null;
   bands_added: number;
   bands_created: number;
@@ -100,7 +116,7 @@ export default function PosterAdminScreen() {
         body: { imageBase64, mediaType: 'image/jpeg' },
       });
 
-      if (error) throw error;
+      if (error) throw new Error(await invokeErrorMessage(error));
       if (data?.error) throw new Error(data.error);
 
       setFestival(data.festival);
@@ -125,7 +141,14 @@ export default function PosterAdminScreen() {
 
   const updateFestival = (field: keyof ParsedFestival, value: string) => {
     if (!festival) return;
-    setFestival({ ...festival, [field]: value.trim() || null } as ParsedFestival);
+    const next = { ...festival, [field]: value.trim() || null } as ParsedFestival;
+    // Al editar el recinto deja de valer el emparejado automático: si no, se
+    // guardaba el recinto emparejado e ignoraba lo escrito. El commit busca o
+    // crea el recinto por nombre + ciudad.
+    if (field === 'venue_name' || field === 'city' || field === 'country') {
+      next.existing_venue_id = null;
+    }
+    setFestival(next);
   };
 
   const commit = async () => {
@@ -164,7 +187,7 @@ export default function PosterAdminScreen() {
         body: payload,
       });
 
-      if (error) throw error;
+      if (error) throw new Error(await invokeErrorMessage(error));
       if (data?.error) throw new Error(data.error);
 
       setResult(data);
@@ -262,6 +285,13 @@ export default function PosterAdminScreen() {
               <View style={styles.badgeRow}>
                 {festival.existing_festival_id ? (
                   <Badge text={t('posterAdmin.badgeExisting')} tint="blood" />
+                ) : festival.previous_edition ? (
+                  <Badge
+                    text={t('posterAdmin.badgeNewEdition', {
+                      year: festival.previous_edition.year ?? '?',
+                    })}
+                    tint="green"
+                  />
                 ) : (
                   <Badge text={t('posterAdmin.badgeNew')} tint="green" />
                 )}
@@ -347,7 +377,9 @@ export default function PosterAdminScreen() {
             <View style={[styles.card, { marginTop: spacing.lg, width: '100%' }]}>
               <ResultRow
                 label={t('posterAdmin.resultFestival')}
-                value={result.created_festival ? t('posterAdmin.created') : t('posterAdmin.updated')}
+                value={
+                  result.created_festival ? t('posterAdmin.created') : t('posterAdmin.updated')
+                }
               />
               <ResultRow
                 label={t('posterAdmin.resultVenue')}
@@ -364,6 +396,12 @@ export default function PosterAdminScreen() {
                     : t('posterAdmin.venueReused')
                 }
               />
+              {!result.venue_has_coords && (
+                <ResultRow
+                  label={t('posterAdmin.resultMap')}
+                  value={t('posterAdmin.venueNoCoordsWarning')}
+                />
+              )}
               <ResultRow
                 label={t('posterAdmin.resultPoster')}
                 value={
