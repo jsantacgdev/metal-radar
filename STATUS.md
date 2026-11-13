@@ -4,11 +4,11 @@ _Última actualización: 2026-11-13_
 
 ## Estado actual
 
-Metal Radar es una app móvil (Expo/React Native) con Google Play como objetivo de publicación más cercano (Apple queda fuera por ahora). El repositorio tiene ~145 commits. El desarrollo estuvo parado del 2026-08-07 (último commit, APK de release generado en local) al 2026-11-13, cuando se retomó.
+Metal Radar es una app móvil (Expo/React Native) de **uso privado y sin fines comerciales**: para el autor y, como mucho, 3 o 4 amigos para organizarse para ir a conciertos. Desde el 2026-11-13 no se plantea publicarla en Google Play; se distribuye como APK (ver "Distribución"). El repositorio tiene ~145 commits. El desarrollo estuvo parado del 2026-08-07 (último commit, APK de release generado en local) al 2026-11-13, cuando se retomó.
 
 Desde la revisión del 2026-08-04 se añadieron: avatar de perfil real, sanciones (baneo/suspensión) a usuarios reportados, y una forma de iniciar conversaciones nuevas desde Mensajes. Al retomar (2026-11-13) se hizo una puesta al día: se verificó que todos los scripts SQL de `supabase/scripts/` están aplicados en producción, se redesplegaron las 11 Edge Functions cuyo código en producción no coincidía con el repo (ahora las 26 coinciden), `npx tsc --noEmit` vuelve a pasar (excluye `supabase/functions`, que es Deno) y `npm run lint` queda sin avisos.
 
-La app tiene un flujo de producto completo y navegable (onboarding → radar → mapa → diario → feed → perfil), con backend en Supabase en producción (proyecto ya linkado vía `supabase/.temp`). No hay suite de tests automatizados configurada; la validación se apoya en `tsc --noEmit`, ESLint y pruebas manuales. Ver "Preparación para publicación" para lo que sigue pendiente antes de subir a Play Console.
+La app tiene un flujo de producto completo y navegable (onboarding → radar → mapa → diario → feed → perfil), con backend en Supabase en producción (proyecto ya linkado vía `supabase/.temp`). No hay suite de tests automatizados configurada; la validación se apoya en `tsc --noEmit`, ESLint y pruebas manuales.
 
 ## Funcionalidades implementadas
 
@@ -40,7 +40,7 @@ La app tiene un flujo de producto completo y navegable (onboarding → radar →
 ### Estadísticas y "Wrapped" anual
 - Estadísticas del año en curso o históricas: nº de conciertos, festivales, bandas y ciudades distintas, km recorridos, banda/género top, mejor año.
 - Detalle drill-down por estadística.
-- Póster "Wrapped": imagen estilo cartel de festival con las bandas del año repartidas en niveles (headliner, invitado especial, etc.), lista para compartir. Pensado para nov–ene, pero **hoy el banner del diario se muestra todo el año** (`isPosterAvailable()` existe en `src/lib/wrappedAvailability.ts` pero no se aplica). Además, en enero el banner usaría el año nuevo mientras `PosterScreen` genera el del año anterior (`getPosterYear`). Decisión (2026-11-13): se deja así durante el desarrollo y se corrige al pasar a producción, activando el filtro nov–ene y usando `getPosterYear()` también en el banner.
+- Póster "Wrapped": imagen estilo cartel de festival con las bandas del año repartidas en niveles (headliner, invitado especial, etc.), lista para compartir. Pensado para nov–ene, pero **hoy el banner del diario se muestra todo el año** (`isPosterAvailable()` existe en `src/lib/wrappedAvailability.ts` pero no se aplica). Además, en enero el banner usaría el año nuevo mientras `PosterScreen` genera el del año anterior (`getPosterYear`). Decisión (2026-11-13): se deja así de momento. Si se cambia, sería activando el filtro nov–ene y usando `getPosterYear()` también en el banner.
 
 ### Importación de cartel de festival (herramienta interna/admin)
 - Punto de entrada oculto (5 taps en el pie del perfil).
@@ -82,28 +82,27 @@ La app tiene un flujo de producto completo y navegable (onboarding → radar →
 - Sincronización manual de conciertos bajo demanda.
 - Borrado de cuenta con purga completa de datos (perfil, bandas seguidas, conciertos, diario, fotos).
 
-## Preparación para publicación (Google Play)
+## Distribución (uso privado)
 
-Auditoría hecha el 2026-08-04 (bugs, calidad de código, checklist de Play). Ya resuelto en código: RLS de mensajes privados, reporte/bloqueo extendido al chat, `eas.json` configurado para generar App Bundle y con el scaffold de `submit.production.android`.
+Desde el 2026-11-13 la app es de uso privado y no comercial, para el autor y unos pocos amigos. No se publica en Google Play. Por eso dejan de aplicar la cuenta de Play, la política de privacidad y el formulario Data Safety, la clave de servicio de Play y los planes de pago por uso comercial (MapTiler Flex, LocationIQ, MusicBrainz Bronze, Spotify Extended Quota). El análisis de proveedores para una publicación comercial se conserva en [API_Terceros.md](API_Terceros.md), por si algún día cambia.
+
+- **Android:** APK de release generado en local (`npm run android` / Gradle; el plugin `withApkName` lo nombra `metal-radar-<versión>-release.apk`), instalado a mano permitiendo "orígenes desconocidos". El perfil `preview` de EAS también genera APK de distribución interna.
+- **iPhone:** no se puede instalar sin cuenta de Apple Developer ($99/año). No está previsto.
+- **Push en Android:** sigue haciendo falta la credencial FCM V1 en EAS (Credentials → Android → FCM). Requisito técnico, no de publicación.
+- **Spotify:** en modo desarrollo; cada amigo que quiera vincular Spotify se añade a mano en el dashboard de la app de Spotify.
 
 Ya hecho en el backend (verificado el 2026-11-13):
 - Scripts SQL aplicados en producción. Se comprobó por la API que existen las tablas y columnas de `add-cron-lock.sql`, `add-user-reports.sql`, `add-user-ban.sql` y `add-avatar-storage.sql`. `fix-direct-messages-update-grant.sql` solo cambia GRANTs y no se puede comprobar desde la API; se da por aplicado.
-- Edge Functions en producción idénticas al repo, incluido el User-Agent real de Nominatim en `cron-sync-all`/`sync-band`.
+- Edge Functions en producción idénticas al repo.
 
-Pendiente, todo fuera del código (ver detalle en la sección de abajo):
+Decisiones abiertas (ya no bloquean nada):
 
-- Generar la clave de servicio de Play Console y colocarla en `./metal-radar-play-service-account.json` (raíz del repo; ya cubierta por el patrón `metal-radar-*.json` de `.gitignore`).
-- Confirmar que la política de privacidad (enlazada desde Ajustes) esté realmente publicada, y darla de alta en Play Console (ficha + formulario Data Safety).
-- Requisitos de proveedores externos (Nominatim, Setlist.fm, Last.fm, MapTiler, Spotify, Ticketmaster, MusicBrainz...) — seguimiento vivo en **[API_Terceros.md](API_Terceros.md)**, no duplicado aquí. Estado a 2026-11-13: atribución con enlace ya añadida para Last.fm y Setlist.fm; corregida la caché de venues, de modo que Nominatim solo recibe venues nuevos y migrar a LocationIQ pasa a ser opcional; siguen pendientes la retención de datos de Setlist.fm, el plan de pago de MapTiler y la aprobación de Spotify.
-
-Pendiente en código antes de publicar:
-
-- Wrapped: activar el filtro nov–ene y usar el año de `getPosterYear()` en el banner del diario (ver "Estadísticas y Wrapped anual"). Se dejó sin activar a propósito durante el desarrollo.
-- Retención de setlists de Setlist.fm (ver [API_Terceros.md](API_Terceros.md)).
+- Wrapped: activar o no el filtro nov–ene y usar el año de `getPosterYear()` en el banner del diario (ver "Estadísticas y Wrapped anual").
+- Retención de setlists de Setlist.fm: su cláusula de no guardarlos de forma permanente aplica sea o no comercial, pero con uso privado el riesgo práctico es nulo. Se deja como está.
 
 ## Stack tecnológico
 
-- **App**: Expo SDK 54, React Native 0.81, React 19, TypeScript en modo estricto. A 2026-11-13 la última SDK de Expo es la 58. El target de Android (API 36) cumple el requisito actual de Google Play, pero Expo Go de la tienda ya no abre proyectos SDK 54: se desarrolla con build nativa local (`npm run android`).
+- **App**: Expo SDK 54, React Native 0.81, React 19, TypeScript en modo estricto. A 2026-11-13 la última SDK de Expo es la 58. Expo Go de la tienda ya no abre proyectos SDK 54: se desarrolla con build nativa local (`npm run android`).
 - **Navegación**: React Navigation (bottom tabs + native stacks) — shell en `RootNavigator` con 5 stacks (Radar, Mapa, Diario, Feed, Perfil).
 - **Estado/datos**: TanStack Query v5 + `@supabase/supabase-js`, un hook por recurso en `src/hooks/`.
 - **Backend**: Supabase (Postgres, Auth con PKCE, Storage, Edge Functions en Deno, `verify_jwt = false` con auth manual por header).
@@ -112,11 +111,11 @@ Pendiente en código antes de publicar:
 - **Monitorización de errores**: Sentry (`@sentry/react-native`), deshabilitado en desarrollo, con scrubbing de PII (IP, email, username, cuerpos de request/response).
 - **Tema**: tema oscuro único, centralizado en `src/theme/` (colores, tipografía, spacing), sin colores/fuentes hardcodeados en componentes.
 - **Calidad**: ESLint (`eslint-config-expo` flat config) + Prettier; sin test runner configurado.
-- **Build/distribución**: EAS (`eas.json`), bundle ids `com.metalradar.app` (iOS y Android), Google Services file y credencial Firebase Admin SDK presentes en el repo raíz (para push). Perfil `production` genera App Bundle para Android; `submit.production.android` ya apunta a la clave de servicio de Play (pendiente generarla, ver "Preparación para publicación"). El plugin `plugins/withApkName.js` da nombre al APK generado en local (`metal-radar-<versión>-release.apk`).
+- **Build/distribución**: EAS (`eas.json`), bundle ids `com.metalradar.app` (iOS y Android), Google Services file y credencial Firebase Admin SDK presentes en el repo raíz (para push). El perfil `production` (App Bundle) y `submit.production.android` quedaron configurados para Play pero no se usan; la distribución es el APK (ver "Distribución"). El plugin `plugins/withApkName.js` da nombre al APK generado en local (`metal-radar-<versión>-release.apk`).
 
 ## APIs de terceros de las que dependemos
 
-Estado de cara a un lanzamiento público con tráfico real revisado el 2026-08-04 — ver el detalle de qué falta en cada una en "Preparación para publicación" más arriba.
+Con uso privado y no comercial, los planes gratuitos de todas cubren el uso actual. El detalle de requisitos, incluido lo que haría falta para una publicación comercial, está en [API_Terceros.md](API_Terceros.md).
 
 | API | Uso |
 |---|---|

@@ -1,24 +1,26 @@
 # Metal Radar — Requisitos de APIs de terceros
 
-_Última actualización: 2026-08-04_
+_Última actualización: 2026-11-13_
 
 Seguimiento vivo de los requisitos de uso (términos de servicio, límites, atribución, niveles de aprobación) de cada API externa de la que depende la app. Se actualiza cada vez que se resuelve, se verifica o se descubre un requisito — no es una foto fija de una auditoría puntual. Si un requisito cambia de estado, edita su casilla y añade una línea al historial al final del documento.
 
+> **Alcance actual (desde el 2026-11-13): uso privado y no comercial**, para el autor y 3 o 4 amigos, sin publicar en Google Play. Con ese uso, los planes gratuitos o "no comerciales" de todos los proveedores bastan. La columna "Si se publicara" y el detalle por proveedor que sigue recogen lo que haría falta para una publicación comercial; se conservan por si algún día cambia el plan.
+
 ## Resumen
 
-| Proveedor | ¿Bloquea publicación? | Estado |
+| Proveedor | Uso privado actual | Si se publicara (comercial) |
 |---|---|---|
-| Nominatim (OSM) | Probablemente no, con la caché arreglada | ⚠️ User-Agent y caché de venues corregidos (2026-11-13); LocationIQ queda como seguro si crece el volumen |
-| Setlist.fm | Sí | ⚠️ Atribución añadida; retención de datos sigue incumpliendo |
-| Last.fm | Probable | ✅ Atribución añadida; uso comercial sin confirmar por escrito |
-| MapTiler | Sí | ❌ Sigue en plan gratuito ($25/mes el plan Flex que sí permite uso comercial) |
-| Spotify | Solo si se abre a todo el público | ❌ Sin resolver (Development Mode) |
-| Ticketmaster | Probablemente no | ⚠️ Requisito de marca sin verificar en detalle |
-| MusicBrainz | Ambiguo | ⚠️ Sin confirmar con MetaBrainz |
-| Anthropic (Claude) | No | ✅ Sin acción pendiente |
-| Expo Push / Firebase | No, si está bien configurado | ⚠️ Verificar credencial FCM V1 en EAS |
-| Sentry | No | ✅ Sin acción pendiente |
-| unpkg.com (CDN de maplibre-gl) | No | ⚠️ Nota de fiabilidad, no de cumplimiento |
+| Nominatim (OSM) | ✅ Uso ligero (User-Agent real y caché de venues desde 2026-11-13) | ⚠️ LocationIQ como seguro si crece el volumen |
+| Setlist.fm | ✅ Key no comercial. La cláusula de retención aplica igual, pero el riesgo práctico es nulo | ❌ Retención de setlists incumple sus términos |
+| Last.fm | ✅ Key gratuita (no comercial), atribución añadida | ⚠️ Uso comercial requiere acuerdo |
+| MapTiler | ✅ Plan gratuito (no comercial) | ❌ Plan Flex ($25/mes) |
+| Spotify | ✅ Modo desarrollo: añadir a mano a cada amigo en el dashboard | ❌ Extended Quota Mode |
+| Ticketmaster | ✅ Discovery API gratuita | ⚠️ Requisito de marca sin verificar |
+| MusicBrainz | ✅ API pública, no comercial | ⚠️ Posible tier Bronze |
+| Anthropic (Claude) | ✅ Pago por uso | ✅ Sin cambios |
+| Expo Push / Firebase | ⚠️ Verificar credencial FCM V1 en EAS (requisito técnico) | ⚠️ Igual |
+| Sentry | ✅ Plan gratuito | ✅ Sin cambios |
+| unpkg.com (CDN de maplibre-gl) | ⚠️ Nota de fiabilidad, no de cumplimiento | ⚠️ Igual |
 
 ## Detalle por proveedor
 
@@ -113,7 +115,11 @@ Seguimiento vivo de los requisitos de uso (términos de servicio, límites, atri
 
 - [ ] Nota de fiabilidad, no de cumplimiento: no hay versión empaquetada localmente ni fallback si unpkg falla. No bloquea publicación pero es un punto único de fallo para el mapa.
 
-## Coste estimado de publicación
+## Coste actual (uso privado)
+
+Prácticamente cero: Supabase, Sentry, MapTiler, Last.fm, Setlist.fm, MusicBrainz, Ticketmaster y Spotify en sus planes gratuitos. El único gasto variable es Anthropic (Claude), por uso: hoy la lectura de carteles, y las automatizaciones de carteles y conciertos si se activan (unos pocos euros al mes).
+
+## Coste estimado si se publicara (comercial)
 
 Precios verificados el 2026-08-04. No incluye Apple (fuera de alcance, ver más abajo) ni gasto en marketing/ASO.
 
@@ -140,6 +146,7 @@ Lo que no cuesta dinero pero sí tiempo: cambiar el modelo de retención de setl
 
 ## Historial
 
+- **2026-11-13** — Cambio de alcance: la app pasa a ser de uso privado y no comercial (autor + 3-4 amigos), sin publicar en Google Play. El resumen distingue entre el uso actual, cubierto por los planes gratuitos, y lo que haría falta si se publicara.
 - **2026-11-13** — Nominatim: corregida la caché de venues en `sync-band`, `sync-concerts` y `cron-sync-all` (el punto "caché ya existente" era incorrecto). LocationIQ pasa de requisito previo a publicar a seguro opcional.
 - **2026-11-13** — Desplegados `cron-sync-all` y `sync-band` con el User-Agent real de Nominatim (el arreglo del 2026-08-04 solo estaba en el repo). El resto de requisitos sigue sin cambios desde 2026-08-04; los precios no se han vuelto a verificar.
 - **2026-08-04** — Verificados precios reales (Google Play $25 único, MapTiler Flex $25/mes, MusicBrainz Bronze $100–499/mes, Supabase Pro ~$25/mes base). Encontrado candidato de sustitución para Nominatim: LocationIQ, plan gratuito que permite uso comercial con atribución. Añadida sección de coste estimado.
