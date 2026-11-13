@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -20,7 +20,6 @@ import { useAuth } from '../hooks/useAuth';
 import { getPosterYear } from '../lib/wrappedAvailability';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { Text } from '../components/ui';
-import { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');

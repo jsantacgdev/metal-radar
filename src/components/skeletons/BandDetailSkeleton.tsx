@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 import Skeleton from '../Skeleton';
-import { colors, radius, spacing } from '../../theme';
+import { colors, spacing } from '../../theme';
 
 export default function BandDetailSkeleton() {
   return (

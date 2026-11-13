@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Setlist, useRefreshSetlist } from '../hooks/useSetlist';
 import { colors, fontFamily, radius, spacing } from '../theme';
 import { InfoTooltip, Text } from './ui';
 import { localeFromI18n } from '../i18n';
-import { Alert, Linking } from 'react-native';
 import { isSpotifyLoggedIn, loginToSpotify } from '../lib/spotify-auth';
 import { exportSetlistToSpotify } from '../lib/spotify-export';
 import { useQueryClient } from '@tanstack/react-query';

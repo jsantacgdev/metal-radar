@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -22,7 +21,6 @@ import BandImage from '../components/BandImage';
 import { localeFromI18n } from '../i18n';
 import EmptyState from '../components/EmptyState';
 import DiarySkeleton from '../components/skeletons/DiarySkeleton';
-import { isPosterAvailable } from '../lib/wrappedAvailability';
 
 type Filter = 'upcoming' | 'past';
 

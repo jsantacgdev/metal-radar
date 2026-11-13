@@ -1,5 +1,5 @@
 import { StyleSheet, View, ViewStyle } from 'react-native';
-import { colors, fontFamily, radius, spacing } from '../../theme';
+import { colors, fontFamily, radius } from '../../theme';
 import Text from './Text';
 
 type Tone = 'steel' | 'blood' | 'solid';

@@ -84,7 +84,8 @@ export function useDirectMessages(otherUserId: string | null, polling: boolean =
   // Identidad estable entre renders: si no, el useEffect de ChatScreen que
   // depende de markRead se re-ejecutaría en cada render (p. ej. cada
   // pulsación de tecla en el composer), no solo al enfocar/recibir mensajes.
-  const markRead = useCallback(() => markReadMutation.mutateAsync(), [markReadMutation.mutateAsync]);
+  const { mutateAsync: markReadAsync } = markReadMutation;
+  const markRead = useCallback(() => markReadAsync(), [markReadAsync]);
 
   return {
     messages: query.data ?? [],

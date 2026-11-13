@@ -117,7 +117,7 @@ export default function PosterAdminScreen() {
   };
 
   const cycleTier = (index: number) => {
-    const cycle: Array<ParsedBand['tier']> = ['headliner', 'subheadliner', 'lineup'];
+    const cycle: ParsedBand['tier'][] = ['headliner', 'subheadliner', 'lineup'];
     const current = bands[index].tier;
     const next = cycle[(cycle.indexOf(current) + 1) % cycle.length];
     setBands(bands.map((b, i) => (i === index ? { ...b, tier: next } : b)));

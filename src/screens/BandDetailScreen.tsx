@@ -21,7 +21,6 @@ import { InfoTooltip, Text, Tag } from '../components/ui';
 import BandImage from '../components/BandImage';
 import BandDetailSkeleton from '../components/skeletons/BandDetailSkeleton';
 import { RadarStackParamList } from '../navigation/RadarStack';
-import { useLayoutEffect } from 'react';
 import { useNavigation } from '@react-navigation/native';
 
 type Props = NativeStackScreenProps<RadarStackParamList, 'BandDetail'>;

@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useConcert } from '../hooks/useConcert';
@@ -32,7 +32,6 @@ import { localeFromI18n } from '../i18n';
 import { addEventToCalendar } from '../lib/calendar';
 import ConcertDetailSkeleton from '../components/skeletons/ConcertDetailSkeleton';
 import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 type Props = NativeStackScreenProps<MapStackParamList, 'ConcertDetail'>;
 

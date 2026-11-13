@@ -63,6 +63,7 @@ export default function SettingsScreen() {
   useFocusEffect(
     useCallback(() => {
       refreshPushStatus();
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- refreshPushStatus se recrea en cada render; incluirlo re-ejecutaría el efecto de foco en bucle (hace setState)
     }, [profile?.push_token]),
   );
 

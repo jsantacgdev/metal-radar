@@ -101,6 +101,7 @@ export default function AddConcertScreen() {
     Alert.alert(t('addConcert.infoDialogTitle'), t('addConcert.infoDialogBody'), [
       { text: t('addConcert.infoDialogAck'), onPress: () => setInfoSeen(true) },
     ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setInfoSeen (usePreference) no es estable: incluirlo volvería a lanzar la alerta en cada render
   }, [isEditMode, loaded, infoSeen]);
 
   useEffect(() => {

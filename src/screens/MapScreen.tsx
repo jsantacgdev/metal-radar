@@ -1,7 +1,8 @@
-import { Animated, Easing } from 'react-native';
 import { useEffect, useMemo, useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   StyleSheet,
   TouchableOpacity,
   View,

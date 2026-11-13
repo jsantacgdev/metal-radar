@@ -33,6 +33,9 @@ export async function resolveInitialLanguage(): Promise<SupportedLanguage> {
 export async function initI18n() {
   const lng = await resolveInitialLanguage();
 
+  // Uso canónico de i18next (instancia por defecto); la regla da falso positivo
+  // porque i18next también exporta `use`/`changeLanguage` con nombre.
+  // eslint-disable-next-line import/no-named-as-default-member
   await i18n.use(initReactI18next).init({
     resources: {
       es: { translation: es },
@@ -48,6 +51,7 @@ export async function initI18n() {
 }
 
 export async function setLanguage(lang: SupportedLanguage) {
+  // eslint-disable-next-line import/no-named-as-default-member
   await i18n.changeLanguage(lang);
   await AsyncStorage.setItem(STORAGE_KEY, lang);
 }

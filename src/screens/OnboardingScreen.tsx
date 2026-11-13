@@ -68,6 +68,7 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
     }
     const timer = setTimeout(() => doSearch(query.trim()), 800);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce solo por query: doSearch se recrea en cada render y reiniciaría el temporizador (búsqueda en bucle)
   }, [query]);
 
   const doSearch = async (q: string) => {

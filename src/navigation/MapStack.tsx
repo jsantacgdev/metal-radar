@@ -1,5 +1,4 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useTranslation } from 'react-i18next';
 import MapScreen from '../screens/MapScreen';
 import ConcertDetailScreen from '../screens/ConcertDetailScreen';
 import FestivalDetailScreen from '../screens/FestivalDetailScreen';
@@ -24,7 +23,6 @@ export type MapStackParamList = {
 const Stack = createNativeStackNavigator<MapStackParamList>();
 
 export default function MapStack() {
-  const { t } = useTranslation();
 
   return (
     <Stack.Navigator
