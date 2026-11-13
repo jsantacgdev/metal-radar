@@ -4,6 +4,8 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+// Llamadas internas de process-poster-inbox (carteles subidos desde el PC).
+const CRON_SECRET = Deno.env.get('CRON_SECRET');
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -39,6 +41,25 @@ function festivalKey(name: string): string {
 function yearOf(date: string | null | undefined): number | null {
   const m = /^(\d{4})-/.exec(date ?? '');
   return m ? Number(m[1]) : null;
+}
+
+// PostgREST devuelve como mucho 1000 filas por consulta: con más de 11.000
+// bandas, un select sin paginar solo comparaba con las 1000 primeras y la
+// revisión marcaba como "a crear" bandas que ya existían.
+async function selectAll(admin: any, table: string, columns: string): Promise<any[]> {
+  const PAGE = 1000;
+  const rows: any[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await admin
+      .from(table)
+      .select(columns)
+      .order('id')
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    rows.push(...(data ?? []));
+    if (!data || data.length < PAGE) break;
+  }
+  return rows;
 }
 
 const PROMPT = `Analiza este cartel de festival de música. Devuelve EXCLUSIVAMENTE un JSON válido, sin texto antes ni después, sin markdown, sin comentarios.
@@ -78,39 +99,49 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) return unauthorized();
 
-    const userClient = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY')!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const {
-      data: { user },
-      error: userError,
-    } = await userClient.auth.getUser();
-    if (userError || !user) return unauthorized();
-
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Herramienta solo para admins: importar carteles crea/edita festivales
-    // reales — no basta con ocultar el botón en el cliente.
-    const { data: profile } = await admin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-    if (profile?.role !== 'admin') {
-      return new Response(JSON.stringify({ error: 'forbidden' }), {
-        status: 403,
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+    // process-poster-inbox (carteles subidos desde el PC al bucket
+    // festival-posters-inbox) llama con CRON_SECRET en vez de con un usuario.
+    const isInternal = !!CRON_SECRET && authHeader === `Bearer ${CRON_SECRET}`;
+    if (!isInternal) {
+      const userClient = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY')!, {
+        global: { headers: { Authorization: authHeader } },
       });
+      const {
+        data: { user },
+        error: userError,
+      } = await userClient.auth.getUser();
+      if (userError || !user) return unauthorized();
+
+      // Herramienta solo para admins: importar carteles crea/edita festivales
+      // reales — no basta con ocultar el botón en el cliente.
+      const { data: profile } = await admin
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      if (profile?.role !== 'admin') {
+        return new Response(JSON.stringify({ error: 'forbidden' }), {
+          status: 403,
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
-    const { imageBase64, mediaType = 'image/jpeg' } = await req.json();
+    // imageUrl: URL firmada del bucket festival-posters-inbox (process-poster-inbox),
+    // para no mandar pósters de varios MB en base64 dentro del JSON.
+    const { imageBase64, mediaType = 'image/jpeg', imageUrl } = await req.json();
 
-    if (!imageBase64) {
-      return new Response(JSON.stringify({ error: 'imageBase64 required' }), {
+    if (!imageBase64 && !imageUrl) {
+      return new Response(JSON.stringify({ error: 'imageBase64 or imageUrl required' }), {
         status: 400,
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
       });
     }
+    const imageSource = imageBase64
+      ? { type: 'base64', media_type: mediaType, data: imageBase64 }
+      : { type: 'url', url: imageUrl };
 
     const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -121,14 +152,15 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 4096,
+        // Un cartel grande (~180 bandas) pasa de 4096 tokens de JSON y se cortaba.
+        max_tokens: 16000,
         messages: [
           {
             role: 'user',
             content: [
               {
                 type: 'image',
-                source: { type: 'base64', media_type: mediaType, data: imageBase64 },
+                source: imageSource,
               },
               { type: 'text', text: PROMPT },
             ],
@@ -230,7 +262,7 @@ Deno.serve(async (req) => {
     }
 
     if (!existingVenueId && parsed.venue_name) {
-      const { data: venues } = await admin.from('venues').select('id, name, city');
+      const venues = await selectAll(admin, 'venues', 'id, name, city');
       const normVenue = normalizeName(parsed.venue_name);
       const normCity = parsed.city ? normalizeName(parsed.city) : null;
       const match = (venues ?? []).find((v: any) => {
@@ -241,10 +273,12 @@ Deno.serve(async (req) => {
       existingVenueId = match?.id ?? null;
     }
 
-    const { data: allBands } = await admin.from('bands').select('id, name');
+    const allBands = await selectAll(admin, 'bands', 'id, name');
     const bandsLookup = new Map<string, { id: string; name: string }>();
-    (allBands ?? []).forEach((b: any) => {
-      bandsLookup.set(normalizeName(b.name), { id: b.id, name: b.name });
+    allBands.forEach((b: any) => {
+      const key = normalizeName(b.name);
+      // Con nombres duplicados se queda la primera, como en commit (ilike + limit 1).
+      if (key && !bandsLookup.has(key)) bandsLookup.set(key, { id: b.id, name: b.name });
     });
 
     const matchedBands = (parsed.bands ?? []).map((b: any) => {

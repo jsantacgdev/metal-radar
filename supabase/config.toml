@@ -657,3 +657,9 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/moderate-user/deno.json"
 entrypoint = "./functions/moderate-user/index.ts"
+
+[functions.process-poster-inbox]
+enabled = true
+verify_jwt = false
+import_map = "./functions/process-poster-inbox/deno.json"
+entrypoint = "./functions/process-poster-inbox/index.ts"

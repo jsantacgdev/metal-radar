@@ -3,6 +3,8 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+// Llamadas internas de process-poster-inbox (carteles subidos desde el PC).
+const CRON_SECRET = Deno.env.get('CRON_SECRET');
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -58,7 +60,28 @@ type Payload = {
   }[];
   imageBase64?: string;
   mediaType?: string;
+  // Alternativa a imageBase64: URL pública del póster (propuestas automáticas
+  // de refresh-festival-lineups). Se descarga y se guarda en el bucket.
+  imageUrl?: string;
 };
+
+const MAX_POSTER_BYTES = 10 * 1024 * 1024;
+
+async function downloadPoster(url: string): Promise<{ binary: Uint8Array; mediaType: string }> {
+  if (!/^https:\/\//i.test(url)) throw new Error('imageUrl debe ser https');
+  const res = await fetch(url, {
+    headers: { 'User-Agent': 'MetalRadar/1.0 (uso personal)' },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status} al descargar el póster`);
+  const mediaType = (res.headers.get('content-type') ?? '').split(';')[0].trim();
+  if (!/^image\/(jpeg|png|webp)$/.test(mediaType)) {
+    throw new Error(`tipo de imagen no soportado: ${mediaType || 'desconocido'}`);
+  }
+  const binary = new Uint8Array(await res.arrayBuffer());
+  if (binary.byteLength > MAX_POSTER_BYTES) throw new Error('póster demasiado grande (>10 MB)');
+  return { binary, mediaType };
+}
 
 async function tryGeocode(query: string): Promise<{ lat: number; lng: number } | null> {
   try {
@@ -131,14 +154,12 @@ async function resolveOrCreateBand(
 async function uploadPosterImage(
   admin: any,
   festivalId: string,
-  imageBase64: string,
+  binary: Uint8Array,
   mediaType: string,
 ): Promise<{ publicUrl: string | null; error: string | null }> {
   try {
     const ext = mediaType.split('/')[1] ?? 'jpg';
     const fileName = `${festivalId}/festival.${ext}`;
-
-    const binary = Uint8Array.from(atob(imageBase64), (c) => c.charCodeAt(0));
 
     const { error: uploadErr } = await admin.storage.from(POSTERS_BUCKET).upload(fileName, binary, {
       contentType: mediaType,
@@ -166,33 +187,38 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) return unauthorized();
 
-    const userClient = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY')!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const {
-      data: { user },
-      error: userError,
-    } = await userClient.auth.getUser();
-    if (userError || !user) return unauthorized();
-
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Herramienta solo para admins: esto crea/edita festivales reales — no
-    // basta con ocultar el botón en el cliente.
-    const { data: profile } = await admin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-    if (profile?.role !== 'admin') {
-      return new Response(JSON.stringify({ error: 'forbidden' }), {
-        status: 403,
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+    // process-poster-inbox (carteles subidos desde el PC y revisados en
+    // Supabase) llama con CRON_SECRET en vez de con un usuario.
+    const isInternal = !!CRON_SECRET && authHeader === `Bearer ${CRON_SECRET}`;
+    if (!isInternal) {
+      const userClient = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY')!, {
+        global: { headers: { Authorization: authHeader } },
       });
+      const {
+        data: { user },
+        error: userError,
+      } = await userClient.auth.getUser();
+      if (userError || !user) return unauthorized();
+
+      // Herramienta solo para admins: esto crea/edita festivales reales — no
+      // basta con ocultar el botón en el cliente.
+      const { data: profile } = await admin
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      if (profile?.role !== 'admin') {
+        return new Response(JSON.stringify({ error: 'forbidden' }), {
+          status: 403,
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     const body = (await req.json()) as Payload;
-    const { festival, bands, imageBase64, mediaType } = body;
+    const { festival, bands, imageBase64, mediaType, imageUrl } = body;
 
     if (!festival?.name) {
       return new Response(JSON.stringify({ error: 'festival.name required' }), {
@@ -367,13 +393,22 @@ Deno.serve(async (req) => {
     }
     results.festival_id = festivalId;
 
+    let poster: { binary: Uint8Array; mediaType: string } | null = null;
     if (imageBase64) {
-      const uploaded = await uploadPosterImage(
-        admin,
-        festivalId,
-        imageBase64,
-        mediaType ?? 'image/jpeg',
-      );
+      poster = {
+        binary: Uint8Array.from(atob(imageBase64), (c) => c.charCodeAt(0)),
+        mediaType: mediaType ?? 'image/jpeg',
+      };
+    } else if (imageUrl) {
+      try {
+        poster = await downloadPoster(imageUrl);
+      } catch (err) {
+        results.image_upload_error = (err as Error).message;
+      }
+    }
+
+    if (poster) {
+      const uploaded = await uploadPosterImage(admin, festivalId, poster.binary, poster.mediaType);
       if (uploaded.publicUrl) {
         await admin
           .from('festivals')
