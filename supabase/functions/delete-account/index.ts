@@ -10,6 +10,12 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const unauthorized = () =>
+  new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+  });
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS_HEADERS });
@@ -17,7 +23,7 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) throw new Error('Missing Authorization header');
+    if (!authHeader) return unauthorized();
 
     // Validar JWT del usuario que pide borrar
     const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -28,7 +34,7 @@ Deno.serve(async (req) => {
       data: { user },
       error: userError,
     } = await userClient.auth.getUser();
-    if (userError || !user) throw new Error('Unauthorized');
+    if (userError || !user) return unauthorized();
 
     const userId = user.id;
     console.log(`[delete-account] Starting deletion for user ${userId}`);

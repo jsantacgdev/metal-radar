@@ -10,6 +10,12 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const unauthorized = () =>
+  new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+  });
+
 const NOMINATIM_HEADERS = {
   'User-Agent': 'MetalRadar/1.0 (contacto: jsantacgdev@gmail.com)',
 };
@@ -172,7 +178,7 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) throw new Error('Falta Authorization header');
+    if (!authHeader) return unauthorized();
 
     const userClient = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY')!, {
       global: { headers: { Authorization: authHeader } },
@@ -182,7 +188,7 @@ Deno.serve(async (req) => {
       data: { user },
       error: userError,
     } = await userClient.auth.getUser();
-    if (userError || !user) throw new Error('Usuario no autenticado');
+    if (userError || !user) return unauthorized();
 
     const { band_id, force } = await req.json();
     if (!band_id) throw new Error('Falta band_id');

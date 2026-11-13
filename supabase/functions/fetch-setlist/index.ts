@@ -12,6 +12,12 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const unauthorized = () =>
+  new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+  });
+
 const SETLISTFM_DELAY_MS = 600; // 2 req/s con margen
 const SPOTIFY_DELAY_MS = 250;
 
@@ -335,7 +341,7 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) throw new Error('Falta Authorization header');
+    if (!authHeader) return unauthorized();
 
     const userClient = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY')!, {
       global: { headers: { Authorization: authHeader } },
@@ -344,7 +350,7 @@ Deno.serve(async (req) => {
       data: { user },
       error: userError,
     } = await userClient.auth.getUser();
-    if (userError || !user) throw new Error('Usuario no autenticado');
+    if (userError || !user) return unauthorized();
 
     const { concertId, bandId, force } = await req.json();
     if (!concertId) {

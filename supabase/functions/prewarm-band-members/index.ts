@@ -9,6 +9,12 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const unauthorized = () =>
+  new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+  });
+
 async function getBandMembers(bandName: string, mbid: string | null): Promise<string[]> {
   try {
     let artistId = mbid;
@@ -53,7 +59,7 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) throw new Error('Falta Authorization header');
+    if (!authHeader) return unauthorized();
 
     // Valida el JWT pero usa service role para escribir
     const userClient = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY')!, {
@@ -64,7 +70,7 @@ Deno.serve(async (req) => {
       data: { user },
       error: userError,
     } = await userClient.auth.getUser();
-    if (userError || !user) throw new Error('Usuario no autenticado');
+    if (userError || !user) return unauthorized();
 
     const body = await req.json();
     const bandIds: string[] = body.band_ids ?? [];

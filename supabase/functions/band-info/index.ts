@@ -12,6 +12,12 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const unauthorized = () =>
+  new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+  });
+
 const HEAVY_GENRE_REGEX =
   /metal|rock|ska|hardcore|punk|metalcore|deathcore|grunge|emo|screamo|thrash|doom|sludge|stoner|industrial|gothic|prog|alternative|nu.?metal|post.?punk|psychedelic|garage|indie/i;
 
@@ -248,7 +254,7 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) throw new Error('Falta Authorization header');
+    if (!authHeader) return unauthorized();
 
     const isServiceRole = authHeader === `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`;
 
@@ -259,7 +265,7 @@ Deno.serve(async (req) => {
       const {
         data: { user },
       } = await userClient.auth.getUser();
-      if (!user) throw new Error('Usuario no autenticado');
+      if (!user) return unauthorized();
     }
 
     const body = await req.json();
