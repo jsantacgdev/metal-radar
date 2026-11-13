@@ -13,6 +13,10 @@ const HEAVY_GENRE_REGEX =
 
 const BATCH_SIZE = 150;
 const SPOTIFY_DELAY_MS = 200;
+// Cada banda puede costar ~0,5-0,8 s (Spotify + Last.fm + pausa): 150 bandas
+// rozan los 150 s de una Edge Function. Pasado este tiempo no se empieza
+// ninguna banda más; las que queden las coge la siguiente ejecución.
+const TIME_BUDGET_MS = 90_000;
 
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
@@ -86,6 +90,48 @@ async function getLastfmTags(artistName: string): Promise<string[]> {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+type PendingBand = { id: string; name: string; spotify_id: string | null; genres: string[] };
+
+// Hay miles de bandas sin foto (seed por género, OCR de carteles...). Primero
+// las que se ven en la app: las que alguien sigue, luego las de carteles de
+// festival y de conciertos, y el resto después. Se usa un join !inner por
+// nivel (no un .in() con miles de ids, que no cabe en la URL) y se deduplica.
+async function loadPendingBands(
+  admin: any,
+  sevenDaysAgo: string,
+): Promise<{ bands: PendingBand[]; priority: number }> {
+  const tiers = ['user_bands', 'festival_bands', 'concert_bands', null];
+  const picked = new Map<string, PendingBand>();
+  let priority = 0;
+  for (const embed of tiers) {
+    if (embed === null) priority = picked.size;
+    if (picked.size >= BATCH_SIZE) break;
+    const { data, error } = await admin
+      .from('bands')
+      .select(
+        embed
+          ? `id, name, spotify_id, genres, ${embed}!inner(band_id)`
+          : 'id, name, spotify_id, genres',
+      )
+      .is('image_url', null)
+      .or(`enrichment_attempted_at.is.null,enrichment_attempted_at.lt.${sevenDaysAgo}`)
+      .limit(BATCH_SIZE);
+    if (error) {
+      console.warn(`cron-enrich-bands: error cargando nivel ${embed ?? 'resto'}:`, error.message);
+      continue;
+    }
+    for (const b of data ?? []) {
+      if (picked.size >= BATCH_SIZE) break;
+      if (!picked.has(b.id)) {
+        picked.set(b.id, { id: b.id, name: b.name, spotify_id: b.spotify_id, genres: b.genres });
+      }
+    }
+  }
+  // Si el lote se llenó antes de llegar al nivel "resto", todo es prioritario.
+  if (picked.size >= BATCH_SIZE && priority === 0) priority = picked.size;
+  return { bands: [...picked.values()], priority };
+}
+
 Deno.serve(async (req) => {
   const authHeader = req.headers.get('Authorization');
   if (authHeader !== `Bearer ${CRON_SECRET}`) {
@@ -99,31 +145,35 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: pending } = await admin
-      .from('bands')
-      .select('id, name, spotify_id, genres')
-      .is('image_url', null)
-      .or(`enrichment_attempted_at.is.null,enrichment_attempted_at.lt.${sevenDaysAgo}`)
-      .limit(BATCH_SIZE);
+    const { bands: pending, priority } = await loadPendingBands(admin, sevenDaysAgo);
 
-    if (!pending || pending.length === 0) {
+    if (pending.length === 0) {
       return new Response(JSON.stringify({ message: 'Sin bandas pendientes', processed: 0 }), {
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
     const token = await getSpotifyToken();
+    const startedAt = Date.now();
     const results = {
       total: pending.length,
+      // Del lote, cuántas eran seguidas / de carteles / de conciertos.
+      priority,
       enriched: 0,
       not_found: 0,
       rejected_genre: 0,
       errors: 0,
       rate_limited: false,
+      stopped_by_time_budget: false,
+      remaining: null as number | null,
     };
 
     for (const band of pending) {
       if (results.rate_limited) break;
+      if (Date.now() - startedAt > TIME_BUDGET_MS) {
+        results.stopped_by_time_budget = true;
+        break;
+      }
 
       try {
         const spotifyData = await searchSpotifyArtist(band.name, token);
@@ -189,6 +239,15 @@ Deno.serve(async (req) => {
         }
       }
     }
+
+    // Pendientes tras esta ejecución (mismo filtro que arriba), para vigilar si
+    // la frecuencia del cron basta.
+    const { count: remaining } = await admin
+      .from('bands')
+      .select('id', { count: 'exact', head: true })
+      .is('image_url', null)
+      .or(`enrichment_attempted_at.is.null,enrichment_attempted_at.lt.${sevenDaysAgo}`);
+    results.remaining = remaining ?? null;
 
     return new Response(JSON.stringify(results), {
       headers: { 'Content-Type': 'application/json' },
