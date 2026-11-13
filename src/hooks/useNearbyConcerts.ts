@@ -24,6 +24,34 @@ export type ConcertWithDetails = {
   user_status: 'interested' | 'going' | 'attended' | null;
 };
 
+// 'mine': conciertos y festivales de las bandas que sigues (en cualquier sitio).
+// 'all': además, todo lo que haya en tu radio, sigas o no a la banda (p. ej. lo
+// que trae sync-ticketmaster-europe).
+export type ConcertScope = 'mine' | 'all';
+
+// .in('id', ids) va en la URL: con cientos de ids se pasa del límite, así que
+// se consulta en bloques.
+const IN_CHUNK = 100;
+
+async function selectInChunks(
+  ids: string[],
+  query: (chunk: string[]) => PromiseLike<{ data: any[] | null; error: any }>,
+): Promise<any[]> {
+  const out: any[] = [];
+  for (let i = 0; i < ids.length; i += IN_CHUNK) {
+    const { data, error } = await query(ids.slice(i, i + IN_CHUNK));
+    if (error) throw error;
+    out.push(...(data ?? []));
+  }
+  return out;
+}
+
+function boundingBox(lat: number, lng: number, radiusKm: number) {
+  const dLat = radiusKm / 111;
+  const dLng = radiusKm / (111 * Math.max(Math.cos((lat * Math.PI) / 180), 0.01));
+  return { minLat: lat - dLat, maxLat: lat + dLat, minLng: lng - dLng, maxLng: lng + dLng };
+}
+
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371;
   const toRad = (d: number) => (d * Math.PI) / 180;
@@ -35,64 +63,98 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number): numb
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
-async function fetchNearbyConcerts(userLat: number, userLng: number) {
+async function fetchNearbyConcerts(
+  userLat: number,
+  userLng: number,
+  scope: ConcertScope,
+  radiusKm: number,
+) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error(i18n.t('errors.noSession'));
 
+  const nowIso = new Date().toISOString();
+  const today = nowIso.split('T')[0];
+
   const { data: followedConcertRows, error: fcError } = await supabase
     .from('concerts')
     .select('id, concert_bands!inner ( band:bands!inner ( user_bands!inner ( user_id ) ) )')
-    .gte('event_date', new Date().toISOString())
+    .gte('event_date', nowIso)
     .eq('concert_bands.band.user_bands.user_id', user.id);
 
   if (fcError) throw fcError;
-  const concertIds = (followedConcertRows ?? []).map((c: any) => c.id);
+  const concertIds = new Set((followedConcertRows ?? []).map((c: any) => c.id as string));
 
   const { data: followedFestivalRows, error: ffError } = await supabase
     .from('festivals')
     .select('id, festival_bands!inner ( band:bands!inner ( user_bands!inner ( user_id ) ) )')
-    .gte('end_date', new Date().toISOString().split('T')[0])
+    .gte('end_date', today)
     .eq('festival_bands.band.user_bands.user_id', user.id);
 
   if (ffError) throw ffError;
-  const festivalIds = (followedFestivalRows ?? []).map((f: any) => f.id);
+  const festivalIds = new Set((followedFestivalRows ?? []).map((f: any) => f.id as string));
 
-  if (concertIds.length === 0 && festivalIds.length === 0) return [];
+  if (scope === 'all') {
+    // Todo lo que hay en el rectángulo que contiene tu radio (el filtro exacto
+    // por distancia se hace abajo con haversine).
+    const box = boundingBox(userLat, userLng, radiusKm);
+    const [{ data: areaConcerts, error: acError }, { data: areaFestivals, error: afError }] =
+      await Promise.all([
+        supabase
+          .from('concerts')
+          .select('id, venue:venues!inner ( lat, lng )')
+          .gte('event_date', nowIso)
+          .lt('report_count', 2)
+          .gte('venue.lat', box.minLat)
+          .lte('venue.lat', box.maxLat)
+          .gte('venue.lng', box.minLng)
+          .lte('venue.lng', box.maxLng)
+          .limit(1000),
+        supabase
+          .from('festivals')
+          .select('id, venue:venues!inner ( lat, lng )')
+          .gte('end_date', today)
+          .gte('venue.lat', box.minLat)
+          .lte('venue.lat', box.maxLat)
+          .gte('venue.lng', box.minLng)
+          .lte('venue.lng', box.maxLng)
+          .limit(200),
+      ]);
+    if (acError) throw acError;
+    if (afError) throw afError;
+    (areaConcerts ?? []).forEach((c: any) => concertIds.add(c.id));
+    (areaFestivals ?? []).forEach((f: any) => festivalIds.add(f.id));
+  }
 
-  const { data: concertsData, error: cError } = concertIds.length
-    ? await supabase
-        .from('concerts')
-        .select(
-          `
+  if (concertIds.size === 0 && festivalIds.size === 0) return [];
+
+  const concertsData = await selectInChunks([...concertIds], (chunk) =>
+    supabase
+      .from('concerts')
+      .select(
+        `
       id, event_date, ticket_url, price_min, price_max, currency, report_count,
       venue:venues!inner ( id, name, city, country, lat, lng ),
       concert_bands ( is_headliner, band:bands ( id, name, image_url ) )
     `,
-        )
-        .in('id', concertIds)
-        .lt('report_count', 2)
-        .order('event_date', { ascending: true })
-    : { data: [] as any[], error: null };
+      )
+      .in('id', chunk)
+      .lt('report_count', 2),
+  );
 
-  if (cError) throw cError;
-
-  const { data: festivalsData, error: fError } = festivalIds.length
-    ? await supabase
-        .from('festivals')
-        .select(
-          `
+  const festivalsData = await selectInChunks([...festivalIds], (chunk) =>
+    supabase
+      .from('festivals')
+      .select(
+        `
       id, name, description, start_date, end_date, ticket_url,
       venue:venues!inner ( id, name, city, country, lat, lng ),
       festival_bands ( is_headliner, band:bands ( id, name, image_url ) )
     `,
-        )
-        .in('id', festivalIds)
-        .order('start_date', { ascending: true })
-    : { data: [] as any[], error: null };
-
-  if (fError) throw fError;
+      )
+      .in('id', chunk),
+  );
 
   const { data: userConcertsData } = await supabase
     .from('user_concerts')
@@ -189,12 +251,14 @@ export function useNearbyConcerts(
   userLat: number | null,
   userLng: number | null,
   radiusKm: number,
+  scope: ConcertScope = 'mine',
 ) {
   const enabled = userLat != null && userLng != null;
 
   const query = useQuery({
-    queryKey: ['nearbyConcerts', userLat, userLng],
-    queryFn: () => fetchNearbyConcerts(userLat!, userLng!),
+    // El radio solo cambia la consulta en modo 'all'.
+    queryKey: ['nearbyConcerts', userLat, userLng, scope, scope === 'all' ? radiusKm : null],
+    queryFn: () => fetchNearbyConcerts(userLat!, userLng!, scope, radiusKm),
     enabled,
   });
 

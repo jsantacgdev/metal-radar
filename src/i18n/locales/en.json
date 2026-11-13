@@ -159,6 +159,9 @@
     "noLocationDesc": "Enable GPS or set your home location in your profile",
     "headerSummaryHome": "{{total}} CONCERTS · FROM HOME LOCATION",
     "filtersTitle": "Filters",
+    "filterScopeLabel": "BANDS",
+    "filterScopeMine": "My bands",
+    "filterScopeAll": "All",
     "filterTypeLabel": "EVENT TYPE",
     "filterTypeAll": "All",
     "filterTypeConcerts": "Concerts",
@@ -249,6 +252,7 @@
     "buyTickets": "Buy tickets",
     "shareMessage": "🤘 Going to see {{band}} on {{date}} in {{place}}. Wanna join?",
     "reportButton": "Report as incorrect",
+    "sourceBandsintown": "Source: Bandsintown",
     "reportThanks": "Thanks, we've logged it"
   },
   "festivalDetail": {

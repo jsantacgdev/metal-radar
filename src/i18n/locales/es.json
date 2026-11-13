@@ -159,6 +159,9 @@
     "noLocationDesc": "Activa el GPS o configura tu ubicación de referencia en el perfil",
     "headerSummaryHome": "{{total}} CONCIERTOS · DESDE UBICACIÓN BASE",
     "filtersTitle": "Filtros",
+    "filterScopeLabel": "BANDAS",
+    "filterScopeMine": "Mis bandas",
+    "filterScopeAll": "Todas",
     "filterTypeLabel": "TIPO DE EVENTO",
     "filterTypeAll": "Todos",
     "filterTypeConcerts": "Conciertos",
@@ -249,6 +252,7 @@
     "buyTickets": "Comprar entradas",
     "shareMessage": "🤘 Voy a ver a {{band}} el {{date}} en {{place}}. ¿Te vienes?",
     "reportButton": "Reportar como incorrecto",
+    "sourceBandsintown": "Fuente: Bandsintown",
     "reportThanks": "Gracias, lo hemos registrado"
   },
   "festivalDetail": {

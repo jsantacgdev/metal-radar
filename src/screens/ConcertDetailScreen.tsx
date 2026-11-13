@@ -371,11 +371,15 @@ export default function ConcertDetailScreen({ route }: Props) {
           </View>
         </Section>
 
-        <View style={{ paddingHorizontal: spacing.xl, marginTop: spacing.lg, marginBottom: spacing.md }}>
+        <View
+          style={{ paddingHorizontal: spacing.xl, marginTop: spacing.lg, marginBottom: spacing.md }}
+        >
           <WhoIsGoingRow
             targetType="concert"
             targetId={concert.id}
-            onPress={() => navigation.navigate('WhoIsGoing', { targetType: 'concert', targetId: concert.id })}
+            onPress={() =>
+              navigation.navigate('WhoIsGoing', { targetType: 'concert', targetId: concert.id })
+            }
           />
         </View>
 
@@ -463,7 +467,15 @@ export default function ConcertDetailScreen({ route }: Props) {
           </View>
         )}
 
-        {concert.source === 'user_submitted' && (
+        {concert.source === 'bandsintown' && (
+          <Text variant="monoSM" color="muted" style={{ marginTop: spacing.lg }}>
+            {t('concertDetail.sourceBandsintown')}
+          </Text>
+        )}
+
+        {/* Ticketmaster es la fuente oficial; los añadidos a mano y los leídos de
+            Bandsintown pueden traer errores, así que se pueden reportar. */}
+        {concert.source !== 'ticketmaster' && (
           <TouchableOpacity
             onPress={handleReport}
             disabled={reportConcert.isPending}

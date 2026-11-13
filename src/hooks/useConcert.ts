@@ -11,7 +11,7 @@ export type ConcertDetail = {
   price_max: number | null;
   currency: string | null;
   status: string;
-  source: 'ticketmaster' | 'user_submitted';
+  source: 'ticketmaster' | 'user_submitted' | 'bandsintown';
   reportCount: number;
   venue: {
     id: string;

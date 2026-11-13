@@ -15,7 +15,8 @@ Seguimiento vivo de los requisitos de uso (términos de servicio, límites, atri
 | Last.fm | ✅ Key gratuita (no comercial), atribución añadida | ⚠️ Uso comercial requiere acuerdo |
 | MapTiler | ✅ Plan gratuito (no comercial) | ❌ Plan Flex ($25/mes) |
 | Spotify | ✅ Modo desarrollo: añadir a mano a cada amigo en el dashboard | ❌ Extended Quota Mode |
-| Ticketmaster | ✅ Discovery API gratuita | ⚠️ Requisito de marca sin verificar |
+| Ticketmaster | ✅ Discovery API gratuita (bandas seguidas + metal en 18 países europeos) | ⚠️ Requisito de marca sin verificar |
+| Bandsintown | ⚠️ Lectura de su página pública (JSON-LD), sin API ni permiso: va contra sus condiciones. Uso personal a bajo volumen, se para si bloquean | ❌ Habría que pedir acceso a su API |
 | MusicBrainz | ✅ API pública, no comercial | ⚠️ Posible tier Bronze |
 | Anthropic (Claude) | ✅ Pago por uso | ✅ Sin cambios |
 | Expo Push / Firebase | ⚠️ Verificar credencial FCM V1 en EAS (requisito técnico) | ⚠️ Igual |
@@ -80,6 +81,17 @@ Seguimiento vivo de los requisitos de uso (términos de servicio, límites, atri
 - [ ] Vigilar el límite de 5.000 llamadas/día y 5 req/seg bajo uso real — no hay alarma ni backoff explícito hoy si se supera.
 
 **Próxima acción:** leer developer.ticketmaster.com/support/terms-of-use con calma y decidir si hace falta añadir atribución visible en la app.
+
+Desde el 2026-11-13 también `sync-ticketmaster-europe`: clasificación `metal` en 18 países europeos, una página de 50 eventos cada 30 minutos (~50-150 llamadas al día, muy por debajo del límite). Cobertura medida ese día: Reino Unido ~528, Polonia ~140, Dinamarca ~53, Alemania ~47, España 4, Italia 2, Francia y Portugal 0. En el sur de Europa casi todo se vende por otras ticketeras sin API pública.
+
+### Bandsintown
+**Uso:** `sync-bandsintown` lee los conciertos en Europa de las bandas seguidas desde la página pública del artista (`bandsintown.com/a/<id>`, datos estructurados schema.org `MusicEvent`). El id de artista se obtiene de MusicBrainz, sin usar su buscador.
+**Nivel actual:** sin API ni permiso, por decisión del usuario (uso personal y no comercial).
+
+- Su `robots.txt` (gestionado por Cloudflare) permite el rastreo general (`User-agent: * Allow: /`), con `Content-Signal: search=yes, ai-train=no` y una reserva expresa de derechos bajo el art. 4 de la Directiva (UE) 2019/790 (minería de textos y datos).
+- Sus condiciones exigen aprobar cualquier uso de su API y restringen el uso de sus datos. No se pudieron leer completas (Cloudflare bloqueó la página de términos), pero leer su web de forma automatizada va casi seguro contra ellas.
+- Medidas: volumen bajo (cada banda una vez al día, solo bandas seguidas), User-Agent identificable con contacto, y **parar si hay bloqueo** (403/429/503 o página de comprobación) sin esquivarlo.
+- Alternativa limpia: pedir acceso a su API por email.
 
 ### MusicBrainz
 **Uso:** metadatos canónicos de banda, relaciones de artistas (formación, miembros).
@@ -146,6 +158,7 @@ Lo que no cuesta dinero pero sí tiempo: cambiar el modelo de retención de setl
 
 ## Historial
 
+- **2026-11-13** — Nuevas fuentes de conciertos: Ticketmaster en 18 países europeos (`sync-ticketmaster-europe`) y Bandsintown (`sync-bandsintown`, lectura de su página pública sin permiso, uso personal, se para si bloquean). MusicBrainz pasa a usarse también para obtener el id de artista de Bandsintown.
 - **2026-11-13** — Cambio de alcance: la app pasa a ser de uso privado y no comercial (autor + 3-4 amigos), sin publicar en Google Play. El resumen distingue entre el uso actual, cubierto por los planes gratuitos, y lo que haría falta si se publicara.
 - **2026-11-13** — Nominatim: corregida la caché de venues en `sync-band`, `sync-concerts` y `cron-sync-all` (el punto "caché ya existente" era incorrecto). LocationIQ pasa de requisito previo a publicar a seguro opcional.
 - **2026-11-13** — Desplegados `cron-sync-all` y `sync-band` con el User-Agent real de Nominatim (el arreglo del 2026-08-04 solo estaba en el repo). El resto de requisitos sigue sin cambios desde 2026-08-04; los precios no se han vuelto a verificar.

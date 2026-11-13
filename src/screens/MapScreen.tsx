@@ -16,7 +16,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { useNearbyConcerts, ConcertWithDetails } from '../hooks/useNearbyConcerts';
+import { useNearbyConcerts, ConcertWithDetails, ConcertScope } from '../hooks/useNearbyConcerts';
 import { MapStackParamList } from '../navigation/MapStack';
 import { useProfile } from '../hooks/useProfile';
 import { colors, fontFamily, radius, spacing } from '../theme';
@@ -61,6 +61,8 @@ export default function MapScreen() {
   } | null>(null);
   const [typeFilter, setTypeFilter] = useState<ConcertTypeFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  // 'mine': solo bandas que sigues; 'all': todo lo que hay en tu radio.
+  const [scopeFilter, setScopeFilter] = useState<ConcertScope>('mine');
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const radiusKm = profile?.search_radius_km ?? 500;
@@ -69,7 +71,9 @@ export default function MapScreen() {
     location?.lat ?? null,
     location?.lng ?? null,
     radiusKm,
+    scopeFilter,
   );
+  const filtersActive = typeFilter !== 'all' || statusFilter !== 'all' || scopeFilter !== 'mine';
 
   const spinValue = useRef(new Animated.Value(0)).current;
 
@@ -97,16 +101,18 @@ export default function MapScreen() {
           const parsed = JSON.parse(raw);
           if (parsed.typeFilter) setTypeFilter(parsed.typeFilter);
           if (parsed.statusFilter) setStatusFilter(parsed.statusFilter);
+          if (parsed.scopeFilter) setScopeFilter(parsed.scopeFilter);
         } catch {}
       })
       .catch(() => {});
   }, []);
 
   useEffect(() => {
-    AsyncStorage.setItem(FILTERS_CACHE_KEY, JSON.stringify({ typeFilter, statusFilter })).catch(
-      () => {},
-    );
-  }, [typeFilter, statusFilter]);
+    AsyncStorage.setItem(
+      FILTERS_CACHE_KEY,
+      JSON.stringify({ typeFilter, statusFilter, scopeFilter }),
+    ).catch(() => {});
+  }, [typeFilter, statusFilter, scopeFilter]);
 
   const spin = spinValue.interpolate({
     inputRange: [0, 1],
@@ -367,9 +373,7 @@ export default function MapScreen() {
             <Ionicons
               name="options-outline"
               size={18}
-              color={
-                typeFilter !== 'all' || statusFilter !== 'all' ? colors.bloodBright : colors.silver
-              }
+              color={filtersActive ? colors.bloodBright : colors.silver}
             />
           </TouchableOpacity>
           <TouchableOpacity
@@ -571,6 +575,22 @@ export default function MapScreen() {
             </View>
 
             <Text variant="monoMD" color="muted" style={styles.filterLabel}>
+              {t('map.filterScopeLabel')}
+            </Text>
+            <View style={styles.filterRow}>
+              <FilterPill
+                label={t('map.filterScopeMine')}
+                active={scopeFilter === 'mine'}
+                onPress={() => setScopeFilter('mine')}
+              />
+              <FilterPill
+                label={t('map.filterScopeAll')}
+                active={scopeFilter === 'all'}
+                onPress={() => setScopeFilter('all')}
+              />
+            </View>
+
+            <Text variant="monoMD" color="muted" style={styles.filterLabel}>
               {t('map.filterTypeLabel')}
             </Text>
             <View style={styles.filterRow}>
@@ -612,12 +632,13 @@ export default function MapScreen() {
               />
             </View>
 
-            {(typeFilter !== 'all' || statusFilter !== 'all') && (
+            {filtersActive && (
               <TouchableOpacity
                 style={styles.clearFiltersBtn}
                 onPress={() => {
                   setTypeFilter('all');
                   setStatusFilter('all');
+                  setScopeFilter('mine');
                 }}
                 activeOpacity={0.7}
               >

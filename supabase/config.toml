@@ -663,3 +663,15 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/process-poster-inbox/deno.json"
 entrypoint = "./functions/process-poster-inbox/index.ts"
+
+[functions.sync-ticketmaster-europe]
+enabled = true
+verify_jwt = false
+import_map = "./functions/sync-ticketmaster-europe/deno.json"
+entrypoint = "./functions/sync-ticketmaster-europe/index.ts"
+
+[functions.sync-bandsintown]
+enabled = true
+verify_jwt = false
+import_map = "./functions/sync-bandsintown/deno.json"
+entrypoint = "./functions/sync-bandsintown/index.ts"

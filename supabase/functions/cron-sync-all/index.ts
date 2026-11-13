@@ -102,6 +102,56 @@ async function loadKnownVenues(admin: any, events: TmEvent[], cache: VenueCache)
   for (const v of data ?? []) cache.set(v.ticketmaster_id, v.id);
 }
 
+// Duplicados entre fuentes (Ticketmaster, Bandsintown, manuales): antes de
+// crear un concierto de Ticketmaster se busca el mismo concierto con
+// find_matching_concert (misma banda, ±18 h, recinto a <3 km o misma ciudad).
+// Si ya existe sin ticketmaster_id (p. ej. de Bandsintown) se le asigna; si
+// existe con otro ticketmaster_id (otro listado del mismo concierto) se reutiliza.
+async function upsertTicketmasterConcert(
+  admin: any,
+  ev: TmEvent,
+  bandIds: string[],
+  row: Record<string, unknown>,
+): Promise<{ id: string; isNew: boolean } | null> {
+  const { data: existing } = await admin
+    .from('concerts')
+    .select('id')
+    .eq('ticketmaster_id', ev.id)
+    .maybeSingle();
+  if (existing) {
+    await admin.from('concerts').update(row).eq('id', existing.id);
+    return { id: existing.id, isNew: false };
+  }
+
+  const venue = ev._embedded?.venues?.[0];
+  const lat = venue?.location ? parseFloat(venue.location.latitude) : NaN;
+  const lng = venue?.location ? parseFloat(venue.location.longitude) : NaN;
+  const { data: matches } = await admin.rpc('find_matching_concert', {
+    p_band_ids: bandIds,
+    p_event_date: row.event_date,
+    p_lat: Number.isFinite(lat) ? lat : null,
+    p_lng: Number.isFinite(lng) ? lng : null,
+    p_city: venue?.city?.name ?? null,
+  });
+  const match = matches?.[0];
+  if (match) {
+    if (!match.ticketmaster_id) {
+      await admin
+        .from('concerts')
+        .update({ ...row, ticketmaster_id: ev.id })
+        .eq('id', match.id);
+    }
+    return { id: match.id, isNew: false };
+  }
+
+  const { data: inserted } = await admin
+    .from('concerts')
+    .insert({ ...row, ticketmaster_id: ev.id, source: 'ticketmaster' })
+    .select('id')
+    .single();
+  return inserted ? { id: inserted.id, isNew: true } : null;
+}
+
 function isRealBand(attr: any): boolean {
   if (!attr.name) return false;
   if (NON_BAND_NAME.test(attr.name)) return false;
@@ -346,33 +396,19 @@ Deno.serve(async (req) => {
           }
 
           const priceRange = ev.priceRanges?.[0];
-          const { data: existing } = await admin
-            .from('concerts')
-            .select('id')
-            .eq('ticketmaster_id', ev.id)
-            .maybeSingle();
-
-          const { data: concertRow } = await admin
-            .from('concerts')
-            .upsert(
-              {
-                ticketmaster_id: ev.id,
-                venue_id: venueId,
-                event_date: eventDate,
-                ticket_url: ev.url,
-                price_min: priceRange?.min ?? null,
-                price_max: priceRange?.max ?? null,
-                currency: priceRange?.currency ?? null,
-                last_synced_at: new Date().toISOString(),
-              },
-              { onConflict: 'ticketmaster_id' },
-            )
-            .select('id')
-            .single();
+          const concertRow = await upsertTicketmasterConcert(admin, ev, [band.id], {
+            venue_id: venueId,
+            event_date: eventDate,
+            ticket_url: ev.url,
+            price_min: priceRange?.min ?? null,
+            price_max: priceRange?.max ?? null,
+            currency: priceRange?.currency ?? null,
+            last_synced_at: new Date().toISOString(),
+          });
 
           if (!concertRow) continue;
 
-          if (!existing) {
+          if (concertRow.isNew) {
             newConcertIds.push(concertRow.id);
           }
 

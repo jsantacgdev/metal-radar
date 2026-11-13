@@ -21,6 +21,8 @@ La app tiene un flujo de producto completo y navegable (onboarding → radar →
 ### Mapa
 - Conciertos y festivales cercanos a la ubicación del usuario (o ubicación "home" de referencia), por distancia real (haversine).
 - Marcadores agrupados por venue; radio de búsqueda configurable; conciertos fuera de radio se listan aparte.
+- Filtro "Bandas: Mis bandas / Todas" (desde el 2026-11-13). "Mis bandas" muestra solo lo de las bandas que sigues; "Todas" añade todo lo que haya dentro del radio, sigas o no a la banda (descubrimiento, sobre todo con lo que trae `sync-ticketmaster-europe`).
+- Fuentes de conciertos: Ticketmaster (bandas seguidas y metal en 18 países europeos), Bandsintown (bandas seguidas, Europa) y conciertos añadidos a mano. El mismo concierto de varias fuentes se guarda una sola vez (ver "Pipeline de sincronización").
 
 ### Ficha de banda
 - Bio, año de formación, género(s), país (con bandera), popularidad.
@@ -142,6 +144,11 @@ Con uso privado y no comercial, los planes gratuitos de todas cubren el uso actu
 
 ### Edge Functions (Supabase, Deno) — `supabase/functions/*`
 - **Pipeline de sincronización**: `sync-concerts`, `sync-band`, `cron-sync-all` (programado), `fix-concert-headliners`. `cron-sync-all` procesa en cada ejecución un lote acotado (máx. 10 bandas y sin empezar bandas nuevas pasados 90 s), empezando por las sincronizadas hace más tiempo. Antes del 2026-11-13 intentaba hacerlas todas en una sola llamada y moría con 546 `WORKER_RESOURCE_LIMIT` (límite de 2 s de CPU), perdiendo el push de conciertos nuevos. La respuesta incluye `bands_pending`: si deja de bajar a 0 entre ejecuciones, hay que subir la frecuencia o el tope. `sync-concerts` (sincronización manual desde Ajustes y desde el mapa) aplica lo mismo con un lote más corto (máx. 10 bandas, 60 s), porque hay un usuario esperando. Lo que no entra lo completa `cron-sync-all`, y Ajustes avisa de cuántas bandas quedan pendientes. Las dos pantallas usan `syncAllConcerts` (`src/lib/sync.ts`), que comprueba `res.ok`: antes, un 546 se mostraba como "Sincronización completada" con "Conciertos: undefined".
+  - **Más fuentes (desde el 2026-11-13):**
+    - `sync-ticketmaster-europe` (cron cada 30 min): conciertos de metal (clasificación `metal`) en 18 países europeos, sigas o no a la banda. Recorre una página de 50 eventos por país y guarda su avance en `ticketmaster_europe_sync`. Medido ese día: Reino Unido ~528, Polonia ~140, Dinamarca ~53, Alemania ~47, España 4, Francia y Portugal 0.
+    - `sync-bandsintown` (cron cada hora): conciertos en Europa de las bandas seguidas, leídos del JSON-LD (schema.org `MusicEvent`) de su página pública de Bandsintown. El artista se obtiene de los enlaces de MusicBrainz (`bands.musicbrainz_mbid` → `bands.bandsintown_id`). Omite las actuaciones en festivales y lo de fuera de Europa. Convierte la hora local a UTC según el país del recinto, con el horario de verano europeo, y obtiene ciudad y país del recinto por geocodificación inversa (Bandsintown no los da). Va contra las condiciones de Bandsintown: es un uso personal a bajo volumen (cada banda una vez al día) con User-Agent identificable. Si recibe un bloqueo se para y lo indica en `blocked`; no se esquiva.
+    - Duplicados: `find_matching_concert` (SQL) considera el mismo concierto si comparten banda, la fecha está a ±18 h y el recinto a menos de ~3 km o en la misma ciudad. Las cinco funciones la consultan antes de crear un concierto: Ticketmaster enlaza el suyo a uno existente de Bandsintown o manual (o reutiliza otro listado del mismo concierto), y Bandsintown se añade a uno ya existente en vez de duplicarlo.
+    - Los conciertos de Bandsintown (`source = 'bandsintown'`) muestran la fuente en la ficha y se pueden reportar.
 - **Enriquecimiento de bandas**: `enrich-bands`, `cron-enrich-bands`, `prewarm-band-members`, `update-band-popularity`, `refresh-all-bands`, `seed-bands-by-genre`, `band-info`, `search-bands`, `recommend-bands`.
 - **Ingesta de carteles de festival**: `parse-festival-poster` (IA) → `commit-festival-from-poster`, desde la app (`PosterAdminScreen`) o desde el PC vía `process-poster-inbox` (cron, bucket `festival-posters-inbox`).
 - **Conciertos manuales / moderación**: `submit-concert`, `report-concert`, `moderate-concert`.
@@ -165,6 +172,7 @@ Cada función es independiente (`deno.json` propio, sin compartir `node_modules`
 - Infraestructura: `add-cron-lock.sql` (evita que `notify-social` se solape consigo mismo).
 - Datos: `festivals-2026.sql`, `fix-resurrection-2027-overwrite.sql` y `fix-resurrection-2027-ocr-bands.sql` (reparaciones ya ejecutadas).
 - Carteles desde el PC: `add-poster-inbox.sql` (bucket `festival-posters-inbox`, tablas `poster_imports` / `poster_import_bands` sin acceso desde la app, triggers y candado) y `schedule-process-poster-inbox.sql`.
+- Fuentes de conciertos: `add-concert-sources.sql` (`concerts.bandsintown_id`, columnas `bandsintown_*` en `bands`, `ticketmaster_europe_sync`, función `find_matching_concert`) y `schedule-concert-sources.sql`.
 
 ### Otros
 - **EAS Build** (`eas.json`) para builds nativas de desarrollo/producción.
