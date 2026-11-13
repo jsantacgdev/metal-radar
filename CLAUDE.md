@@ -34,7 +34,7 @@ Two one-off admin scripts exist under `scripts/` (PowerShell, run manually again
 
 ## Environment
 
-App config is read from `EXPO_PUBLIC_*` vars (`.env`): `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_MAPTILER_KEY`, `EXPO_PUBLIC_SENTRY_DSN`, `EXPO_PUBLIC_SPOTIFY_CLIENT_ID`, `EXPO_PUBLIC_CRON_SECRET`. Edge functions read their own secrets from `Deno.env` (service role key, Ticketmaster key, etc.) — these are configured in the Supabase project, not `.env`.
+App config is read from `EXPO_PUBLIC_*` vars (`.env`): `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_MAPTILER_KEY`, `EXPO_PUBLIC_SENTRY_DSN`, `EXPO_PUBLIC_SPOTIFY_CLIENT_ID`. Edge functions read their own secrets from `Deno.env` (service role key, Ticketmaster key, `CRON_SECRET`, etc.) — these are configured in the Supabase project, not `.env`. Never give a server secret an `EXPO_PUBLIC_` prefix: once referenced in app code it is inlined into the bundle/APK.
 
 ## Expo version note
 
@@ -44,7 +44,7 @@ This project is on **Expo SDK 54**, which has changed significantly from older S
 
 ### Navigation shell
 
-`App.tsx` initializes Sentry, loads all custom fonts via `useFonts`, awaits `initI18n()`, then renders `RootNavigator` inside `QueryClientProvider` + `SafeAreaProvider`. `RootNavigator` (`src/navigation/RootNavigator.tsx`) branches on auth/onboarding state from `useAuth`: unauthenticated → `AuthNavigator`, authenticated-but-not-onboarded → `OnboardingScreen`, otherwise → `MainTabs`. `MainTabs` has four tabs, each backed by its own stack navigator: `RadarStack`, `MapStack`, `DiaryStack`, `ProfileStack`.
+`App.tsx` initializes Sentry, loads all custom fonts via `useFonts`, awaits `initI18n()`, then renders `RootNavigator` inside `QueryClientProvider` + `SafeAreaProvider`. `RootNavigator` (`src/navigation/RootNavigator.tsx`) branches on auth/onboarding state from `useAuth`: unauthenticated → `AuthNavigator`, authenticated-but-not-onboarded → `OnboardingScreen`, otherwise → `MainTabs`. `MainTabs` has five tabs, each backed by its own stack navigator: `RadarStack`, `MapStack`, `DiaryStack`, `FeedStack`, `ProfileStack`.
 
 ### Data layer
 
@@ -63,7 +63,8 @@ Each function is a standalone `Deno.serve` handler with CORS headers, a service-
 
 - **Sync pipeline**: `sync-concerts` (pulls Ticketmaster events, geocodes venues via Nominatim, dedupes/filters tribute & VIP listings), `sync-band`, `cron-sync-all` (scheduled fan-out).
 - **Band enrichment**: `enrich-bands`, `cron-enrich-bands`, `prewarm-band-members`, `update-band-popularity`, `refresh-all-bands`, `seed-bands-by-genre`, `band-info`, `search-bands`, `recommend-bands`.
-- **Festival poster ingestion**: `parse-festival-poster` (AI-parses an uploaded festival poster image into structured lineup data) → `commit-festival-from-poster` (writes the parsed result into `festivals`/`festival_bands`/`venues`); driven from `PosterAdminScreen`/`PosterScreen` + `usePosterData`.
+- **Festival poster ingestion**: `parse-festival-poster` (AI-parses an uploaded festival poster image into structured lineup data) → `commit-festival-from-poster` (writes the parsed result into `festivals`/`festival_bands`/`venues`); driven from `PosterAdminScreen` (hidden admin entry). Not to be confused with `PosterScreen` + `usePosterData`, which render the yearly "Wrapped" poster.
+- **Social / moderation**: `report-concert`, `moderate-concert`, `submit-concert`, `report-comment`, `moderate-comment`, `moderate-user` (ban/unban), `notify-social` (push for social events + DMs, scheduled via pg_cron).
 - **Notifications**: `notify-day-before`, `send-push`.
 - **Account/misc**: `delete-account`, `fetch-setlist`.
 

@@ -86,7 +86,7 @@ npm run lint        # eslint
 npx tsc --noEmit    # type-check
 ```
 
-Required environment variables in `.env` (`EXPO_PUBLIC_*`): `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_MAPTILER_KEY`, `EXPO_PUBLIC_SENTRY_DSN`, `EXPO_PUBLIC_SPOTIFY_CLIENT_ID`, `EXPO_PUBLIC_CRON_SECRET`.
+Required environment variables in `.env` (`EXPO_PUBLIC_*`): `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_MAPTILER_KEY`, `EXPO_PUBLIC_SENTRY_DSN`, `EXPO_PUBLIC_SPOTIFY_CLIENT_ID`. Never put server secrets (e.g. `CRON_SECRET`, service role key) behind an `EXPO_PUBLIC_` prefix: any referenced `EXPO_PUBLIC_*` var is inlined into the app bundle.
 
 Edge Functions (`supabase/functions/*`) are deployed separately with the Supabase CLI (`supabase functions deploy <name>`) and use their own secrets (`SUPABASE_SERVICE_ROLE_KEY`, `TICKETMASTER_API_KEY`, `SETLISTFM_API_KEY`, etc.) configured in the Supabase project, not in `.env`.
 

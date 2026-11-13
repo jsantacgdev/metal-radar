@@ -26,7 +26,7 @@ Seguimiento vivo de los requisitos de uso (términos de servicio, límites, atri
 **Uso:** geocodificación de venues — `sync-concerts`, `cron-sync-all`, `sync-band`, `band-info`, `moderate-concert`, `submit-concert`, `commit-festival-from-poster`, `prewarm-band-members`, `refresh-all-bands`.
 **Nivel actual:** instancia pública gratuita, sin key.
 
-- [x] User-Agent identificable con email de contacto real en todas las llamadas — corregido 2026-08-04 (`sync-band` y `cron-sync-all` tenían un placeholder `tu@email.com`; el resto ya estaba bien).
+- [x] User-Agent identificable con email de contacto real en todas las llamadas — corregido en código el 2026-08-04 (`sync-band` y `cron-sync-all` tenían un placeholder `tu@email.com`; el resto ya estaba bien), pero **no se desplegó hasta el 2026-11-13**: hasta entonces producción siguió enviando el placeholder.
 - [x] Caché de coordenadas para no repetir geocodificaciones — ya existente (lat/lng se guardan en `venues`).
 - [ ] Límite de 1 req/seg, y máx. 4 req/min en tareas programadas — no verificado que `cron-sync-all` respete el límite de ráfaga con throttling explícito.
 - [ ] **Sin nivel de aprobación para uso comercial/público a volumen real** — la política de Nominatim pide autoalojarlo o usar un proveedor de pago por encima de uso ligero. No existe un "modo aprobado" al que solicitar acceso.
@@ -140,6 +140,7 @@ Lo que no cuesta dinero pero sí tiempo: cambiar el modelo de retención de setl
 
 ## Historial
 
+- **2026-11-13** — Desplegados `cron-sync-all` y `sync-band` con el User-Agent real de Nominatim (el arreglo del 2026-08-04 solo estaba en el repo). El resto de requisitos sigue sin cambios desde 2026-08-04; los precios no se han vuelto a verificar.
 - **2026-08-04** — Verificados precios reales (Google Play $25 único, MapTiler Flex $25/mes, MusicBrainz Bronze $100–499/mes, Supabase Pro ~$25/mes base). Encontrado candidato de sustitución para Nominatim: LocationIQ, plan gratuito que permite uso comercial con atribución. Añadida sección de coste estimado.
 - **2026-08-04** — Añadida atribución con enlace para Last.fm (`BandDetailScreen.tsx`) y Setlist.fm (`Setlist.tsx`) vía el nuevo componente `InfoTooltip`. Creado este documento.
 - **2026-08-04** — Auditoría inicial de proveedores (bugs/calidad/Play Store). Corregido el User-Agent placeholder de Nominatim en `sync-band`/`cron-sync-all`. Retirada `EXPO_PUBLIC_TICKETMASTER_API_KEY` de la documentación por no usarse.
